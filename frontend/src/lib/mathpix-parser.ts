@@ -1,3 +1,101 @@
+/**
+ * Clean common Mathpix OCR markdown artifacts before parsing.
+ * Handles delimiter normalization, broken LaTeX, unicode math, and whitespace.
+ */
+export function cleanMathpixMarkdown(text: string): string {
+  if (!text) return '';
+
+  let cleaned = text;
+
+  // 1. Normalize math delimiters
+  //    \(...\) → $...$  and  \[...\] → $$...$$
+  cleaned = cleaned.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
+  cleaned = cleaned.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+
+  // 2. Fix common Mathpix broken LaTeX patterns
+  //    "aligned" without surrounding $$ → wrap it
+  cleaned = cleaned.replace(/([^$])\s*\\begin\{aligned\}/g, '$1$$\n\\begin{aligned}');
+  cleaned = cleaned.replace(/\\end\{aligned\}\s*([^$])/g, '\\end{aligned}\n$$$1');
+  //    Fix \begin{cases} without math mode
+  cleaned = cleaned.replace(/([^$])\s*\\begin\{cases\}/g, '$1$$\n\\begin{cases}');
+  cleaned = cleaned.replace(/\\end\{cases\}\s*([^$])/g, '\\end{cases}\n$$$1');
+
+  // 3. Convert Unicode math symbols to LaTeX
+  const unicodeToLatex: [RegExp, string][] = [
+    [/×/g, '\\times '],
+    [/÷/g, '\\div '],
+    [/−/g, '-'],
+    [/±/g, '\\pm '],
+    [/∓/g, '\\mp '],
+    [/√/g, '\\sqrt{}'],
+    [/∛/g, '\\sqrt[3]{}'],
+    [/∞/g, '\\infty '],
+    [/π/g, '\\pi '],
+    [/θ/g, '\\theta '],
+    [/α/g, '\\alpha '],
+    [/β/g, '\\beta '],
+    [/γ/g, '\\gamma '],
+    [/δ/g, '\\delta '],
+    [/Δ/g, '\\Delta '],
+    [/Σ/g, '\\Sigma '],
+    [/∫/g, '\\int '],
+    [/∑/g, '\\sum '],
+    [/∏/g, '\\prod '],
+    [/∂/g, '\\partial '],
+    [/∇/g, '\\nabla '],
+    [/∈/g, '\\in '],
+    [/∉/g, '\\notin '],
+    [/∋/g, '\\ni '],
+    [/⊂/g, '\\subset '],
+    [/⊃/g, '\\supset '],
+    [/⊆/g, '\\subseteq '],
+    [/⊇/g, '\\supseteq '],
+    [/∪/g, '\\cup '],
+    [/∩/g, '\\cap '],
+    [/∧/g, '\\land '],
+    [/∨/g, '\\lor '],
+    [/¬/g, '\\lnot '],
+    [/∀/g, '\\forall '],
+    [/∃/g, '\\exists '],
+    [/∠/g, '\\angle '],
+    [/⊥/g, '\\perp '],
+    [/∥/g, '\\parallel '],
+    [/≅/g, '\\cong '],
+    [/≈/g, '\\approx '],
+    [/≠/g, '\\neq '],
+    [/≡/g, '\\equiv '],
+    [/≤/g, '\\leq '],
+    [/≥/g, '\\geq '],
+    [/→/g, '\\to '],
+    [/←/g, '\\leftarrow '],
+    [/⇒/g, '\\Rightarrow '],
+    [/⇔/g, '\\Leftrightarrow '],
+    [/↦/g, '\\mapsto '],
+    [/°C/g, '{}^\\circ C'],
+    [/°/g, '{}^\\circ '],
+    [/²/g, '^2'],
+    [/³/g, '^3'],
+  ];
+  for (const [pattern, replacement] of unicodeToLatex) {
+    cleaned = cleaned.replace(pattern, replacement);
+  }
+
+  // 4. Remove redundant LaTeX braces (e.g., ${x}$ → $x$, $${...}$$ → $$...$$)
+  cleaned = cleaned.replace(/\$\{([^}]+)\}\$/g, '$$$1$$');
+  cleaned = cleaned.replace(/\$\$\{([^}]+)\}\$\$/g, '$$$$1$$$$');
+
+  // 5. Fix whitespace around math delimiters
+  cleaned = cleaned.replace(/\$\s+/g, '$');
+  cleaned = cleaned.replace(/\s+\$/g, '$');
+  cleaned = cleaned.replace(/\$\$\s+/g, '$$');
+  cleaned = cleaned.replace(/\s+\$\$/g, '$$');
+
+  // 6. Normalize multiple blank lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  return cleaned.trim();
+}
+
 export interface ParsedOption {
   label: string;
   text: string;

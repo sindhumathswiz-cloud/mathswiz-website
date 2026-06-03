@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Database, SplitSquareHorizontal, CheckCircle, XCircle, AlertCircle, FileText, Search, Edit3, Save, Clock, X, Clipboard, ChevronLeft, FileSpreadsheet, Shield, Users } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
 import MathRenderer from '@/components/MathRenderer';
+import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
+import katex from 'katex';
 import { BulkImportModal } from './BulkImportModal';
 
 const montserrat = Montserrat({ subsets: ['latin'], weight: '800' });
@@ -28,23 +30,56 @@ const ScopeBadge = ({ scope }: { scope: string }) => {
     }
 };
 
+function renderLatexBlock(text: string): string {
+    try {
+        return katex.renderToString(text, { throwOnError: false, displayMode: false, strict: false });
+    } catch {
+        return text;
+    }
+}
+
+function LatexInline({ content }: { content: string }) {
+    let text = content
+        .replace(/\\\(/g, '$').replace(/\\\)/g, '$')
+        .replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+    const parts: { text: string; math: boolean }[] = [];
+    const regex = /\$\$(.+?)\$\$|\$(.+?)\$/g;
+    let lastIndex = 0, match;
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) parts.push({ text: text.substring(lastIndex, match.index), math: false });
+        parts.push({ text: match[1] || match[2] || '', math: true });
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) parts.push({ text: text.substring(lastIndex), math: false });
+    if (!parts.some(p => p.math) && /\\[a-zA-Z]|\\\(|\\\[|[\\^_{]/.test(content)) {
+        return <span className="leading-relaxed" dangerouslySetInnerHTML={{ __html: renderLatexBlock(text) }} />;
+    }
+    return (<span className="leading-relaxed">{parts.map((part, i) => part.math ? <span key={i} dangerouslySetInnerHTML={{ __html: renderLatexBlock(part.text) }} /> : <span key={i}>{part.text}</span>)}</span>);
+}
+
 export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publicCount?: number; teacherPrivateCount?: number }) {
     const { data: session } = useSession();
     const [questions, setQuestions] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<'DRAFT' | 'PENDING_REVIEW' | 'REPORTED' | 'ALL'>('ALL');
+    const [filterStatus, setFilterStatus] = useState<'DRAFT' | 'PENDING_REVIEW' | 'REPORTED' | 'APPROVED' | 'ALL'>('ALL');
     const [filterScope, setFilterScope] = useState<'PUBLIC' | 'TEACHER_PRIVATE' | 'ALL'>('ALL');
     const [selectedQuestion, setSelectedQuestion] = useState<any | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [isSplitView, setIsSplitView] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [selectedTaxonomyIds, setSelectedTaxonomyIds] = useState<string[]>([]);
     const [editForm, setEditForm] = useState<any>({
         content: '',
         options: ['', '', '', ''],
         correctAnswer: '',
         explanation: '',
-        tags: []
+        tags: [],
+        type: 'SINGLE_CHOICE',
+        difficulty: 'MEDIUM',
+        subject: '',
+        classLevel: '',
+        examType: '',
     });
 
     useEffect(() => {
@@ -54,8 +89,14 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                 options: Array.isArray(selectedQuestion.options) ? [...selectedQuestion.options, '', '', '', ''].slice(0, 4) : ['', '', '', ''],
                 correctAnswer: selectedQuestion.correctAnswer || '',
                 explanation: selectedQuestion.explanation || '',
-                tags: Array.isArray(selectedQuestion.tags) ? selectedQuestion.tags : []
+                tags: Array.isArray(selectedQuestion.tags) ? selectedQuestion.tags : [],
+                type: selectedQuestion.type || 'SINGLE_CHOICE',
+                difficulty: selectedQuestion.difficulty || 'MEDIUM',
+                subject: selectedQuestion.subject || '',
+                classLevel: selectedQuestion.classLevel || selectedQuestion.class || '',
+                examType: selectedQuestion.examType || '',
             });
+            setSelectedTaxonomyIds(Array.isArray(selectedQuestion.taxonomyTagIds) ? selectedQuestion.taxonomyTagIds : []);
             setIsEditing(false);
         }
     }, [selectedQuestion]);
@@ -90,7 +131,13 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                     options: editForm.options.some((o: string) => o.trim()) ? editForm.options : undefined,
                     correctAnswer: editForm.correctAnswer,
                     explanation: editForm.explanation,
-                    tags: editForm.tags
+                    tags: editForm.tags,
+                    type: editForm.type,
+                    difficulty: editForm.difficulty,
+                    subject: editForm.subject,
+                    'class': editForm.classLevel,
+                    examType: editForm.examType,
+                    taxonomyTagIds: selectedTaxonomyIds,
                 })
             });
             if (!res.ok) throw new Error('Failed to save');
@@ -173,13 +220,13 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
 
                 {/* Status Filter */}
                 <div className="flex rounded-lg overflow-hidden border border-gray-300 shadow-sm">
-                    {(['DRAFT', 'PENDING_REVIEW', 'REPORTED', 'ALL'] as const).map((status) => (
+                    {(['DRAFT', 'PENDING_REVIEW', 'REPORTED', 'APPROVED', 'ALL'] as const).map((status) => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
                             className={`px-4 py-2 text-sm font-bold ${filterStatus === status ? 'bg-indigo-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
                         >
-                            {status === 'ALL' ? 'All' : status === 'PENDING_REVIEW' ? 'Pending' : status === 'REPORTED' ? 'Reported' : 'Drafts'}
+                            {status === 'ALL' ? 'All' : status === 'PENDING_REVIEW' ? 'Pending' : status === 'REPORTED' ? 'Reported' : status === 'DRAFT' ? 'Drafts' : status === 'APPROVED' ? 'Approved' : status}
                         </button>
                     ))}
                 </div>
@@ -255,7 +302,7 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                             {q.scope && <ScopeBadge scope={q.scope} />}
                                         </div>
                                         <div className="text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed">
-                                            <MathRenderer content={q.content} />
+                                            <LatexInline content={q.content} />
                                         </div>
                                     </div>
                                 </div>
@@ -340,6 +387,68 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                                     </div>
                                                 ))}
                                             </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Tags</label>
+                                                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl min-h-[46px] mt-2">
+                                                    {editForm.tags.map((tag: string, tidx: number) => (
+                                                        <span key={tidx} className="bg-indigo-600 text-white px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+                                                            {tag}
+                                                            <X className="w-3 h-3 cursor-pointer hover:text-red-300" onClick={() => { const t = [...editForm.tags]; t.splice(tidx, 1); setEditForm({...editForm, tags: t}); }} />
+                                                        </span>
+                                                    ))}
+                                                    <input className="bg-transparent border-none outline-none text-sm text-gray-600 flex-1 min-w-[100px]" placeholder="+ add tag..." onKeyDown={e => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === 'Enter' && v) { e.preventDefault(); if (!editForm.tags.includes(v)) setEditForm({...editForm, tags: [...editForm.tags, v]}); (e.target as HTMLInputElement).value = ''; }}} />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Type</label>
+                                                    <select value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2">
+                                                        <option value="SINGLE_CHOICE">Single Choice</option>
+                                                        <option value="MULTIPLE_CHOICE">Multiple Choice</option>
+                                                        <option value="INTEGER">Integer</option>
+                                                        <option value="TRUE_FALSE">True/False</option>
+                                                        <option value="SUBJECTIVE">Subjective</option>
+                                                        <option value="FILL_IN_BLANKS">Fill in Blanks</option>
+                                                        <option value="ASSERTION_REASONING">Assertion-Reasoning</option>
+                                                        <option value="CASE_STUDY">Case Study</option>
+                                                        <option value="VERY_SHORT_ANSWER">Very Short Answer</option>
+                                                        <option value="SHORT_ANSWER">Short Answer</option>
+                                                        <option value="LONG_ANSWER">Long Answer</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Difficulty</label>
+                                                    <select value={editForm.difficulty} onChange={e => setEditForm({...editForm, difficulty: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2">
+                                                        <option value="EASY">Easy</option>
+                                                        <option value="MEDIUM">Medium</option>
+                                                        <option value="HARD">Hard</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Subject</label>
+                                                    <input type="text" value={editForm.subject} onChange={e => setEditForm({...editForm, subject: e.target.value})} placeholder="e.g. Mathematics" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2"/>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Class</label>
+                                                    <input type="text" value={editForm.classLevel} onChange={e => setEditForm({...editForm, classLevel: e.target.value})} placeholder="e.g. Class 12" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2"/>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Exam Type</label>
+                                                    <input type="text" value={editForm.examType} onChange={e => setEditForm({...editForm, examType: e.target.value})} placeholder="e.g. JEE Main" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2"/>
+                                                </div>
+                                            </div>
+
+                                            <details className="bg-gray-50 border border-gray-200 rounded-xl group mt-4">
+                                                <summary className="cursor-pointer text-[10px] font-black text-indigo-600 uppercase tracking-widest p-3 hover:bg-gray-100 rounded-xl transition-all flex items-center gap-2 select-none">
+                                                    <svg className={`w-3 h-3 transition-transform group-open:rotate-90`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                                    Taxonomy Tags (optional)
+                                                </summary>
+                                                <div className="p-3 border-t border-gray-200">
+                                                    <TaxonomyCascadeSelector selectedIds={selectedTaxonomyIds} onSelectMultiple={setSelectedTaxonomyIds} />
+                                                </div>
+                                            </details>
                                         </div>
                                     </div>
                                 ) : (
@@ -358,6 +467,13 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                             </div>
                                         )}
                                         <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                {selectedQuestion.type && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.type.replace(/_/g, ' ')}</span>}
+                                                {selectedQuestion.difficulty && <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${selectedQuestion.difficulty === 'EASY' ? 'bg-emerald-100 text-emerald-700' : selectedQuestion.difficulty === 'HARD' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{selectedQuestion.difficulty}</span>}
+                                                {selectedQuestion.subject && <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.subject}</span>}
+                                                {selectedQuestion.class && <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.class}</span>}
+                                                {selectedQuestion.examType && <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.examType}</span>}
+                                            </div>
                                             <div className="prose max-w-none text-gray-900 text-lg mb-8">
                                                 <MathRenderer content={selectedQuestion.content} />
                                             </div>

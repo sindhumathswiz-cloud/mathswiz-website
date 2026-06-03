@@ -10,6 +10,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    // Background backfill for existing questions with taxonomy tags but empty topic/subTopic/class fields
+    // This runs immediately in the background and does not block the stats response
+    (async () => {
+      try {
+        const qs = await prisma.question.findMany({
+          where: {
+            OR: [
+              { class: null }, { topic: null }, { subTopic: null },
+              { class: "" }, { topic: "" }, { subTopic: "" },
+            ]
+          },
+          include: { questionTags: { include: { tag: { select: { name: true, type: true } } } } }
+        });
+        const updates: { id: string; data: any }[] = [];
+        for (const q of qs) {
+          const classTax = q.questionTags.find(qt => qt.tag.type === 'CLASS');
+          const subjectTax = q.questionTags.find(qt => qt.tag.type === 'SUBJECT');
+          const topicTax = q.questionTags.find(qt => qt.tag.type === 'TOPIC');
+          const subTopicTax = q.questionTags.find(qt => qt.tag.type === 'SUBTOPIC');
+          const data: any = {};
+          if ((!q.class || q.class === "") && classTax) data.class = classTax.tag.name;
+          if ((!q.subject || q.subject === "") && subjectTax) data.subject = subjectTax.tag.name;
+          if ((!q.topic || q.topic === "") && topicTax) data.topic = topicTax.tag.name;
+          if ((!q.subTopic || q.subTopic === "") && subTopicTax) data.subTopic = subTopicTax.tag.name;
+          if (Object.keys(data).length > 0) updates.push({ id: q.id, data });
+        }
+        // Batch in groups of 10 to avoid overloading the transaction
+        for (let i = 0; i < updates.length; i += 10) {
+          const batch = updates.slice(i, i + 10);
+          await prisma.$transaction(batch.map(u => prisma.question.update({ where: { id: u.id }, data: u.data })));
+        }
+      } catch (e) {
+        console.error('[STATS-BACKFILL] Background sync error:', e);
+      }
+    })();
+
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 

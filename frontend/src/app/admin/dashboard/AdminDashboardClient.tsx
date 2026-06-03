@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -111,7 +111,7 @@ export default function AdminDashboardClient({
     const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
     const [newLead, setNewLead] = useState({ name: '', phone: '', courseInterest: '' });
     const [leads, setLeads] = useState(initialLeads);
-    const [activeTab, setActiveTab] = useState<'Platform Overview' | 'User Directory' | 'Manage Website' | 'Approvals' | 'Lead CRM' | 'Curriculum Manager' | 'Test & Exam Engine' | 'Reports & Export' | 'System Features' | 'Fee Management'>('Platform Overview');
+    const [activeTab, setActiveTab] = useState<'Platform Overview' | 'User Directory' | 'Manage Website' | 'Approvals' | 'Lead CRM' | 'Curriculum Manager' | 'Test & Exam Engine' | 'Reports & Export' | 'System Features' | 'Fee Management' | 'Question Bank'>('Platform Overview');
     const [isCreateBatchOpen, setIsCreateBatchOpen] = useState(false);
     const [newBatch, setNewBatch] = useState({ name: '', code: '', teacherId: '', class: 'Class 12', startDate: '' });
 
@@ -332,7 +332,7 @@ export default function AdminDashboardClient({
                         { title: 'Global Users', value: stats.totalUsers, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100', trend: '+12%', id: 'users' },
                         { title: 'Active Batches', value: stats.totalBatches, icon: LayoutDashboard, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', trend: '+3', id: 'batches' },
                         { title: 'Live Now', value: stats.activeSessions, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', trend: 'Live', id: 'active' },
-                        { title: 'Gross Revenue', value: `₹${stats.revenue.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', trend: '+18%', id: 'revenue' },
+                        { title: 'Gross Revenue', value: `â‚¹${stats.revenue.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', trend: '+18%', id: 'revenue' },
                     ].map((m, i) => (
                         <div key={i} onClick={() => setActiveKpiModal(m.id)} className={`bg-white p-6 rounded-2xl border ${m.border} shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden`}>
                             <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity`}>
@@ -388,7 +388,7 @@ export default function AdminDashboardClient({
                         </div>
                     </button>
 
-                    <button onClick={() => window.location.href = '/admin/question-bank'} className="group bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-700/50 shadow-xl shadow-slate-950/20 hover:scale-[1.01] transition-all flex items-center justify-between overflow-hidden relative">
+                    <button onClick={() => setActiveTab('Question Bank')} className="group bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-700/50 shadow-xl shadow-slate-950/20 hover:scale-[1.01] transition-all flex items-center justify-between overflow-hidden relative">
                         <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
                             <BookOpen className="w-24 h-24 text-white" />
                         </div>
@@ -398,6 +398,12 @@ export default function AdminDashboardClient({
                             </div>
                             <h3 className="text-xl font-black text-white mb-2">Question Bank</h3>
                             <p className="text-slate-400 text-xs font-bold max-w-xs">{stats.questionBank?.total || 0} questions in the repository.</p>
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                                <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">{stats.questionBank?.approved || 0} Approved</span>
+                                <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">{stats.questionBank?.pending || 0} Pending</span>
+                                <span className="bg-slate-600/30 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold">{stats.questionBank?.draft || 0} Drafts</span>
+                                <span className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-[10px] font-bold">{stats.questionBank?.public || 0} Public</span>
+                            </div>
                         </div>
                         <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-slate-700 transition-colors">
                             <ArrowUpRight className="w-5 h-5" />
@@ -407,7 +413,7 @@ export default function AdminDashboardClient({
 
                 {/* Pill-Shaped Secondary Navigation */}
                 <div className="flex space-x-2 mb-8 overflow-x-auto pb-2 scrollbar-none w-full">
-                    {['Platform Overview', 'User Directory', 'Curriculum Manager', 'Manage Website', 'Approvals', 'Lead CRM', 'Test & Exam Engine', 'Fee Management', 'Reports & Export', 'System Features'].map((tab) => (
+                    {['Platform Overview', 'User Directory', 'Curriculum Manager', 'Manage Website', 'Approvals', 'Lead CRM', 'Test & Exam Engine', 'Fee Management', 'Reports & Export', 'System Features', 'Question Bank'].map((tab) => (
                         <button 
                             key={tab} 
                             onClick={() => setActiveTab(tab as any)} 
@@ -522,6 +528,11 @@ export default function AdminDashboardClient({
                     )}
 
                     {/* Fee Management Tab */}
+                    {activeTab === 'Question Bank' && (
+                        <div className="animate-in fade-in duration-500 bg-white p-6 rounded-2xl border border-gray-200">
+                            <QuestionBankStats />
+                        </div>
+                    )}
                     {activeTab === 'Fee Management' && (
                         <div className="space-y-12 animate-in fade-in duration-500">
                             <FeeStructureGenerator />
@@ -710,3 +721,5 @@ export default function AdminDashboardClient({
         </div>
     );
 }
+
+

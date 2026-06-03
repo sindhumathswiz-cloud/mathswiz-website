@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { cleanMathpixMarkdown } from "@/lib/mathpix-parser";
 
 export async function POST(request: NextRequest) {
     try {
@@ -87,9 +88,13 @@ export async function POST(request: NextRequest) {
         const rawText = await mdRes.text();
         console.log(`[EXTRACT-PDF] Extracted ${rawText.length} characters of Markdown.`);
 
-        // 4. Rule-based question extraction
+        // 4. Clean Mathpix output before parsing
+        console.log(`[EXTRACT-PDF] Cleaning Mathpix markdown...`);
+        const cleanedText = cleanMathpixMarkdown(rawText);
+
+        // 5. Rule-based question extraction
         console.log(`[EXTRACT-PDF] Parsing questions via rule-based engine...`);
-        const extractedQuestions = parseMathpixMarkdown(rawText);
+        const extractedQuestions = parseMathpixMarkdown(cleanedText);
         console.log(`[EXTRACT-PDF] Found ${extractedQuestions.length} questions.`);
 
         // 5. Resolve taxonomy info
@@ -186,211 +191,301 @@ interface ParsedQuestion {
     rawText: string;
 }
 
-enum SectionType {
-    QUESTIONS = 'questions',
-    SOLUTIONS = 'solutions',
-    ANSWERS = 'answers',
-    PRACTICE = 'practice',
-    UNKNOWN = 'unknown'
-}
-
-interface DocumentSection {
-    type: SectionType;
-    startLine: number;
-    endLine: number;
-    lines: string[];
-}
-
 function parseMathpixMarkdown(text: string): ParsedQuestion[] {
     const lines = text.split('\n');
     const questions: ParsedQuestion[] = [];
     const solutionMap = new Map<string, string>();
     const answerMap = new Map<string, string>();
-    
-    // Section detection patterns
-    const sectionHeaders = [
-        { regex: /^(?:Solutions?|Solution\s*Key)\s*$/i, type: SectionType.SOLUTIONS },
-        { regex: /^(?:Answers?|Answer\s*Key)\s*$/i, type: SectionType.ANSWERS },
-        { regex: /^(?:Practice\s*(?:Exercise|Problems?|Questions?))\s*$/i, type: SectionType.PRACTICE },
-        { regex: /^(?:Exercise|Exercises)\s*\d*\s*$/i, type: SectionType.PRACTICE },
-        { regex: /^(?:MCQs?|Multiple\s*Choice)\s*$/i, type: SectionType.QUESTIONS },
-        { regex: /^(?:Long\s*Answer\s*(?:Type\s*)?Questions?)\s*$/i, type: SectionType.QUESTIONS },
-        { regex: /^(?:Short\s*Answer\s*(?:Type\s*)?Questions?)\s*$/i, type: SectionType.QUESTIONS },
+    // Track which line indices belong to solutions so we skip them in question pass
+    const solutionLineIndices = new Set<number>();
+
+    // -- Section detection patterns --
+    const sectionHeaders: { regex: RegExp; type: 'questions' | 'solutions' | 'answers' | 'practice' }[] = [
+        { regex: /^(?:Solutions?|Solution\s*Key)\s*$/i, type: 'solutions' },
+        { regex: /^(?:Answers?|Answer\s*Key)\s*$/i, type: 'answers' },
+        { regex: /^(?:Practice\s*(?:Exercise|Problems?|Questions?))\s*$/i, type: 'practice' },
+        { regex: /^(?:Exercise|Exercises)\s*\d*\s*$/i, type: 'practice' },
+        { regex: /^(?:MCQs?|Multiple\s*Choice)\s*$/i, type: 'questions' },
+        { regex: /^(?:Long\s*Answer\s*(?:Type\s*)?Questions?)\s*$/i, type: 'questions' },
+        { regex: /^(?:Short\s*Answer\s*(?:Type\s*)?Questions?)\s*$/i, type: 'questions' },
     ];
-    
-    // Question patterns
-    const questionStartRegex = /^(?:Q(?:uestion)?\.?\s*)?(\d+)[\.\)]\s+(.*)/i;
-    const optionRegex = /^\s*\(?([A-Da-d])[\.\)]\s+(.*)/;
-    const answerRegex = /(?:^|\s)(?:Ans(?:wer)?\.?|Correct\s*(?:option|answer)?)\s*[:\-]?\s*([A-Da-d](?:\s*,\s*[A-Da-d])*)/i;
-    const solutionLineRegex = /^(?:Sol(?:ution)?\.?|Explanation)\s*[:\-]?\s*(.*)/i;
-    const solutionNumberRegex = /^(?:Sol(?:ution)?\.?|Ans(?:wer)?\.?)\s*(\d+)\s*[:\-]?\s*(.*)/i;
-    
-    // First pass: Identify sections
-    const sections: DocumentSection[] = [];
-    let currentSection: DocumentSection = {
-        type: SectionType.QUESTIONS,
-        startLine: 0,
-        endLine: lines.length - 1,
-        lines: []
-    };
-    
+
+    // ──────────── FIRST PASS: section splitting ────────────
+    interface DocSection { type: string; startLine: number; endLine: number; lines: string[]; headerIndex: number; }
+    const sections: DocSection[] = [];
+    let currentSection: DocSection = { type: 'questions', startLine: 0, endLine: lines.length - 1, lines: [], headerIndex: -1 };
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        
-        // Check for section headers
+        let matched = false;
         for (const header of sectionHeaders) {
             if (header.regex.test(line)) {
-                // Close current section
                 currentSection.endLine = i - 1;
                 currentSection.lines = lines.slice(currentSection.startLine, i);
                 sections.push(currentSection);
-                
-                // Start new section
-                currentSection = {
-                    type: header.type,
-                    startLine: i + 1,
-                    endLine: lines.length - 1,
-                    lines: []
-                };
+                currentSection = { type: header.type, startLine: i + 1, endLine: lines.length - 1, lines: [], headerIndex: i };
+                matched = true;
                 break;
             }
         }
+        // Also treat standalone "##" section headers as breaks
+        if (!matched && /^##\s+\S/.test(line)) {
+            currentSection.endLine = i - 1;
+            currentSection.lines = lines.slice(currentSection.startLine, i);
+            sections.push(currentSection);
+            currentSection = { type: 'unknown', startLine: i + 1, endLine: lines.length - 1, lines: [], headerIndex: i };
+        }
     }
-    
-    // Close last section
     if (currentSection.startLine < lines.length) {
         currentSection.lines = lines.slice(currentSection.startLine);
         sections.push(currentSection);
     }
-    
-    console.log(`[PARSER] Found ${sections.length} sections:`);
-    sections.forEach((s, i) => console.log(`  Section ${i}: ${s.type} (lines ${s.startLine}-${s.endLine})`));
-    
-    // Second pass: Parse questions from question/practice sections
+
+    // ──────────── SECOND PASS: parse solutions/answers sections ────────────
     for (const section of sections) {
-        if (section.type === SectionType.SOLUTIONS || section.type === SectionType.ANSWERS) {
-            // Parse solutions/answers separately
-            parseSolutionsSection(section.lines, solutionMap, answerMap);
-            continue;
+        if (section.type === 'solutions' || section.type === 'answers') {
+            parseSolutionsSection(section.lines, solutionMap, answerMap, solutionLineIndices, section.startLine);
         }
-        
-        // Parse questions from this section
-        parseQuestionsSection(section.lines, questions, solutionMap, answerMap);
     }
-    
-    // Third pass: Match solutions to questions by number
+
+    // ──────────── THIRD PASS: detect INLINE solutions in question sections ────────────
+    // Scan for inline "Sol.", "Solution:", "Ans.", "Answer:" markers
+    for (const section of sections) {
+        if (section.type === 'questions' || section.type === 'practice' || section.type === 'unknown') {
+            parseInlineSolutionLines(
+                lines, section.startLine, section.startLine + section.lines.length,
+                solutionMap, solutionLineIndices
+            );
+        }
+    }
+
+    // ──────────── FOURTH PASS: parse questions (skipping solution lines) ────────────
+    for (const section of sections) {
+        if (section.type === 'questions' || section.type === 'practice' || section.type === 'unknown') {
+            parseQuestionsSection(
+                lines, section.startLine, section.startLine + section.lines.length,
+                questions, solutionLineIndices, solutionMap, answerMap
+            );
+        }
+    }
+
+    // ──────────── FIFTH PASS: match solutions to questions by number ────────────
     matchSolutionsToQuestions(questions, solutionMap, answerMap);
-    
-    console.log(`[PARSER] Final: ${questions.length} questions, ${solutionMap.size} solutions, ${answerMap.size} answers`);
-    return questions;
+
+    // ──────────── SIXTH PASS: filter out solution-only entries mis-parsed as questions ────────────
+    const filtered = questions.filter(q => {
+        if (!q.rawText) return true;
+        const firstLine = q.rawText.split('\n')[0].trim();
+        // If a "question" starts with "Sol." or "Solution:" it's really a solution
+        if (/^(?:Sol(?:ution)?\.?|Ans(?:wer)?\.?)\b/i.test(firstLine)) return false;
+        // If the content is extremely short and has solution keywords
+        if (q.content.length < 15 && /^(?:Sol|Ans|Hence|Therefore|Thus)/i.test(q.content)) return false;
+        return true;
+    });
+
+    console.log(`[PARSER] Final: ${filtered.length} questions, ${solutionMap.size} solutions, ${answerMap.size} answers (filtered ${questions.length - filtered.length} solution-as-question entries)`);
+    return filtered;
 }
 
 function parseSolutionsSection(
-    lines: string[], 
-    solutionMap: Map<string, string>, 
-    answerMap: Map<string, string>
+    lines: string[],
+    solutionMap: Map<string, string>,
+    answerMap: Map<string, string>,
+    solutionLineIndices: Set<number>,
+    baseOffset: number
 ) {
     let currentNum: string | null = null;
     let currentText: string[] = [];
-    
-    const flushSolution = () => {
+    let currentStartIdx = -1;
+
+    const flush = () => {
         if (currentNum && currentText.length > 0) {
             const text = currentText.join('\n').trim();
-            if (text.length > 5) {
-                // Check if it's just an answer (A, B, C, D) or a full solution
+            if (text.length > 3) {
                 if (/^[A-D](\s*,\s*[A-D])*$/.test(text)) {
                     answerMap.set(currentNum, text);
                 } else {
                     solutionMap.set(currentNum, text);
                 }
             }
+            // Mark all lines in this solution block as solution lines
+            if (currentStartIdx >= 0) {
+                for (let j = currentStartIdx; j < currentStartIdx + currentText.length; j++) {
+                    solutionLineIndices.add(baseOffset + j);
+                }
+            }
         }
         currentNum = null;
         currentText = [];
+        currentStartIdx = -1;
     };
-    
-    for (const line of lines) {
-        const trimmed = line.trim();
+
+    for (let i = 0; i < lines.length; i++) {
+        const trimmed = lines[i].trim();
         if (!trimmed) continue;
-        
-        // Check for numbered solution
+
+        // "Sol 1." or "Ans 1." or "Q.1" prefix
         const solMatch = trimmed.match(/^(?:Sol(?:ution)?\.?|Ans(?:wer)?\.?|Q\.?)\s*(\d+)\s*[:\-]?\s*(.*)/i);
         if (solMatch) {
-            flushSolution();
+            flush();
             currentNum = solMatch[1];
+            currentStartIdx = i;
             if (solMatch[2]) {
                 currentText.push(solMatch[2]);
             }
             continue;
         }
-        
-        // Check for simple number pattern (1., 2., etc.) in solutions section
+
+        // Bare number: "1." or "1)" in a known solutions section
         const numMatch = trimmed.match(/^(\d+)[\.\)]\s*(.*)/);
         if (numMatch) {
-            flushSolution();
+            flush();
             currentNum = numMatch[1];
+            currentStartIdx = i;
             if (numMatch[2]) {
                 currentText.push(numMatch[2]);
             }
             continue;
         }
-        
-        // Accumulate solution text
+
         if (currentNum) {
             currentText.push(trimmed);
         }
     }
-    
-    flushSolution();
+    flush();
+}
+
+function parseInlineSolutionLines(
+    allLines: string[],
+    startIdx: number,
+    endIdx: number,
+    solutionMap: Map<string, string>,
+    solutionLineIndices: Set<number>
+) {
+    let currentNum: string | null = null;
+    let currentText: string[] = [];
+    let currentStart = -1;
+    let inInlineSol = false;
+
+    const flush = () => {
+        if (currentNum && currentText.length > 0 && currentStart >= 0) {
+            const text = currentText.join('\n').trim();
+            if (text.length > 5 && !solutionMap.has(currentNum)) {
+                solutionMap.set(currentNum, text);
+                for (let j = currentStart; j < currentStart + currentText.length; j++) {
+                    solutionLineIndices.add(startIdx + j);
+                }
+            }
+        }
+        currentNum = null;
+        currentText = [];
+        currentStart = -1;
+        inInlineSol = false;
+    };
+
+    for (let i = 0; i < endIdx - startIdx; i++) {
+        const idx = startIdx + i;
+        if (idx >= allLines.length) break;
+        const trimmed = allLines[idx].trim();
+        if (!trimmed) continue;
+
+        // Check for inline Sol/Ans prefix (with optional number): "Sol. 12." or "Sol. x = 5"
+        const solMatch = trimmed.match(/^(?:Sol(?:ution)?\.?|Ans(?:wer)?\.?)\s*(\d*)\s*[:\-]?\s*(.*)/i);
+        if (solMatch) {
+            // If a number follows "Sol", use it as the solution number
+            if (solMatch[1]) {
+                flush();
+                currentNum = solMatch[1];
+                currentStart = i;
+                if (solMatch[2]) {
+                    currentText.push(solMatch[2]);
+                }
+                inInlineSol = true;
+            } else {
+                // "Sol." without number — attach to previous question later
+                flush();
+                inInlineSol = true;
+                currentStart = i;
+                if (solMatch[2]) {
+                    currentText.push(solMatch[2]);
+                }
+            }
+            continue;
+        }
+
+        if (inInlineSol) {
+            // Check if we've hit a new numbered question
+            if (/^(?:Q(?:uestion)?\.?\s*)?\d+[\.\)]\s/.test(trimmed)) {
+                flush();
+                continue;
+            }
+            currentText.push(trimmed);
+        }
+    }
+    flush();
 }
 
 function parseQuestionsSection(
-    lines: string[], 
+    allLines: string[],
+    startIdx: number,
+    endIdx: number,
     questions: ParsedQuestion[],
+    solutionLineIndices: Set<number>,
     solutionMap: Map<string, string>,
     answerMap: Map<string, string>
 ) {
     let currentQuestion: ParsedQuestion | null = null;
-    let potentialOptions: string[] = [];
-    let optionStartLine = -1;
-    let inSolution = false;
-    
+    let potentialOptions: { letter: string; text: string }[] = [];
+    let afterQuestionTextLine = 0; // track that we had at least one text line before options
+    let seenSolutionBlock = false;
+
     const flushQuestion = () => {
-        if (currentQuestion && currentQuestion.content.trim().length > 5) {
-            currentQuestion.content = currentQuestion.content.trim().replace(/\n\s*\n/g, '\n');
-            currentQuestion.explanation = currentQuestion.explanation.trim().replace(/\n\s*\n/g, '\n');
-            
-            if (potentialOptions.length >= 2 && potentialOptions.length <= 4 && optionStartLine > 0) {
-                currentQuestion.options = potentialOptions;
-                currentQuestion.type = 'SINGLE_CHOICE';
-            } else {
-                currentQuestion.options = [];
-                currentQuestion.type = 'INTEGER';
-            }
-            
+        if (!currentQuestion) return;
+        const content = currentQuestion.content.trim();
+        if (content.length <= 5) {
+            currentQuestion = null;
+            potentialOptions = [];
+            return;
+        }
+
+        // Determine type from options
+        if (potentialOptions.length >= 2 && potentialOptions.length <= 6) {
+            currentQuestion.options = potentialOptions.map(o => o.text);
+            currentQuestion.type = currentQuestion.correctAnswer && currentQuestion.correctAnswer.length > 1
+                ? 'MULTIPLE_CHOICE' : 'SINGLE_CHOICE';
+        } else {
+            currentQuestion.options = [];
+            currentQuestion.type = 'INTEGER';
+        }
+
+        // Clean content
+        currentQuestion.content = content.replace(/\n{3,}/g, '\n\n');
+
+        if (currentQuestion.content.length > 3) {
             questions.push(currentQuestion);
         }
         currentQuestion = null;
         potentialOptions = [];
-        optionStartLine = -1;
-        inSolution = false;
+        afterQuestionTextLine = 0;
+        seenSolutionBlock = false;
     };
-    
-    const commitOptions = () => {
-        if (potentialOptions.length >= 2 && potentialOptions.length <= 4 && currentQuestion) {
-            currentQuestion.options = potentialOptions;
-            currentQuestion.type = 'SINGLE_CHOICE';
-        }
-        potentialOptions = [];
-        optionStartLine = -1;
-    };
-    
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        
-        // Check for new question
-        const qMatch = line.match(/^(?:Q(?:uestion)?\.?\s*)?(\d+)[\.\)]\s+(.*)/i);
+
+    for (let i = 0; i < endIdx - startIdx; i++) {
+        const idx = startIdx + i;
+        if (idx >= allLines.length) break;
+
+        // Skip lines flagged as solution content
+        if (solutionLineIndices.has(idx)) continue;
+
+        const line = allLines[idx];
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Detect "## " section header — stop parsing
+        if (/^##\s+\S/.test(trimmed)) { flushQuestion(); break; }
+
+        // Detect a new question number
+        const qMatch = trimmed.match(/^(?:Q(?:uestion)?\.?\s*)?(\d+)[\.\)]\s+(.*)/i);
         if (qMatch) {
             flushQuestion();
             currentQuestion = {
@@ -400,87 +495,69 @@ function parseQuestionsSection(
                 explanation: '',
                 type: 'INTEGER',
                 difficulty: 'MEDIUM',
-                rawText: line
+                rawText: line,
             };
-            inSolution = false;
+            afterQuestionTextLine = qMatch[2] ? 1 : 0;
+            potentialOptions = [];
             continue;
         }
-        
+
         if (!currentQuestion) continue;
-        
-        // Check for inline solution marker
-        const solMatch = line.match(/^(?:Sol(?:ution)?\.?|Explanation)\s*[:\-]?\s*(.*)/i);
-        if (solMatch) {
-            inSolution = true;
-            commitOptions();
-            if (solMatch[1]) {
-                currentQuestion.explanation += (currentQuestion.explanation ? '\n' : '') + solMatch[1];
-            }
-            continue;
-        }
-        
-        // Check for answer
-        const ansMatch = line.match(/(?:^|\s)(?:Ans(?:wer)?\.?|Correct\s*(?:option|answer)?)\s*[:\-]?\s*([A-Da-d](?:\s*,\s*[A-Da-d])*)/i);
-        if (ansMatch && !inSolution) {
+
+        // Check for answer line: "Ans: A", "Answer: B", "Correct option: C"
+        const ansMatch = trimmed.match(/(?:^|\s)(?:Ans(?:wer)?\.?|Correct\s*(?:option|answer)?)\s*[:\-]?\s*([A-Da-d](?:\s*,\s*[A-Da-d])*)/i);
+        if (ansMatch) {
             currentQuestion.correctAnswer = ansMatch[1].toUpperCase().replace(/\s/g, '');
             continue;
         }
-        
-        // Check for option
-        const optMatch = line.match(/^\s*\(?([A-Da-d])[\.\)]\s+(.*)/);
-        if (optMatch && !inSolution) {
-            const optLetter = optMatch[1].toUpperCase();
-            const expectedLetters = ['A', 'B', 'C', 'D', 'E'];
-            const expectedIndex = potentialOptions.length;
-            
-            if (expectedLetters[expectedIndex] === optLetter) {
-                if (potentialOptions.length === 0) {
-                    optionStartLine = i;
-                }
-                potentialOptions.push(optMatch[2]);
-            } else {
-                commitOptions();
-                currentQuestion.content += '\n' + line;
+
+        // Check for option line: "(A) ..." "A. ..." "A) ..."
+        const optMatch = trimmed.match(/^\s*\(?([A-Da-d])\)?[\.\)]\s+(.*)/);
+        if (optMatch) {
+            const letter = optMatch[1].toUpperCase();
+            // Only accept if letter is A-D
+            if (['A', 'B', 'C', 'D'].includes(letter)) {
+                potentialOptions.push({ letter, text: optMatch[2] });
+                continue;
             }
-            continue;
         }
-        
-        // If we had potential options but this line breaks the pattern
-        if (potentialOptions.length > 0 && !optMatch) {
-            commitOptions();
+
+        // If we're collecting options and hit text that isn't an option,
+        // check if we need to flush options (e.g. new question content after options done)
+        if (potentialOptions.length >= 2) {
+            // If we see a line that doesn't start with A-D, commit options
+            const looksLikeAnswer = /^(?:Ans|Correct|Hence|Therefore|Thus|Sol)/i.test(trimmed);
+            if (looksLikeAnswer || trimmed.startsWith('**')) {
+                if (potentialOptions.length >= 2) {
+                    currentQuestion.options = potentialOptions.map(o => o.text);
+                    currentQuestion.type = 'SINGLE_CHOICE';
+                }
+                potentialOptions = [];
+                currentQuestion.content += '\n' + trimmed;
+                continue;
+            }
+            // If it's a short line (likely continuation), don't break options
         }
-        
-        // If in solution mode, accumulate
-        if (inSolution) {
-            currentQuestion.explanation += (currentQuestion.explanation ? '\n' : '') + line;
-            continue;
+
+        // Accumulate into question content
+        if (currentQuestion.content) {
+            currentQuestion.content += '\n' + trimmed;
+        } else {
+            currentQuestion.content = trimmed;
         }
-        
-        // Default: add to question content
-        currentQuestion.content += (currentQuestion.content ? '\n' : '') + line;
+        afterQuestionTextLine++;
     }
-    
+
     flushQuestion();
 
-    // Post-processing
+    // Post-processing: default types
     for (const q of questions) {
-        if (q.options.length === 0) {
-            q.type = 'INTEGER';
+        if (!q.options || q.options.length === 0) {
             q.options = [];
-        } else if (q.options.length >= 2 && q.options.length <= 4) {
-            q.type = 'SINGLE_CHOICE';
-            if (q.correctAnswer.length > 1) {
-                q.type = 'MULTIPLE_CHOICE';
-            }
-        } else {
-            q.options = [];
-            q.type = 'INTEGER';
+            if (q.type !== 'INTEGER') q.type = 'INTEGER';
         }
     }
-    
-    return questions;
 }
-
 
 function matchSolutionsToQuestions(
     questions: ParsedQuestion[],
@@ -488,18 +565,13 @@ function matchSolutionsToQuestions(
     answerMap: Map<string, string>
 ) {
     for (const q of questions) {
-        // Extract question number
         const numMatch = q.rawText.match(/(\d+)/);
         if (!numMatch) continue;
-        
         const qNum = numMatch[1];
-        
-        // Match solution first
+
         if (!q.explanation && solutionMap.has(qNum)) {
             q.explanation = solutionMap.get(qNum)!;
         }
-        
-        // Match answer
         if (!q.correctAnswer && answerMap.has(qNum)) {
             q.correctAnswer = answerMap.get(qNum)!;
         }

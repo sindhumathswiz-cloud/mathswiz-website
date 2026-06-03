@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
@@ -6,14 +6,66 @@ import Link from 'next/link';
 import { Database, UploadCloud, CheckCircle, XCircle, AlertCircle, FileText, Search, Loader2, SplitSquareHorizontal, Edit3, Save, Clock, X, Clipboard, ChevronLeft } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
 import MathRenderer from '@/components/MathRenderer';
+import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 const montserrat = Montserrat({ subsets: ['latin'], weight: '800' });
+
+function renderLatexBlock(text: string): string {
+    try {
+        return katex.renderToString(text, {
+            throwOnError: false,
+            displayMode: false,
+            strict: false,
+        });
+    } catch {
+        return text;
+    }
+}
+
+function LatexInline({ content }: { content: string }) {
+    let text = content
+        .replace(/\\\(/g, '$')
+        .replace(/\\\)/g, '$')
+        .replace(/\\\[/g, '$$')
+        .replace(/\\\]/g, '$$');
+    const parts: { text: string; math: boolean }[] = [];
+    const regex = /\$\$(.+?)\$\$|\$(.+?)\$/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            parts.push({ text: text.substring(lastIndex, match.index), math: false });
+        }
+        parts.push({ text: match[1] || match[2] || '', math: true });
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+        parts.push({ text: text.substring(lastIndex), math: false });
+    }
+    // If no math delimiters found, try rendering entire content as inline LaTeX
+    if (!parts.some(p => p.math) && /\\[a-zA-Z]|\\\(|\\\[|[\\^_{]/.test(content)) {
+        return <span className="leading-relaxed katex-inline-fallback" dangerouslySetInnerHTML={{ __html: renderLatexBlock(text) }} />;
+    }
+    return (
+        <span className="leading-relaxed">
+            {parts.map((part, i) =>
+                part.math ? (
+                    <span key={i} dangerouslySetInnerHTML={{ __html: renderLatexBlock(part.text) }} />
+                ) : (
+                    <span key={i}>{part.text}</span>
+                )
+            )}
+        </span>
+    );
+}
 
 export default function AdminQuestionBank() {
     const { data: session } = useSession();
     const [questions, setQuestions] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<'PENDING_REVIEW' | 'REPORTED' | 'ALL'>('PENDING_REVIEW');
+    const [filterStatus, setFilterStatus] = useState<'PENDING_REVIEW' | 'REPORTED' | 'APPROVED' | 'ALL'>('PENDING_REVIEW');
     const [selectedQuestion, setSelectedQuestion] = useState<any | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -22,9 +74,15 @@ export default function AdminQuestionBank() {
         options: ['', '', '', ''],
         correctAnswer: '',
         explanation: '',
-        tags: []
+        tags: [],
+        type: 'SINGLE_CHOICE',
+        difficulty: 'MEDIUM',
+        subject: '',
+        classLevel: '',
+        examType: '',
     });
     const [showOriginal, setShowOriginal] = useState(false);
+    const [selectedTaxonomyIds, setSelectedTaxonomyIds] = useState<string[]>([]);
 
     useEffect(() => {
         if (selectedQuestion) {
@@ -33,8 +91,14 @@ export default function AdminQuestionBank() {
                 options: Array.isArray(selectedQuestion.options) ? [...selectedQuestion.options, '', '', '', ''].slice(0, 4) : ['', '', '', ''],
                 correctAnswer: selectedQuestion.correctAnswer || '',
                 explanation: selectedQuestion.explanation || '',
-                tags: Array.isArray(selectedQuestion.tags) ? selectedQuestion.tags : []
+                tags: Array.isArray(selectedQuestion.tags) ? selectedQuestion.tags : [],
+                type: selectedQuestion.type || 'SINGLE_CHOICE',
+                difficulty: selectedQuestion.difficulty || 'MEDIUM',
+                subject: selectedQuestion.subject || '',
+                classLevel: selectedQuestion.classLevel || selectedQuestion.class || '',
+                examType: selectedQuestion.examType || '',
             });
+            setSelectedTaxonomyIds(Array.isArray(selectedQuestion.taxonomyTagIds) ? selectedQuestion.taxonomyTagIds : []);
             setIsEditing(false);
         }
     }, [selectedQuestion]);
@@ -50,7 +114,13 @@ export default function AdminQuestionBank() {
                     options: editForm.options.some((o: string) => o.trim()) ? editForm.options : undefined,
                     correctAnswer: editForm.correctAnswer,
                     explanation: editForm.explanation,
-                    tags: editForm.tags
+                    tags: editForm.tags,
+                    type: editForm.type,
+                    difficulty: editForm.difficulty,
+                    subject: editForm.subject,
+                    'class': editForm.classLevel,
+                    examType: editForm.examType,
+                    taxonomyTagIds: selectedTaxonomyIds,
                 })
             });
             if (!res.ok) throw new Error('Failed to save');
@@ -191,6 +261,12 @@ export default function AdminQuestionBank() {
                                     Reported
                                 </button>
                                 <button
+                                    onClick={() => setFilterStatus('APPROVED')}
+                                    className={`px-4 py-2 text-sm font-bold border-r border-gray-300 ${filterStatus === 'APPROVED' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    Approved
+                                </button>
+                                <button
                                     onClick={() => setFilterStatus('ALL')}
                                     className={`px-4 py-2 text-sm font-bold ${filterStatus === 'ALL' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
                                 >
@@ -255,8 +331,8 @@ export default function AdminQuestionBank() {
                                                         <StatusBadge status={q.status} />
                                                         <span className="text-xs text-gray-400 font-mono">#{q.id.substring(q.id.length - 6)}</span>
                                                     </div>
-                                                    <div className="whitespace-normal break-words text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed">
-                                                        {q.content.replace(/\\\[|\\\]|\\\(|\\\)/g, ' ')}
+                                                    <div className="line-clamp-2 text-sm font-semibold text-gray-900">
+                                                        <LatexInline content={q.content} />
                                                     </div>
                                                     <div className="mt-3 flex gap-2 text-xs font-medium text-gray-500">
                                                         <span className="bg-white border px-2 py-1 rounded">{q.class}</span>
@@ -342,7 +418,7 @@ export default function AdminQuestionBank() {
                                                                             />
                                                                             <label className={`text-[10px] font-black uppercase tracking-widest ${isCorrect ? 'text-emerald-500' : 'text-indigo-400'}`}>Option {letter}</label>
                                                                         </div>
-                                                                        {isCorrect && <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">✓ Correct</span>}
+                                                                        {isCorrect && <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">âœ“ Correct</span>}
                                                                     </div>
                                                                     <textarea 
                                                                         value={opt}
@@ -405,6 +481,58 @@ export default function AdminQuestionBank() {
                                                         </div>
                                                     </div>
 
+                                                    <details className="bg-gray-50 border border-gray-200 rounded-xl group">
+                                                        <summary className="cursor-pointer text-[10px] font-black text-indigo-600 uppercase tracking-widest p-3 hover:bg-gray-100 rounded-xl transition-all flex items-center gap-2 select-none">
+                                                            <svg className={`w-3 h-3 transition-transform group-open:rotate-90`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                                            Taxonomy Tags (optional)
+                                                        </summary>
+                                                        <div className="p-3 border-t border-gray-200">
+                                                            <TaxonomyCascadeSelector 
+                                                                selectedIds={selectedTaxonomyIds} 
+                                                                onSelectMultiple={setSelectedTaxonomyIds}
+                                                            />
+                                                        </div>
+                                                    </details>
+
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Type</label>
+                                                            <select value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                                                <option value="SINGLE_CHOICE">Single Choice</option>
+                                                                <option value="MULTIPLE_CHOICE">Multiple Choice</option>
+                                                                <option value="INTEGER">Integer</option>
+                                                                <option value="TRUE_FALSE">True/False</option>
+                                                                <option value="SUBJECTIVE">Subjective</option>
+                                                                <option value="FILL_IN_BLANKS">Fill in Blanks</option>
+                                                                <option value="ASSERTION_REASONING">Assertion-Reasoning</option>
+                                                                <option value="CASE_STUDY">Case Study</option>
+                                                                <option value="VERY_SHORT_ANSWER">Very Short Answer</option>
+                                                                <option value="SHORT_ANSWER">Short Answer</option>
+                                                                <option value="LONG_ANSWER">Long Answer</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Difficulty</label>
+                                                            <select value={editForm.difficulty} onChange={e => setEditForm({...editForm, difficulty: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                                                                <option value="EASY">Easy</option>
+                                                                <option value="MEDIUM">Medium</option>
+                                                                <option value="HARD">Hard</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Subject</label>
+                                                            <input type="text" value={editForm.subject} onChange={e => setEditForm({...editForm, subject: e.target.value})} placeholder="e.g. Mathematics" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all"/>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Class</label>
+                                                            <input type="text" value={editForm.classLevel} onChange={e => setEditForm({...editForm, classLevel: e.target.value})} placeholder="e.g. Class 12" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all"/>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Exam Type</label>
+                                                            <input type="text" value={editForm.examType} onChange={e => setEditForm({...editForm, examType: e.target.value})} placeholder="e.g. JEE Main" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all"/>
+                                                        </div>
+                                                    </div>
+
                                                     <div>
                                                         <div className="flex items-center justify-between mb-2">
                                                             <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">Solution / Explanation</label>
@@ -442,7 +570,7 @@ export default function AdminQuestionBank() {
                                                         {editForm.options.map((opt: string, idx: number) => (
                                                             <div key={idx} className={`p-3 rounded-lg border flex items-center gap-3 ${editForm.correctAnswer.toUpperCase().includes(String.fromCharCode(65 + idx)) ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}>
                                                                 <span className="font-bold text-indigo-600">{String.fromCharCode(65 + idx)}.</span>
-                                                                <MathRenderer content={opt || '—'} />
+                                                                <MathRenderer content={opt || 'â€”'} />
                                                             </div>
                                                         ))}
                                                     </div>
@@ -471,6 +599,14 @@ export default function AdminQuestionBank() {
                                                 <div className={`${showOriginal ? 'w-1/2' : 'w-full'} bg-gray-50 rounded-xl p-8 border border-gray-200 shadow-inner overflow-y-auto relative select-none`} onContextMenu={(e) => e.preventDefault()}>
                                                     <div className="absolute top-4 right-4 bg-gray-800 text-gray-400 text-[10px] uppercase font-bold px-2 py-1 rounded tracking-widest">
                                                         Protected Canvas
+                                                    </div>
+
+                                                    <div className="flex flex-wrap gap-2 mb-6">
+                                                        {selectedQuestion.type && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.type.replace(/_/g, ' ')}</span>}
+                                                        {selectedQuestion.difficulty && <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${selectedQuestion.difficulty === 'EASY' ? 'bg-emerald-100 text-emerald-700' : selectedQuestion.difficulty === 'HARD' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{selectedQuestion.difficulty}</span>}
+                                                        {selectedQuestion.subject && <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.subject}</span>}
+                                                        {selectedQuestion.class && <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.class}</span>}
+                                                        {selectedQuestion.examType && <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.examType}</span>}
                                                     </div>
 
                                                     <div className="prose max-w-none text-gray-900 text-lg leading-relaxed mb-8">
@@ -539,3 +675,5 @@ export default function AdminQuestionBank() {
         </div>
     );
 }
+
+

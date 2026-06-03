@@ -36,7 +36,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             status, reportedIssues,
             content, options, correctAnswer, explanation,
             type, difficulty, subject, class: classLevel, examType, tags,
-            confidence, reviewNotes
+            confidence, reviewNotes, taxonomyTagIds
         } = body;
 
         const updateData: any = {};
@@ -59,6 +59,72 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             where: { id: questionId },
             data: updateData
         });
+
+        // Handle taxonomy tags: create QuestionTag records + add taxonomy names to tags
+        if (taxonomyTagIds && Array.isArray(taxonomyTagIds) && taxonomyTagIds.length > 0) {
+            // Delete existing QuestionTag records for this question (re-sync)
+            await prisma.questionTag.deleteMany({ where: { questionId } });
+
+            // Fetch taxonomy names with types
+            const taxonomies = await prisma.tagTaxonomy.findMany({
+                where: { id: { in: taxonomyTagIds } },
+                select: { id: true, name: true, type: true }
+            });
+
+            // Create new QuestionTag records
+            for (const tax of taxonomies) {
+                await prisma.questionTag.create({
+                    data: { questionId, tagId: tax.id }
+                });
+            }
+
+            // Merge taxonomy names into tags array (deduplicated)
+            const taxonomyNames = taxonomies.map(t => t.name).filter(Boolean);
+            const mergedTags = [...new Set([...(updateData.tags || []), ...taxonomyNames])];
+            if (mergedTags.length > (updateData.tags || []).length) {
+                await prisma.question.update({
+                    where: { id: questionId },
+                    data: { tags: mergedTags }
+                });
+            }
+
+            // Set topic/subTopic from taxonomy if not already set in updateData
+            const classTax = taxonomies.find(t => t.type === 'CLASS');
+            const subjectTax = taxonomies.find(t => t.type === 'SUBJECT');
+            const topicTax = taxonomies.find(t => t.type === 'TOPIC');
+            const subTopicTax = taxonomies.find(t => t.type === 'SUBTOPIC');
+            const taxonomyMetaUpdate: any = {};
+            if (!updateData.class && classTax) taxonomyMetaUpdate.class = classTax.name;
+            if (!updateData.subject && subjectTax) taxonomyMetaUpdate.subject = subjectTax.name;
+            if (topicTax) taxonomyMetaUpdate.topic = topicTax.name;
+            if (subTopicTax) taxonomyMetaUpdate.subTopic = subTopicTax.name;
+            if (Object.keys(taxonomyMetaUpdate).length > 0) {
+                await prisma.question.update({
+                    where: { id: questionId },
+                    data: taxonomyMetaUpdate
+                });
+            }
+        } else if (status === 'APPROVED') {
+            // Even if no new tags provided, ensure existing QuestionTag names are in the tags array
+            const existingTags = await prisma.questionTag.findMany({
+                where: { questionId },
+                include: { tag: { select: { name: true } } }
+            });
+            if (existingTags.length > 0) {
+                const q = await prisma.question.findUnique({
+                    where: { id: questionId },
+                    select: { tags: true }
+                });
+                const taxonomyNames = existingTags.map(qt => qt.tag.name).filter(Boolean);
+                const merged = [...new Set([...(q?.tags || []), ...taxonomyNames])];
+                if (merged.length > (q?.tags || []).length) {
+                    await prisma.question.update({
+                        where: { id: questionId },
+                        data: { tags: merged }
+                    });
+                }
+            }
+        }
 
         return NextResponse.json({ success: true, question });
     } catch (error) {

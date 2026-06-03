@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
@@ -20,7 +20,8 @@ import {
     Folder,
     XCircle,
     Zap,
-    Link2
+    Link2,
+    Image,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -41,7 +42,23 @@ const fetcher = (url: string) => fetch(url).then(res => {
     return res.json().catch(() => ({ error: 'Invalid JSON' }));
 });
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+interface DuplicateMatchData {
+    content: string;
+    options: string[];
+    explanation: string;
+    type: string;
+    difficulty: string;
+    class: string;
+    topic: string;
+    subject: string;
+    examType: string;
+    tags: string[];
+    status: string;
+    similarity: number;
+    matchType: string;
+}
+
 interface ExtractedQuestion {
     id: string;
     dbId?: string;
@@ -59,6 +76,9 @@ interface ExtractedQuestion {
     originalRawText?: string;
     isDuplicate?: boolean;       // true if question already exists in DB
     duplicateChecked?: boolean;  // true once the check has completed
+    duplicateMatchId?: string;   // ID of the matched existing question
+    duplicateMatchContent?: string; // text of the matched question for comparison
+    duplicateMatchData?: DuplicateMatchData;
 }
 
 
@@ -114,7 +134,7 @@ const mapDbQuestion = (q: {
     originalRawText: q.originalRawText || '',
 });
 
-// ─── Caching Helpers ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Caching Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const getCacheDB = (): Promise<IDBDatabase> => {
     return new Promise((resolve, reject) => {
         const req = indexedDB.open('MathswizOCR', 1);
@@ -196,7 +216,22 @@ const mapExtracted = (q: any, prefix: string, idx: number): ExtractedQuestion =>
     tagInput: '',
 });
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ PDF.js loader (module-level, shared by component + SourcePanel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const loadPdfJs = async (): Promise<any> => {
+    if ((window as any).pdfjsLib) return (window as any).pdfjsLib;
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    document.body.appendChild(script);
+    return new Promise(resolve => {
+        script.onload = () => {
+            (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            resolve((window as any).pdfjsLib);
+        };
+    });
+};
+
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function BulkImportStudio() {
     const { data: session } = useSession();
 
@@ -212,7 +247,7 @@ export default function BulkImportStudio() {
     const [isExtracting, setIsExtracting] = useState(false);
     const [rawMarkdown, setRawMarkdown] = useState<string>('');
     const [showRawMarkdown, setShowRawMarkdown] = useState(false);
-    const [sourceViewMode, setSourceViewMode] = useState<'raw' | 'rendered'>('raw');
+    const [sourceViewMode, setSourceViewMode] = useState<'raw' | 'rendered' | 'pdf'>('raw');
 
     // PDF state
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -293,21 +328,6 @@ export default function BulkImportStudio() {
         else { setSuccessMsg(text); setTimeout(() => setSuccessMsg(''), 3000); }
     };
 
-    // ── PDF.js loader ─────────────────────────────────────────────────────────
-    const loadPdfJs = async (): Promise<any> => {
-        if ((window as any).pdfjsLib) return (window as any).pdfjsLib;
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        document.body.appendChild(script);
-        return new Promise(resolve => {
-            script.onload = () => {
-                (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
-                    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                resolve((window as any).pdfjsLib);
-            };
-        });
-    };
-
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -319,6 +339,11 @@ export default function BulkImportStudio() {
         }
 
         if (file.type === 'application/pdf') {
+            // Create blob URL for SourcePanel PDF page view
+            const blobUrl = URL.createObjectURL(file);
+            setPdfUrl(blobUrl);
+            setCurrentPage(1);
+
             const fileHash = await generateFileHash(file);
             const cached = await getCachedExtraction(fileHash);
             
@@ -492,7 +517,7 @@ export default function BulkImportStudio() {
         setCurrentPage(p => dir === 'next' ? Math.min(p + 1, totalPages) : Math.max(p - 1, 1));
     };
 
-    // ── Word Document handler ─────────────────────────────────────────────────
+    // â”€â”€ Word Document handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const handleWordUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -503,14 +528,14 @@ export default function BulkImportStudio() {
         setWordStatus('parsing');
 
         try {
-            // Step 1: parse .docx → raw text
+            // Step 1: parse .docx â†’ raw text
             const form = new FormData();
             form.append('file', file);
             const parseRes = await fetch('/api/extract-word', { method: 'POST', body: form });
             const parseData = await parseRes.json();
             if (!parseRes.ok || parseData.error) throw new Error(parseData.error || 'Word parse failed');
 
-            // Step 2: structure raw text → JSON questions
+            // Step 2: structure raw text â†’ JSON questions
             setWordStatus('structuring');
             const structRes = await fetch('/api/admin/extract-mathpix', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -531,7 +556,7 @@ export default function BulkImportStudio() {
         }
     };
     
-    // ── Excel handler ────────────────────────────────────────────────────────
+    // â”€â”€ Excel handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -665,7 +690,7 @@ export default function BulkImportStudio() {
 
 
 
-    // ── Queue card state helpers ──────────────────────────────────────────────
+    // â”€â”€ Queue card state helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const updateCard = (id: string, field: keyof ExtractedQuestion, value: any) =>
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q));
     const updateOption = (id: string, oIdx: number, value: string) =>
@@ -682,7 +707,7 @@ export default function BulkImportStudio() {
     const removeTag = (id: string, tag: string) =>
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, tags: q.tags.filter(t => t !== tag) } : q));
 
-    // ── Draft card state helpers ──────────────────────────────────────────────
+    // â”€â”€ Draft card state helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const updateDraftCard = (id: string, field: keyof ExtractedQuestion, value: any) =>
         setDraftQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q));
     const updateDraftOption = (id: string, oIdx: number, value: string) =>
@@ -699,7 +724,7 @@ export default function BulkImportStudio() {
     const removeDraftTag = (id: string, tag: string) =>
         setDraftQuestions(prev => prev.map(q => q.id === id ? { ...q, tags: q.tags.filter(t => t !== tag) } : q));
 
-    // ── Save newly extracted questions ────────────────────────────────────────
+    // â”€â”€ Save newly extracted questions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const saveQuestion = async (q: ExtractedQuestion, status: 'DRAFT' | 'APPROVED') => {
         if (status === 'APPROVED') {
             const res = await fetch('/api/questions/check-duplicate', {
@@ -707,7 +732,7 @@ export default function BulkImportStudio() {
                 body: JSON.stringify({ content: q.content })
             });
             const { isDuplicate } = await res.json();
-            if (isDuplicate && !window.confirm('⚠️ A similar question already exists.\nApprove anyway?')) return;
+            if (isDuplicate && !window.confirm('âš ï¸ A similar question already exists.\nApprove anyway?')) return;
         }
         try {
             const res = await fetch('/api/questions', {
@@ -720,17 +745,17 @@ export default function BulkImportStudio() {
                     type: q.type, difficulty: q.difficulty,
                     subject: q.subject, class: q.classLevel, examType: q.examType,
                     tags: q.tags, status,
-                    knowledgeFolderId: selectedTaxonomyIds || undefined,
+                    taxonomyTagIds: selectedTaxonomyIds,
                     createdById: (session?.user as any)?.id || 'admin'
                 })
             });
             if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Save failed'); }
             setQuestions(prev => prev.filter(x => x.id !== q.id));
-            showMsg('success', status === 'APPROVED' ? '✓ Published to question bank!' : '✓ Saved as draft.');
+            showMsg('success', status === 'APPROVED' ? 'âœ“ Published to question bank!' : 'âœ“ Saved as draft.');
         } catch (err: any) { showMsg('error', err.message); }
     };
 
-    // ── Bulk Import Helper ────────────────────────────────────────────────────
+    // â”€â”€ Bulk Import Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const handleBulkImport = async () => {
         if (selectedIds.size === 0) return;
         setIsBulkImporting(true);
@@ -761,7 +786,7 @@ export default function BulkImportStudio() {
                         type: q.type, difficulty: q.difficulty,
                         subject: q.subject, class: q.classLevel, examType: q.examType,
                         tags: q.tags, status: 'APPROVED',
-                        knowledgeFolderId: selectedTaxonomyIds || undefined,
+                        taxonomyTagIds: selectedTaxonomyIds,
                         createdById: (session?.user as any)?.id || 'admin'
                     })
                 });
@@ -778,7 +803,7 @@ export default function BulkImportStudio() {
         showMsg(failCount > 0 ? 'error' : 'success', `Bulk Import: ${successCount} saved, ${failCount} skipped/failed.`);
     };
 
-    // ── Background Duplicate Checker ─────────────────────────────────────────
+    // â”€â”€ Background Duplicate Checker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const checkDuplicatesForQueue = async (qs: ExtractedQuestion[]) => {
         if (qs.length === 0) return;
         setIsDuplicateChecking(true);
@@ -788,9 +813,32 @@ export default function BulkImportStudio() {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: q.content })
                 });
-                const { isDuplicate } = await res.json();
+                const data = await res.json();
+                const isDuplicate = !!data.isDuplicate;
+                const dupData: DuplicateMatchData | undefined = isDuplicate ? {
+                    content: data.matchContent ?? '',
+                    options: data.matchOptions ?? [],
+                    explanation: data.matchExplanation ?? '',
+                    type: data.matchTypeLabel ?? '',
+                    difficulty: data.matchDifficulty ?? '',
+                    class: data.matchClass ?? '',
+                    topic: data.matchTopic ?? '',
+                    subject: data.matchSubject ?? '',
+                    examType: data.matchExamType ?? '',
+                    tags: data.matchTags ?? [],
+                    status: data.matchStatus ?? '',
+                    similarity: data.similarity ?? 0,
+                    matchType: data.matchType ?? '',
+                } : undefined;
                 setQuestions(prev => prev.map(x =>
-                    x.id === q.id ? { ...x, isDuplicate: !!isDuplicate, duplicateChecked: true } : x
+                    x.id === q.id ? { 
+                        ...x, 
+                        isDuplicate, 
+                        duplicateChecked: true,
+                        duplicateMatchId: isDuplicate ? (data.existingId ?? null) : undefined,
+                        duplicateMatchContent: isDuplicate ? (data.matchContent ?? null) : undefined,
+                        duplicateMatchData: dupData,
+                    } : x
                 ));
             } catch {
                 setQuestions(prev => prev.map(x =>
@@ -801,7 +849,16 @@ export default function BulkImportStudio() {
         setIsDuplicateChecking(false);
     };
 
-    // ── Approve / save / delete existing drafts ───────────────────────────────
+    // â”€â”€ Batch Edit Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const batchSetDifficulty = useCallback((difficulty: string) => {
+        setQuestions(prev => prev.map(q => selectedIds.has(q.id) ? { ...q, difficulty } : q));
+    }, [selectedIds]);
+
+    const batchSetType = useCallback((type: string) => {
+        setQuestions(prev => prev.map(q => selectedIds.has(q.id) ? { ...q, type } : q));
+    }, [selectedIds]);
+
+    // â”€â”€ Approve / save / delete existing drafts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const saveDraftQuestion = async (q: ExtractedQuestion, status: 'DRAFT' | 'APPROVED') => {
         if (!q.dbId) return showMsg('error', 'Missing DB id.');
         if (status === 'APPROVED') {
@@ -810,7 +867,7 @@ export default function BulkImportStudio() {
                 body: JSON.stringify({ content: q.content })
             });
             const { isDuplicate } = await res.json();
-            if (isDuplicate && !window.confirm('⚠️ A similar question already exists.\nApprove anyway?')) return;
+            if (isDuplicate && !window.confirm('âš ï¸ A similar question already exists.\nApprove anyway?')) return;
         }
         try {
             const res = await fetch(`/api/questions/${q.dbId}`, {
@@ -824,17 +881,17 @@ export default function BulkImportStudio() {
                     type: q.type, difficulty: q.difficulty,
                     subject: q.subject, class: q.classLevel, examType: q.examType,
                     tags: q.tags,
-                    knowledgeFolderId: selectedTaxonomyIds || undefined,
+                    taxonomyTagIds: selectedTaxonomyIds,
                 })
             });
             if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Update failed'); }
             if (status === 'APPROVED') {
                 setDraftQuestions(prev => prev.filter(x => x.id !== q.id));
                 mutateDrafts();
-                showMsg('success', '✓ Approved & published!');
+                showMsg('success', 'âœ“ Approved & published!');
             } else {
                 mutateDrafts();
-                showMsg('success', '✓ Draft saved.');
+                showMsg('success', 'âœ“ Draft saved.');
             }
         } catch (err: any) { showMsg('error', err.message); }
     };
@@ -847,7 +904,7 @@ export default function BulkImportStudio() {
             if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
             setDraftQuestions(prev => prev.filter(x => x.id !== q.id));
             mutateDrafts();
-            showMsg('success', '✓ Draft deleted.');
+            showMsg('success', 'âœ“ Draft deleted.');
         } catch (err: any) { showMsg('error', err.message); }
     };
 
@@ -898,7 +955,7 @@ export default function BulkImportStudio() {
         showMsg('success', 'Solution stitched successfully in workspace!');
     };
 
-    // ── Shared alert overlay ──────────────────────────────────────────────────
+    // â”€â”€ Shared alert overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const AlertOverlay = () => (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none">
             {errorMsg && (
@@ -917,9 +974,9 @@ export default function BulkImportStudio() {
         </div>
     );
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // UPLOAD / LANDING VIEW
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     return (
         <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
             <AlertOverlay />
@@ -944,7 +1001,7 @@ export default function BulkImportStudio() {
                     </div>
                     <div>
                         <h1 className="text-base font-black text-white tracking-tight">AI Extraction Studio</h1>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Mathpix OCR · Bulk Import</p>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Mathpix OCR Â· Bulk Import</p>
                     </div>
                 </div>
                 <GlobalMathToolbar />
@@ -971,7 +1028,7 @@ export default function BulkImportStudio() {
                     ))}
                 </div>
 
-                {/* ── Tab: PDF / Image ── */}
+                {/* â”€â”€ Tab: PDF / Image â”€â”€ */}
                 {mainTab === 'pdf' && (
                     <div className="space-y-6">
                         <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-8">
@@ -1022,7 +1079,7 @@ export default function BulkImportStudio() {
                     </div>
                 )}
 
-                {/* ── Tab: Word Document ── */}
+                {/* â”€â”€ Tab: Word Document â”€â”€ */}
                 {mainTab === 'word' && (
                     <div className="space-y-6">
                         <div
@@ -1037,7 +1094,7 @@ export default function BulkImportStudio() {
                                 <MousePointerClick className="w-4 h-4" /> Click or drag &amp; drop (.docx)
                             </p>
                             <div className="mt-5 flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-2">
-                                <span className="text-[11px] text-violet-300 font-bold">mammoth text extraction → OpenRouter LLM structuring</span>
+                                <span className="text-[11px] text-violet-300 font-bold">mammoth text extraction â†’ OpenRouter LLM structuring</span>
                             </div>
                             <input ref={docxInputRef} type="file" onChange={handleWordUpload} className="hidden" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                         </div>
@@ -1052,7 +1109,7 @@ export default function BulkImportStudio() {
                                     <p className="text-sm font-black text-white">
                                         {wordStatus === 'parsing' && `Parsing "${wordFileName}"...`}
                                         {wordStatus === 'structuring' && 'Sending to AI for question extraction...'}
-                                        {wordStatus === 'done' && `"${wordFileName}" processed successfully — check the queue below!`}
+                                        {wordStatus === 'done' && `"${wordFileName}" processed successfully â€” check the queue below!`}
                                         {wordStatus === 'error' && 'Processing failed'}
                                     </p>
                                     {wordStatus === 'error' && <p className="text-xs text-red-400 mt-1">{wordError}</p>}
@@ -1064,7 +1121,7 @@ export default function BulkImportStudio() {
                         {questions.length > 0 && (
                             <div className="flex gap-4 mt-8">
                                 {showRawMarkdown && rawMarkdown && (
-                                    <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="indigo" />
+                                    <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="indigo" pdfUrl={pdfUrl} pageNumber={currentPage} />
                                 )}
                                 <div className={`${showRawMarkdown && rawMarkdown ? 'w-1/2' : 'w-full'} space-y-4`}>
                                     {rawMarkdown && (
@@ -1086,6 +1143,8 @@ export default function BulkImportStudio() {
                                         onAddBlank={() => setQuestions(prev => [blankQuestion(), ...prev])}
                                         onBulkImport={handleBulkImport}
                                         isBulkImporting={isBulkImporting}
+                                        onBatchSetDifficulty={batchSetDifficulty}
+                                        onBatchSetType={batchSetType}
                                     />
                                     <div className="space-y-8">
                                         {questions.map((q, idx) => (
@@ -1108,7 +1167,7 @@ export default function BulkImportStudio() {
                         )}
                     </div>
                 )}
-                {/* ── Tab: Excel / CSV ── */}
+                {/* â”€â”€ Tab: Excel / CSV â”€â”€ */}
                 {mainTab === 'excel' && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1191,7 +1250,7 @@ export default function BulkImportStudio() {
                                 <div>
                                     <p className="text-sm font-black text-white">
                                         {excelStatus === 'parsing' && 'Analyzing spreadsheet data...'}
-                                        {excelStatus === 'done' && 'Import complete — check the queue below!'}
+                                        {excelStatus === 'done' && 'Import complete â€” check the queue below!'}
                                         {excelStatus === 'error' && 'Excel processing failed'}
                                     </p>
                                     {excelStatus === 'error' && <p className="text-xs text-red-400 mt-1">{excelError}</p>}
@@ -1203,7 +1262,7 @@ export default function BulkImportStudio() {
                         {questions.length > 0 && (
                             <div className="flex gap-4 mt-6">
                                 {showRawMarkdown && rawMarkdown && (
-                                    <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="emerald" />
+                                    <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="emerald" pdfUrl={pdfUrl} pageNumber={currentPage} />
                                 )}
                                 <div className={`${showRawMarkdown && rawMarkdown ? 'w-1/2' : 'w-full'} space-y-4`}>
                                     {rawMarkdown && (
@@ -1226,6 +1285,8 @@ export default function BulkImportStudio() {
                                         onBulkImport={handleBulkImport}
                                         isBulkImporting={isBulkImporting}
                                         color="emerald"
+                                        onBatchSetDifficulty={batchSetDifficulty}
+                                        onBatchSetType={batchSetType}
                                     />
                                     <div className="grid grid-cols-1 gap-8">
                                         {questions.map((q, idx) => (
@@ -1278,13 +1339,13 @@ export default function BulkImportStudio() {
                                 </div>
                                 <p className="text-slate-500 font-bold">No items in the creation queue.</p>
                                 <button onClick={() => setQuestions([blankQuestion()])} className="mt-4 text-emerald-400 hover:text-emerald-300 font-black text-sm transition-colors">
-                                    Click here to start with a blank question →
+                                    Click here to start with a blank question â†’
                                 </button>
                             </div>
                         ) : (
                             <div className="flex gap-4">
                                 {showRawMarkdown && rawMarkdown && (
-                                    <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="emerald" />
+                                    <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="emerald" pdfUrl={pdfUrl} pageNumber={currentPage} />
                                 )}
                                 <div className={`${showRawMarkdown && rawMarkdown ? 'w-1/2' : 'w-full'} space-y-4`}>
                                     {rawMarkdown && (
@@ -1307,6 +1368,8 @@ export default function BulkImportStudio() {
                                         onBulkImport={handleBulkImport}
                                         isBulkImporting={isBulkImporting}
                                         color="emerald"
+                                        onBatchSetDifficulty={batchSetDifficulty}
+                                        onBatchSetType={batchSetType}
                                     />
                                     <div className="space-y-8">
                                         {questions.map((q, idx) => (
@@ -1330,7 +1393,7 @@ export default function BulkImportStudio() {
                     </div>
                 )}
 
-                {/* ── Tab: Pending Drafts ── */}
+                {/* â”€â”€ Tab: Pending Drafts â”€â”€ */}
                 {mainTab === 'drafts' && (
                     <div>
                         <div className="flex items-center justify-between mb-6">
@@ -1392,7 +1455,7 @@ export default function BulkImportStudio() {
                         <div className="flex gap-4">
                             {/* Left Panel: Raw Markdown */}
                             {showRawMarkdown && rawMarkdown && (
-                                <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="amber" />
+                                <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="amber" pdfUrl={pdfUrl} pageNumber={currentPage} />
                             )}
                             
                             {/* Right Panel: Draft Questions */}
@@ -1406,7 +1469,7 @@ export default function BulkImportStudio() {
                                 {!isDraftsLoading && draftQuestions.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-64 opacity-40 gap-4 bg-slate-900 rounded-3xl border border-slate-800">
                                         <CheckCircle2 className="w-14 h-14 text-emerald-500" />
-                                        <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No pending drafts — all clear!</p>
+                                        <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No pending drafts â€” all clear!</p>
                                     </div>
                                 )}
                                 {!isDraftsLoading && draftQuestions.length > 0 && (
@@ -1445,12 +1508,15 @@ export default function BulkImportStudio() {
     );
 }
 
-// ─── Shared UI Components ──────────────────────────────────────────────────
+// â”€â”€â”€ Shared UI Components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function QueuePanelHeader({ 
-    count, selectedCount, allSelected, toggleSelectAll, onAddBlank, onBulkImport, isBulkImporting, color = 'indigo', hideActions = false
+    count, selectedCount, allSelected, toggleSelectAll, onAddBlank, onBulkImport, isBulkImporting, color = 'indigo', hideActions = false,
+    onBatchSetDifficulty, onBatchSetType,
 }: { 
     count: number; selectedCount: number; allSelected: boolean; toggleSelectAll: () => void; onAddBlank: () => void; 
     onBulkImport: () => void; isBulkImporting: boolean; color?: string; hideActions?: boolean;
+    onBatchSetDifficulty?: (d: string) => void;
+    onBatchSetType?: (t: string) => void;
 }) {
     const bgColors: any = { indigo: 'bg-indigo-600', emerald: 'bg-emerald-600', violet: 'bg-violet-600', red: 'bg-red-600', blue: 'bg-blue-600', amber: 'bg-amber-600' };
     const borderColors: any = { indigo: 'border-indigo-500/30', emerald: 'border-emerald-500/30', violet: 'border-violet-500/30', red: 'border-red-500/30', blue: 'border-blue-500/30', amber: 'border-amber-500/30' };
@@ -1477,11 +1543,33 @@ function QueuePanelHeader({
                             <Plus className="w-4 h-4" /> Add Question
                         </button>
                         {selectedCount > 0 && (
-                            <button onClick={onBulkImport} disabled={isBulkImporting}
-                                className={`flex items-center gap-2 ${bgColors[color]} hover:opacity-90 disabled:opacity-50 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg`}>
-                                {isBulkImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
-                                Import Selected ({selectedCount})
-                            </button>
+                            <>
+                                {onBatchSetDifficulty && (
+                                    <select onChange={(e) => { if (e.target.value) { onBatchSetDifficulty(e.target.value); e.target.value = ''; } }}
+                                        className="bg-slate-800 border border-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer outline-none">
+                                        <option value="">Set difficultyâ€¦</option>
+                                        <option value="EASY">EASY</option>
+                                        <option value="MEDIUM">MEDIUM</option>
+                                        <option value="HARD">HARD</option>
+                                    </select>
+                                )}
+                                {onBatchSetType && (
+                                    <select onChange={(e) => { if (e.target.value) { onBatchSetType(e.target.value); e.target.value = ''; } }}
+                                        className="bg-slate-800 border border-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer outline-none">
+                                        <option value="">Set typeâ€¦</option>
+                                        <option value="SINGLE_CHOICE">Single MCQ</option>
+                                        <option value="MULTIPLE_CHOICE">Multi MCQ</option>
+                                        <option value="INTEGER">Integer</option>
+                                        <option value="TRUE_FALSE">True/False</option>
+                                        <option value="SUBJECTIVE">Subjective</option>
+                                    </select>
+                                )}
+                                <button onClick={onBulkImport} disabled={isBulkImporting}
+                                    className={`flex items-center gap-2 ${bgColors[color]} hover:opacity-90 disabled:opacity-50 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg`}>
+                                    {isBulkImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
+                                    Import Selected ({selectedCount})
+                                </button>
+                            </>
                         )}
                     </div>
                 )}
@@ -1498,7 +1586,7 @@ function QueuePanelHeader({
     );
 }
 
-// ─── Queue Panel (right side of workspace) ───────────────────────────────────
+// â”€â”€â”€ Queue Panel (right side of workspace) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function QueuePanel({ questions, isExtracting, onUpdate, onUpdateOption, onAddTag, onRemoveTag, onDelete, onSave, onAddBlank,
     rightZoom, setRightZoom, selectedIds, setSelectedIds, editingIds, setEditingIds, isBulkImporting, handleBulkImport
 }: {
@@ -1576,7 +1664,7 @@ function QueuePanel({ questions, isExtracting, onUpdate, onUpdateOption, onAddTa
                 {!isExtracting && questions.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 opacity-30 gap-4">
                         <Target className="w-14 h-14 text-slate-600" />
-                        <p className="text-slate-500 font-black uppercase tracking-widest text-sm">Queue Empty — Extract a page or add manually</p>
+                        <p className="text-slate-500 font-black uppercase tracking-widest text-sm">Queue Empty â€” Extract a page or add manually</p>
                     </div>
                 )}
                 {questions.map((q, idx) => (
@@ -1598,15 +1686,18 @@ function QueuePanel({ questions, isExtracting, onUpdate, onUpdateOption, onAddTa
     );
 }
 
-// ─── Source Panel (side-by-side extracted markdown viewer) ──────────────────
-function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMode, color = 'indigo' }: {
+// â”€â”€â”€ Source Panel (side-by-side extracted markdown viewer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMode, color = 'indigo', pdfUrl, pageNumber = 1 }: {
     rawMarkdown: string;
     fullRawText?: string;
-    sourceViewMode: 'raw' | 'rendered';
-    setSourceViewMode: (mode: 'raw' | 'rendered') => void;
+    sourceViewMode: 'raw' | 'rendered' | 'pdf';
+    setSourceViewMode: (mode: 'raw' | 'rendered' | 'pdf') => void;
     color?: string;
+    pdfUrl?: string | null;
+    pageNumber?: number;
 }) {
     const [sourceSource, setSourceSource] = useState<'markdown' | 'original'>('markdown');
+    const [pdfCanvas, setPdfCanvas] = useState<HTMLCanvasElement | null>(null);
     const displayText = sourceSource === 'original' && fullRawText ? fullRawText : rawMarkdown;
     const borderColors: Record<string, string> = {
         indigo: 'border-indigo-500/30', emerald: 'border-emerald-500/30',
@@ -1624,35 +1715,84 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
     const bg = bgColors[color] || bgColors.indigo;
     const tc = textColors[color] || textColors.indigo;
     const hasBoth = !!fullRawText && rawMarkdown !== fullRawText;
+    const hasPdf = !!pdfUrl;
+
+    // Render PDF page to canvas when sourceViewMode === 'pdf'
+    useEffect(() => {
+        if (sourceViewMode !== 'pdf' || !pdfUrl) return;
+        let cancelled = false;
+        (async () => {
+            const pdfjsLib = await loadPdfJs();
+            if (cancelled) return;
+            const loadingTask = pdfjsLib.getDocument(pdfUrl);
+            const pdfDoc = await loadingTask.promise;
+            if (cancelled) return;
+            const page = await pdfDoc.getPage(Math.min(pageNumber, pdfDoc.numPages));
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise;
+            if (!cancelled) setPdfCanvas(canvas);
+        })();
+        return () => { cancelled = true; };
+    }, [sourceViewMode, pdfUrl, pageNumber]);
+
+    const titleLabel = !hasPdf ? (sourceSource === 'original' ? 'Original Raw Text' : 'Extracted Markdown')
+        : sourceViewMode === 'pdf' ? 'Original PDF Page'
+        : sourceSource === 'original' ? 'Original Raw Text'
+        : 'Extracted Markdown';
+
     return (
         <div className={`w-1/2 border ${bc} rounded-2xl overflow-hidden bg-slate-900/50 flex flex-col shrink-0`}
             style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
             <div className={`flex items-center justify-between px-4 py-3 ${bg} border-b ${bc} shrink-0`}>
                 <div className="flex items-center gap-2 min-w-0">
-                    <FileText className={`w-4 h-4 ${tc} shrink-0`} />
-                    <span className={`text-sm font-black ${tc} uppercase tracking-widest truncate`}>{sourceSource === 'original' ? 'Original Raw Text' : 'Extracted Markdown'}</span>
-                    <span className="text-[10px] text-slate-500 font-bold shrink-0">({displayText.length.toLocaleString()} chars)</span>
+                    {sourceViewMode === 'pdf' ? <Image className={`w-4 h-4 ${tc} shrink-0`} /> : <FileText className={`w-4 h-4 ${tc} shrink-0`} />}
+                    <span className={`text-sm font-black ${tc} uppercase tracking-widest truncate`}>{titleLabel}</span>
+                    {sourceViewMode !== 'pdf' && <span className="text-[10px] text-slate-500 font-bold shrink-0">({displayText.length.toLocaleString()} chars)</span>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                    {hasBoth && (
+                    {hasPdf && (
+                        <button onClick={() => setSourceViewMode(sourceViewMode === 'pdf' ? 'rendered' : 'pdf')}
+                            className={`flex items-center gap-1.5 ${bg} hover:opacity-80 border ${bc} ${tc} px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all`}>
+                            {sourceViewMode === 'pdf' ? <FileText className="w-3 h-3" /> : <Image className="w-3 h-3" />}
+                            {sourceViewMode === 'pdf' ? 'Markdown' : 'PDF Page'}
+                        </button>
+                    )}
+                    {hasBoth && sourceViewMode !== 'pdf' && (
                         <button onClick={() => setSourceSource(s => s === 'markdown' ? 'original' : 'markdown')}
                             className={`flex items-center gap-1.5 ${bg} hover:opacity-80 border ${bc} ${tc} px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all`}>
                             {sourceSource === 'markdown' ? 'Original Text' : 'Markdown'}
                         </button>
                     )}
-                    <button onClick={() => setSourceViewMode(sourceViewMode === 'raw' ? 'rendered' : 'raw')}
-                        className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all">
-                        {sourceViewMode === 'raw' ? <Eye className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                        {sourceViewMode === 'raw' ? 'Rendered' : 'Raw'}
-                    </button>
-                    <button onClick={() => { navigator.clipboard.writeText(displayText); toast.success(`${sourceSource === 'original' ? 'Original' : 'Markdown'} source copied!`); }}
-                        className={`flex items-center gap-1.5 ${bg} hover:opacity-80 border ${bc} ${tc} px-3 py-1.5 rounded-lg text-xs font-bold transition-all`}>
-                        <Clipboard className="w-3.5 h-3.5" /> Copy All
-                    </button>
+                    {sourceViewMode !== 'pdf' && (
+                        <button onClick={() => setSourceViewMode(sourceViewMode === 'raw' ? 'rendered' : 'raw')}
+                            className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all">
+                            {sourceViewMode === 'raw' ? <Eye className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                            {sourceViewMode === 'raw' ? 'Rendered' : 'Raw'}
+                        </button>
+                    )}
+                    {sourceViewMode !== 'pdf' && (
+                        <button onClick={() => { navigator.clipboard.writeText(displayText); toast.success(`${sourceSource === 'original' ? 'Original' : 'Markdown'} source copied!`); }}
+                            className={`flex items-center gap-1.5 ${bg} hover:opacity-80 border ${bc} ${tc} px-3 py-1.5 rounded-lg text-xs font-bold transition-all`}>
+                            <Clipboard className="w-3.5 h-3.5" /> Copy All
+                        </button>
+                    )}
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                {sourceViewMode === 'raw' ? (
+                {sourceViewMode === 'pdf' ? (
+                    pdfCanvas ? (
+                        <div className="flex justify-center">
+                            <img src={pdfCanvas.toDataURL()} alt="PDF Page" className="max-w-full h-auto rounded-lg shadow-xl" />
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-full">
+                            <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
+                        </div>
+                    )
+                ) : sourceViewMode === 'raw' ? (
                     <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed select-all">
                         {displayText}
                     </pre>
@@ -1671,7 +1811,7 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
     );
 }
 
-// ─── ReviewCard ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ ReviewCard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface ReviewCardProps {
     q: ExtractedQuestion; idx: number; isDraft?: boolean;
     onUpdate: (id: string, field: keyof ExtractedQuestion, value: any) => void;
@@ -1695,6 +1835,7 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
     const editing = isEditing ?? true; // drafts are always in edit mode; queue cards default to view mode
     const isDup = !!q.isDuplicate;
     const [showOriginal, setShowOriginal] = useState(false);
+    const [showComparison, setShowComparison] = useState(false);
 
     // Debounced updates to avoid excessive re-renders and sync calls
     const debouncedOnUpdate = useCallback(
@@ -1726,13 +1867,83 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
             'bg-slate-900 border-slate-800'
         }`}>
             {isDup && (
-                <div className="absolute top-3 right-3 z-20">
+                <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
                     <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-lg animate-pulse uppercase tracking-widest">
-                        ⚠ Duplicate
+                        âš  Duplicate
                     </span>
+                    {q.duplicateMatchData && (
+                        <button onClick={() => setShowComparison(!showComparison)}
+                            className="bg-red-600/20 hover:bg-red-600/40 border border-red-500/40 text-red-400 px-2 py-0.5 rounded text-[9px] font-bold transition-all flex items-center gap-1">
+                            <Eye className="w-3 h-3" /> {showComparison ? 'Hide' : 'Show Existing'}
+                        </button>
+                    )}
                 </div>
             )}
-            {/* Card header */}
+            {isDup && showComparison && q.duplicateMatchData && (
+                <div className="mx-4 mb-4 border border-red-500/30 bg-slate-900 rounded-2xl overflow-hidden shadow-lg animate-in fade-in zoom-in duration-200">
+                    <div className="flex items-center justify-between px-4 py-2 bg-red-500/10 border-b border-red-500/20">
+                        <span className="text-[10px] font-black text-red-400 uppercase tracking-widest flex items-center gap-2">
+                            <FileText className="w-3.5 h-3.5" /> Existing Question in Database
+                        </span>
+                        <span className="text-[9px] text-slate-500 font-mono">Match: {q.duplicateMatchData.similarity}% ({q.duplicateMatchData.matchType})</span>
+                    </div>
+                    <div className="p-4 space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
+                        <div className="flex flex-wrap gap-1.5">
+                            {q.duplicateMatchData.class && (
+                                <span className="bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded text-[10px] font-bold">{q.duplicateMatchData.class}</span>
+                            )}
+                            {q.duplicateMatchData.topic && (
+                                <span className="bg-purple-500/10 text-purple-300 px-2 py-0.5 rounded text-[10px] font-bold">{q.duplicateMatchData.topic}</span>
+                            )}
+                            {q.duplicateMatchData.difficulty && (
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    q.duplicateMatchData.difficulty === 'EASY' ? 'bg-green-500/10 text-green-300' :
+                                    q.duplicateMatchData.difficulty === 'HARD' ? 'bg-red-500/10 text-red-300' :
+                                    'bg-yellow-500/10 text-yellow-300'
+                                }`}>{q.duplicateMatchData.difficulty}</span>
+                            )}
+                            {q.duplicateMatchData.type && (
+                                <span className="bg-blue-500/10 text-blue-300 px-2 py-0.5 rounded text-[10px] font-bold">{q.duplicateMatchData.type.replace(/_/g, ' ')}</span>
+                            )}
+                            {q.duplicateMatchData.examType && (
+                                <span className="bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">{q.duplicateMatchData.examType}</span>
+                            )}
+                        </div>
+                        <div className="bg-slate-800/50 rounded-xl p-3 text-sm text-slate-200">
+                            <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-2">Question:</div>
+                            <MathRenderer content={q.duplicateMatchData.content} />
+                        </div>
+                        {q.duplicateMatchData.options && q.duplicateMatchData.options.length > 0 && q.duplicateMatchData.options.some((o: string) => o.trim()) && (
+                            <div className="grid grid-cols-2 gap-2">
+                                {q.duplicateMatchData.options.map((opt: string, oi: number) => {
+                                    const letter = String.fromCharCode(65 + oi);
+                                    return opt.trim() ? (
+                                        <div key={oi} className="flex items-start gap-2 p-2 rounded-lg text-xs bg-slate-800/30">
+                                            <span className="font-bold shrink-0 text-slate-400">{letter}.</span>
+                                            <MathRenderer content={opt} />
+                                        </div>
+                                    ) : null;
+                                })}
+                            </div>
+                        )}
+                        {q.duplicateMatchData.explanation && (
+                            <div className="bg-blue-500/5 rounded-xl p-3 border border-blue-500/20">
+                                <div className="text-[9px] text-blue-400 font-bold uppercase tracking-widest mb-1">Solution:</div>
+                                <div className="text-xs text-slate-300">
+                                    <MathRenderer content={q.duplicateMatchData.explanation} />
+                                </div>
+                            </div>
+                        )}
+                        {q.duplicateMatchData.tags && q.duplicateMatchData.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                                {q.duplicateMatchData.tags.map((t: string) => (
+                                    <span key={t} className="px-2 py-0.5 text-[9px] rounded-full bg-slate-800 text-slate-400 border border-slate-700">{t}</span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}{/* Card header */}
             <div className={`flex items-center justify-between px-4 py-3 border-b border-slate-800 ${isDup ? 'bg-red-500/10' : 'bg-slate-800/40'}`}>
                 <div className="flex items-center gap-2 min-w-0">
                     {onToggleSelect && (
@@ -1743,7 +1954,7 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
                         Q{idx + 1}
                     </span>
                     {q.duplicateChecked === false && (
-                        <span className="text-slate.600 text-[9px] font-bold animate-pulse">checking…</span>
+                        <span className="text-slate.600 text-[9px] font-bold animate-pulse">checkingâ€¦</span>
                     )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -1826,7 +2037,7 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
                             {q.options.map((opt, oIdx) => (
                                 <div key={oIdx} className={`rounded-xl p-3 text-xs border ${q.correctAnswer.toUpperCase().includes(String.fromCharCode(65 + oIdx)) ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-slate-800 border-slate-700'}`}>
                                     <span className="font-black text-indigo-400 mr-2">{String.fromCharCode(65 + oIdx)}.</span>
-                                    <span className="text-slate.300"><MathRenderer content={opt || '—'} /></span>
+                                    <span className="text-slate.300"><MathRenderer content={opt || 'â€”'} /></span>
                                 </div>
                             ))}
                         </div>
@@ -1958,7 +2169,7 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
                                                     />
                                                     <div className={`text-[9px] font-black uppercase tracking-widest ${isCorrect ? 'text-emerald-400' : 'text-slate-500'}`}>Option {letter}</div>
                                                 </div>
-                                                {isCorrect && <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">✓ Correct</span>}
+                                                {isCorrect && <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">âœ“ Correct</span>}
                                             </div>
                                             <FieldRow label="" value={opt} onChange={v => onUpdateOption(q.id, oIdx, v)} rows={2} compact />
                                             
@@ -2018,7 +2229,7 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
     );
 }
 
-// ─── FieldRow (side-by-side LaTeX textarea | MathRenderer) ───────────────────
+// â”€â”€â”€ FieldRow (side-by-side LaTeX textarea | MathRenderer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function FieldRow({ label, value, onChange, rows, compact }: {
     label: string; value: string; onChange: (v: string) => void; rows: number; compact?: boolean;
 }) {
@@ -2055,3 +2266,8 @@ function FolderIcon(props: any) {
         </svg>
     )
 }
+
+
+
+
+

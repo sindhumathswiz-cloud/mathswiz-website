@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 
@@ -71,7 +72,7 @@ export default function MathRenderer({ content }: MathRendererProps) {
     return (
         <div className="math-renderer-container prose max-w-none">
             <ReactMarkdown
-                remarkPlugins={[remarkMath]}
+                remarkPlugins={[remarkMath, remarkGfm]}
                 rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
             >
                 {sanitizedContent}

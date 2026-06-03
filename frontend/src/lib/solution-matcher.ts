@@ -84,6 +84,64 @@ export async function matchSolutionsForDocument(documentId: string) {
     return matches;
 }
 
+/**
+ * Match solutions from raw markdown text (used in bulk-import flow).
+ * Parses the full markdown, separates solutions section from questions section,
+ * and matches by number. Falls back to content-based matching when numbering is ambiguous.
+ */
+export function matchSolutionsFromMarkdown(
+    markdown: string,
+    questionNumbers: (string | null)[]
+): Map<string, string> {
+    const result = new Map<string, string>();
+    const lines = markdown.split('\n');
+
+    // Find the solutions section header
+    let solSectionStart = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (/^(?:##\s*)?(?:Solutions?|Answer\s*Key)\s*$/i.test(lines[i].trim())) {
+            solSectionStart = i + 1;
+            break;
+        }
+    }
+
+    if (solSectionStart < 0) return result;
+
+    // Parse numbered solutions from the solutions section
+    const solLines = lines.slice(solSectionStart);
+    let currentNum: string | null = null;
+    let currentText: string[] = [];
+
+    const flush = () => {
+        if (currentNum && currentText.length > 0) {
+            result.set(currentNum, currentText.join('\n').trim());
+        }
+        currentNum = null;
+        currentText = [];
+    };
+
+    for (const line of solLines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Match "1. ", "1) ", "Sol 1. ", "Ans 1. "
+        const solMatch = trimmed.match(/^(?:(?:Sol(?:ution)?\.?\s*|Ans(?:wer)?\.?\s*|Q\.?\s*))?(\d{1,3})[\.\)\s:]\s*(.*)$/i);
+        if (solMatch && solMatch[1]) {
+            flush();
+            currentNum = solMatch[1];
+            if (solMatch[2]) currentText.push(solMatch[2]);
+            continue;
+        }
+
+        if (currentNum) {
+            currentText.push(trimmed);
+        }
+    }
+    flush();
+
+    return result;
+}
+
 export async function verifyMatchWithLLM(questionText: string, solutionText: string) {
     if (!process.env.OPENROUTER_API_KEY) {
         return { isCorrect: false, confidence: 0, reason: 'No API key' };

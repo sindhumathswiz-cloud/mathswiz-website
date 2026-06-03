@@ -62,6 +62,13 @@ export async function GET(req: Request) {
                         lastName: true,
                         role: true,
                     }
+                },
+                questionTags: {
+                    include: {
+                        tag: {
+                            select: { name: true, type: true }
+                        }
+                    }
                 }
             },
             orderBy: {
@@ -69,7 +76,36 @@ export async function GET(req: Request) {
             }
         });
 
-        return NextResponse.json({ questions });
+        // Merge taxonomy tag names into each question's tags array
+        // Also populate topic/subTopic/class/subject from taxonomy types if empty
+        const enriched = questions.map(q => {
+            const taxonomyNames = q.questionTags
+                .map(qt => qt.tag.name)
+                .filter(Boolean);
+            const taxonomyTagIds = q.questionTags.map(qt => qt.tagId);
+            const mergedTags = taxonomyNames.length > 0
+                ? [...new Set([...(q.tags || []), ...taxonomyNames])]
+                : q.tags;
+
+            // Populate topic/subTopic/class/subject from taxonomy types
+            const classTax = q.questionTags.find(qt => qt.tag.type === 'CLASS');
+            const subjectTax = q.questionTags.find(qt => qt.tag.type === 'SUBJECT');
+            const topicTax = q.questionTags.find(qt => qt.tag.type === 'TOPIC');
+            const subTopicTax = q.questionTags.find(qt => qt.tag.type === 'SUBTOPIC');
+
+            const { questionTags, ...rest } = q;
+            return {
+                ...rest,
+                tags: mergedTags,
+                taxonomyTagIds,
+                class: rest.class || classTax?.tag.name || '',
+                subject: rest.subject || subjectTax?.tag.name || '',
+                topic: rest.topic || topicTax?.tag.name || '',
+                subTopic: rest.subTopic || subTopicTax?.tag.name || '',
+            };
+        });
+
+        return NextResponse.json({ questions: enriched });
     } catch (error) {
         console.error("Failed to fetch questions:", error);
         return NextResponse.json({ error: "Failed to fetch questions" }, { status: 500 });
@@ -132,10 +168,45 @@ export async function POST(req: Request) {
                         createdById: userId
                     }
                 });
-                if (q.tagTaxonomyId) {
+                const tagIds: string[] = [];
+                if (Array.isArray(q.taxonomyTagIds)) {
+                    tagIds.push(...q.taxonomyTagIds);
+                } else if (q.tagTaxonomyId) {
+                    tagIds.push(q.tagTaxonomyId);
+                }
+                for (const tid of tagIds) {
                     await tx.questionTag.create({
-                        data: { questionId: question.id, tagId: q.tagTaxonomyId }
+                        data: { questionId: question.id, tagId: tid }
                     });
+                }
+                // Merge taxonomy names into tags if we have tagIds
+                if (tagIds.length > 0) {
+                    const taxonomies = await tx.tagTaxonomy.findMany({
+                        where: { id: { in: tagIds } },
+                        select: { name: true, type: true }
+                    });
+                    const taxonomyNames = taxonomies.map(t => t.name).filter(Boolean);
+                    const existingTags: string[] = Array.isArray(q.tags) ? q.tags : [];
+                    const mergedTags = [...new Set([...existingTags, ...taxonomyNames])];
+                    const questionUpdateData: any = {};
+                    if (mergedTags.length > existingTags.length) {
+                        questionUpdateData.tags = mergedTags;
+                    }
+                    // Set topic/subTopic/class/subject from taxonomy if not already set
+                    const classTax = taxonomies.find(t => t.type === 'CLASS');
+                    const subjectTax = taxonomies.find(t => t.type === 'SUBJECT');
+                    const topicTax = taxonomies.find(t => t.type === 'TOPIC');
+                    const subTopicTax = taxonomies.find(t => t.type === 'SUBTOPIC');
+                    if (!q.class && classTax) questionUpdateData.class = classTax.name;
+                    if (!q.subject && subjectTax) questionUpdateData.subject = subjectTax.name;
+                    if (topicTax) questionUpdateData.topic = topicTax.name;
+                    if (subTopicTax) questionUpdateData.subTopic = subTopicTax.name;
+                    if (Object.keys(questionUpdateData).length > 0) {
+                        await tx.question.update({
+                            where: { id: question.id },
+                            data: questionUpdateData
+                        });
+                    }
                 }
                 results.push(question);
             }
