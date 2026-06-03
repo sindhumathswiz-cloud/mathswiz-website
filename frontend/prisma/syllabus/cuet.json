@@ -1,0 +1,88 @@
+{
+  "board": "CUET",
+  "exam": "Common University Entrance Test",
+  "sourceUrl": "https://www.nta.gov.in/cuet",
+  "topics": [
+    {
+      "name": "Integral Calculus",
+      "subtopics": [
+        "Integration as anti-derivative",
+        "Indefinite and definite integrals",
+        "Techniques of integration",
+        "Integration by substitution",
+        "Integration by parts",
+        "Partial fractions",
+        "Definite integrals and their properties",
+        "Applications of integrals (area under curves)"
+      ]
+    },
+    {
+      "name": "Differential Calculus",
+      "subtopics": [
+        "Continuity and differentiability",
+        "Derivatives of various functions",
+        "Chain rule",
+        "Derivatives of inverse functions",
+        "Second order derivatives",
+        "Maxima and minima",
+        "Applications of derivatives"
+      ]
+    },
+    {
+      "name": "Matrices and Determinants",
+      "subtopics": [
+        "Types of matrices",
+        "Operations on matrices",
+        "Adjoint and inverse",
+        "Determinants and properties",
+        "System of linear equations",
+        "Cramer's rule and matrix method"
+      ]
+    },
+    {
+      "name": "Vectors",
+      "subtopics": [
+        "Vector algebra",
+        "Scalar and vector products",
+        "Application to geometry",
+        "Vector equations"
+      ]
+    },
+    {
+      "name": "Three Dimensional Geometry",
+      "subtopics": [
+        "Direction cosines and ratios",
+        "Equation of lines and planes",
+        "Distance between points and lines",
+        "Angle between lines and planes"
+      ]
+    },
+    {
+      "name": "Probability",
+      "subtopics": [
+        "Classical and conditional probability",
+        "Bayes theorem",
+        "Random variables",
+        "Binomial and Poisson distribution"
+      ]
+    },
+    {
+      "name": "Sequences and Series",
+      "subtopics": [
+        "Arithmetic and geometric progressions",
+        "Arithmetic and geometric mean",
+        "Sum of n terms",
+        "Infinite series"
+      ]
+    },
+    {
+      "name": "Complex Numbers",
+      "subtopics": [
+        "Modulus and argument",
+        "Polar representation",
+        "Euler's formula",
+        "Quadratic equations with complex roots"
+      ]
+    }
+  ]
+}

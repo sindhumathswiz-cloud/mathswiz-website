@@ -1,0 +1,1130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum EnrollmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  BLOCKED
+}
+
+model User {
+  id                  String        @id @default(cuid())
+  firstName           String?
+  lastName            String?
+  password            String? // Hashed password for standard login
+  email               String?       @unique
+  emailVerified       DateTime?
+  image               String?
+  role                Role          @default(STUDENT)
+  accountStatus       AccountStatus @default(PENDING)
+  mobileNumber        String?       @unique
+  phone               String? // Task 1: Phone field for student contact
+  currentSessionToken String?
+  lastActiveAt        DateTime?     @default(now()) // To track "Currently Online"
+  lastLoginAt         DateTime? // To track exact login history
+  loginDevice         String? // To track device headers
+  microsoftId         String?       @unique // Link to Microsoft Entra ID Account
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @default(now()) @updatedAt
+  // Profile Fields
+  class               String?
+  school              String?
+  fathersName         String?
+  mothersName         String?
+  childName           String?
+  childMobile         String?
+  subjectExpertise    String?
+  profilePictureUrl   String?
+
+  // Monetization & AI Features
+  subscription String @default("FREE") // "FREE" or "PREMIUM"
+  aiTokens     Int    @default(5) // Refreshed daily via cron or manual script
+
+  // Parent-Student Relationship
+  parentId String?
+  parent   User?   @relation("ParentChildren", fields: [parentId], references: [id])
+  children User[]  @relation("ParentChildren")
+
+  // NextAuth Relations
+  accounts Account[]
+  sessions Session[]
+
+  // App Relations
+  enrollments      BatchEnrollment[]
+  createdQuestions Question[]
+  createdTests     Test[]
+  studentProgress  StudentProgress[]
+  testAttempts     TestAttempt[]
+  teacherBatches   Batch[]           @relation("TeacherBatches")
+  feeStructures    FeeStructure[]    @relation("TeacherFeeStructures")
+  testAssignments  TestAssignment[]  @relation("StudentAssignments")
+  createdMaterials Material[]        @relation("TeacherMaterials")
+  studentGoal      StudentGoal?
+  teacherNotices   Notice[]          @relation("TeacherNotices")
+  leads            Lead[]            @relation("TeacherLeads")
+  knowledgeFolders KnowledgeFolder[]
+
+  // Gamification & Portals Relations
+  challengerOf       PeerChallenge[]     @relation("Challenger")
+  opponentOf         PeerChallenge[]     @relation("Opponent")
+  studentQueries     TeacherQuery[]      @relation("StudentQueries")
+  teacherQueries     TeacherQuery[]      @relation("TeacherReceivedQueries")
+  queryReplies       QueryReply[]
+  parentLinks        ParentLink[]        @relation("ParentLinks")
+  studentLinks       ParentLink[]        @relation("StudentLinks")
+  attendanceRecords  AttendanceRecord[]
+  ingestionJobs      IngestionJob[]
+  userBadges         UserBadge[]
+  pointsTransactions PointsTransaction[]
+  sentMessages       Message[]           @relation("MessageSender")
+  notifications      Notification[]
+  ingestedDocuments  SourceDocument[]    @relation("AdminIngestedDocs")
+  ingestedPapers     SamplePaper[]       @relation("AdminIngestedPapers")
+  extractionSessions ExtractionSession[]
+}
+
+model Batch {
+  id              String    @id @default(cuid())
+  name            String // e.g., "Target JEE 2026"
+  code            String    @unique // e.g., "JEE26" for students to request join
+  class           String? // e.g., "Class 12"
+  startDate       DateTime? // When the batch officially starts
+  teacherId       String
+  microsoftTeamId String?   @unique // Link to Microsoft Team ID
+  oneNoteUrl      String? // Link to Class Notebook
+  teamChatUrl     String? // Link to MS Teams General Channel
+  lastMeetingLink String? // Quick jump to last/current live meeting
+  lastMeetingId   String? // MS Graph meeting identity
+  createdAt       DateTime  @default(now())
+
+  teacher     User              @relation("TeacherBatches", fields: [teacherId], references: [id])
+  enrollments BatchEnrollment[]
+  assignments TestAssignment[]
+  coupons     DiscountCoupon[]
+  liveClasses LiveClass[]
+  notices     Notice[]
+  messages    Message[]
+}
+
+model LiveClass {
+  id           String   @id @default(cuid())
+  batchId      String
+  title        String
+  startTime    DateTime
+  endTime      DateTime
+  meetingUrl   String // Microsoft Teams Join Link
+  recordingUrl String? // Microsoft Teams Recording Link
+  eventId      String?  @unique // MS Graph Event ID for deduplication
+
+  batch      Batch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  attendance AttendanceRecord[]
+}
+
+// Notices / Announcements sent to student dashboards per batch
+model Notice {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.Text
+  batchId   String
+  teacherId String
+  createdAt DateTime @default(now())
+
+  batch   Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  teacher User  @relation("TeacherNotices", fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+// Teacher's personal saved / favourite questions
+model TeacherFavorite {
+  id         String   @id @default(cuid())
+  teacherId  String
+  questionId String
+  createdAt  DateTime @default(now())
+
+  @@unique([teacherId, questionId])
+}
+
+model FeeStructure {
+  id           String   @id @default(cuid())
+  teacherId    String // Fee structures are created by teachers, NOT linked to a specific batch
+  name         String // e.g., "Standard 2-Installment Plan" or "One-Time Upfront"
+  totalAmount  Float
+  installments Json // Stores array: [{ amount: 5000, description: "Inst 1", dueOffsetDays: 0 }, { amount: 5000, description: "Inst 2", dueOffsetDays: 30 }]
+  createdAt    DateTime @default(now())
+
+  teacher     User              @relation("TeacherFeeStructures", fields: [teacherId], references: [id])
+  enrollments BatchEnrollment[]
+}
+
+model BatchEnrollment {
+  id             String   @id @default(cuid())
+  batchId        String
+  studentId      String
+  feeStructureId String?
+  status         String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt      DateTime @default(now())
+
+  batch        Batch           @relation(fields: [batchId], references: [id])
+  student      User            @relation(fields: [studentId], references: [id])
+  feeStructure FeeStructure?   @relation(fields: [feeStructureId], references: [id])
+  payments     PaymentRecord[]
+
+  @@unique([batchId, studentId])
+}
+
+model DiscountCoupon {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  discountPct Float? // Percentage discount (e.g., 20.0 for 20%)
+  discountAmt Float? // Flat amount discount
+  batchId     String? // Optional: If null, applies to any batch
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  batch Batch? @relation(fields: [batchId], references: [id])
+}
+
+model PaymentRecord {
+  id            String    @id @default(cuid())
+  enrollmentId  String
+  amount        Float
+  description   String    @default("Fee Payment")
+  dueDate       DateTime?
+  status        String    @default("UPCOMING") // PAID, UNPAID (Overdue), UPCOMING, PENDING_VERIFICATION
+  transactionId String? // From Payment Gateway
+  paymentMode   String? // e.g., "Cash", "UPI", "Bank Transfer"
+  couponUsed    String? // Code of the applied coupon
+  recordedBy    String? // 'SYSTEM' or TeacherId (for manual entries)
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  enrollment BatchEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model Lead {
+  id             String   @id @default(cuid())
+  name           String
+  email          String?
+  phone          String
+  source         String? // e.g., "Website", "Referral"
+  courseInterest String? // e.g., "NDA 2026", "JEE 2025"
+  status         String   @default("NEW") // NEW, CONTACTED, CONVERTED, LOST
+  notes          String?  @db.Text
+  teacherId      String? // Scoping leads to a specific teacher
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  teacher User? @relation("TeacherLeads", fields: [teacherId], references: [id])
+}
+
+// NEW: System Features (Banners, Notifications, and Pages)
+model Banner {
+  id        String   @id @default(cuid())
+  title     String
+  imageUrl  String
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id            String    @id @default(cuid())
+  userId        String? // NULL = broadcast to role, otherwise specific user
+  title         String
+  message       String    @db.Text
+  type          String // TEST_REMINDER, FEE_DUE, ACHIEVEMENT, MESSAGE, BATCH_ANNOUNCEMENT, SYSTEM
+  targetRole    String? // "ALL", "STUDENT", "TEACHER", "PARENT"
+  targetBatchId String?
+  isRead        Boolean   @default(false)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SitePage {
+  id             String   @id @default(cuid())
+  slug           String   @unique // e.g., "home", "about-us"
+  title          String
+  content        Json // Stores blocks, text, images, AND styling metadata
+  isPublished    Boolean  @default(false)
+  isVisible      Boolean  @default(true) // For hiding/showing pages in the nav
+  globalSettings Json? // Institute branding (logo, name, phone, etc.)
+  updatedAt      DateTime @updatedAt
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum QuestionScope {
+  PUBLIC
+  TEACHER_PRIVATE
+}
+
+enum ExtractionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+enum SolutionStepType {
+  EXPLANATION
+  CALCULATION
+  DIAGRAM
+  FORMULA
+  CONCLUSION
+}
+
+enum TagType {
+  CLASS
+  SUBJECT
+  TOPIC
+  SUBTOPIC
+  EXAM_TYPE
+  CUSTOM
+}
+
+enum SourceType {
+  PDF
+  URL
+  IMAGE
+  YOUTUBE
+  WORD
+  TEXT
+  MANUAL
+}
+
+enum DocumentCategory {
+  QUESTION_PAPER
+  SOLUTIONS
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  INTEGER
+  TRUE_FALSE
+  SUBJECTIVE
+  FILL_IN_BLANKS
+  ASSERTION_REASONING
+  CASE_STUDY
+  VERY_SHORT_ANSWER
+  SHORT_ANSWER
+  LONG_ANSWER
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuestionStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REPORTED
+  ARCHIVED
+}
+
+model Question {
+  id String @id @default(cuid())
+
+  // Content
+  content       String // The actual question text (supports LaTeX)
+  options       Json? // Array of option strings (for MCQs)
+  correctAnswer String? // The correct option or integer value
+  explanation   String? // Step-by-step solution (supports LaTeX)
+
+  // Categorization & Taxonomy
+  type       QuestionType @default(SINGLE_CHOICE)
+  difficulty Difficulty   @default(MEDIUM)
+  subject    String? // e.g., "Math"
+  class      String? // e.g., "Class 12"
+  examType   String? // e.g., "NDA", "CUET", "Board"
+  topic      String? // e.g., "Calculus"
+  subTopic   String? // e.g., "Limits"
+  tags       String[] // Additional optional custom tags (legacy)
+
+  // QA Workflow
+  status          QuestionStatus @default(PENDING_REVIEW)
+  reportedIssues  String? // Notes if a teacher reports an error
+  originalRawText String?        @db.Text // Source text for typo verification
+  sourceUrl       String? // Link to original PDF or Website
+
+  // Scope & Confidence
+  scope       QuestionScope @default(PUBLIC)
+  confidence  Float? // AI extraction confidence (0-100)
+  reviewNotes String? // Admin/teacher review comments
+
+  // Source tracking
+  sourceDocumentId String? // Link to book chapter ingestion
+  samplePaperId    String? // Link to sample paper ingestion
+
+  // Versioning
+  currentVersion Int @default(1)
+
+  // Tracking
+  createdById       String // ID of Teacher or Admin who created it
+  knowledgeFolderId String? // Optional link to a KnowledgeFolder
+  createdAt         DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  createdBy       User             @relation(fields: [createdById], references: [id])
+  knowledgeFolder KnowledgeFolder? @relation(fields: [knowledgeFolderId], references: [id], onDelete: SetNull)
+  testQuestions   TestQuestion[]
+  testResponses   TestResponse[]
+
+  // New relations
+  sourceDocument SourceDocument?   @relation(fields: [sourceDocumentId], references: [id])
+  samplePaper    SamplePaper?      @relation(fields: [samplePaperId], references: [id])
+  solution       Solution?
+  images         QuestionImage[]
+  versions       QuestionVersion[]
+  questionTags   QuestionTag[]
+  embeddings     QuestionEmbedding[]
+}
+
+enum TestMode {
+  STRICT
+  PRACTICE
+}
+
+model Test {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  class       String? // e.g. "Class 12"
+  mode        TestMode @default(STRICT)
+  duration    Int      @default(60) // Duration in minutes
+  totalMarks  Float    @default(0)
+  isPublished Boolean  @default(false)
+
+  sections    TestSection[]
+  attempts    TestAttempt[]
+  assignments TestAssignment[]
+
+  createdById String   @default("admin")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id])
+}
+
+model TestAttempt {
+  id              String  @id @default(cuid())
+  testId          String? // Made optional for Practice Arena
+  isPracticeArena Boolean @default(false) // Flags practice sessions
+  userId          String
+
+  startTime DateTime  @default(now())
+  endTime   DateTime?
+  status    String    @default("IN_PROGRESS") // IN_PROGRESS, SUBMITTED, AUTO_SUBMITTED
+
+  totalScore     Float @default(0)
+  totalCorrect   Int   @default(0)
+  totalIncorrect Int   @default(0)
+  totalSkipped   Int   @default(0)
+
+  responses TestResponse[]
+
+  test Test? @relation(fields: [testId], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [userId], references: [id])
+}
+
+model TestSection {
+  id               String  @id @default(cuid())
+  testId           String
+  title            String // e.g., "Section A: Objective"
+  instructions     String?
+  marksPerQuestion Float   @default(4.0)
+  negativeMarks    Float   @default(1.0) // e.g., 1.0 means -1 for wrong answer
+
+  questions TestQuestion[]
+
+  test Test @relation(fields: [testId], references: [id], onDelete: Cascade)
+}
+
+model TestQuestion {
+  id         String @id @default(cuid())
+  sectionId  String
+  questionId String
+  orderIndex Int    @default(0)
+
+  section  TestSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id])
+}
+
+// Student-Test Responses
+model TestResponse {
+  id         String @id @default(cuid())
+  attemptId  String
+  questionId String
+
+  selectedOption  String? // For MCQs — the letter chosen e.g. "A"
+  subjectiveText  String? // Free-text answer for subjective questions
+  subjectiveImage String? // URL of uploaded handwritten solution image
+
+  isCorrect    Boolean @default(false)
+  marksAwarded Float   @default(0)
+
+  timeSpent Int    @default(0) // Seconds spent on this question
+  status    String @default("ANSWERED") // ANSWERED, MARKED_FOR_REVIEW, SKIPPED
+
+  attempt  TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id])
+}
+
+model TestAssignment {
+  id           String    @id @default(cuid())
+  testId       String
+  batchId      String? // If assigned to a whole batch
+  studentId    String? // If assigned to a specific student
+  scheduledFor DateTime? // When the test unlocks
+  deadline     DateTime? // When the test closes
+  maxAttempts  Int       @default(1) // Controls attempt limit
+  createdAt    DateTime  @default(now())
+
+  test    Test   @relation(fields: [testId], references: [id], onDelete: Cascade)
+  batch   Batch? @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student User?  @relation("StudentAssignments", fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+enum MaterialType {
+  PDF
+  VIDEO
+  LINK
+}
+
+model Material {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  type        MaterialType @default(PDF)
+  contentUrl  String // URL to PDF, Video, etc.
+  isFree      Boolean      @default(false)
+
+  // Categorization for robust filtering
+  class   String? // e.g. "Class 12"
+  subject String?
+  topic   String?
+
+  createdById String
+  createdBy   User   @relation("TeacherMaterials", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudentGoal {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  targetExam  String // e.g., "JEE Advanced"
+  targetScore Float // e.g., 250
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StudentProgress {
+  id              String   @id @default(cuid())
+  userId          String
+  topic           String
+  masteryScore    Int      @default(0) // 0-100 logic
+  currentStreak   Int      @default(0)
+  lastPracticedAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topic])
+}
+
+// NEW MODEL: Knowledge Folders (Topic-based grouping for Admins & Teachers)
+model KnowledgeFolder {
+  id        String  @id @default(cuid())
+  userId    String // Owner (Admin or Teacher)
+  topicName String // e.g., "Calculus - Integration"
+  className String? // e.g., "Class 12"
+  subject   String? // e.g., "Mathematics"
+  parentId  String? // Nullable, used to support sub-folders
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   KnowledgeFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children KnowledgeFolder[] @relation("FolderHierarchy")
+
+  documents      KnowledgeDocument[]
+  flashcards     Flashcard[]
+  documentChunks DocumentChunk[]
+  questions      Question[]
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicName, className, subject])
+}
+
+// NEW MODEL: Knowledge Documents (Multi-format Permanent Cache)
+model KnowledgeDocument {
+  id         String   @id @default(cuid())
+  folderId   String
+  title      String // e.g., "Class 12 Notes.pdf" or "YouTube Video URL"
+  sourceType String // e.g., "PDF", "WORD", "IMAGE", "URL", "YOUTUBE", "TEXT"
+  content    String   @db.Text // Raw extracted text for the LLM to read permanently
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  folder KnowledgeFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+}
+
+// --- NEW GAMIFICATION & INTEGRATIONS ---
+
+model Flashcard {
+  id        String   @id @default(cuid())
+  folderId  String
+  front     String   @db.Text
+  back      String   @db.Text
+  createdAt DateTime @default(now())
+
+  folder KnowledgeFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+}
+
+model PeerChallenge {
+  id           String   @id @default(cuid())
+  topic        String
+  challengerId String
+  opponentId   String
+  status       String   @default("PENDING") // PENDING, ACCEPTED, COMPLETED, DECLINED
+  winnerId     String?
+  createdAt    DateTime @default(now())
+
+  challenger User @relation("Challenger", fields: [challengerId], references: [id])
+  opponent   User @relation("Opponent", fields: [opponentId], references: [id])
+}
+
+model TeacherQuery {
+  id         String   @id @default(cuid())
+  studentId  String
+  teacherId  String
+  questionId String?
+  content    String   @db.Text
+  status     String   @default("OPEN") // OPEN, RESOLVED
+  createdAt  DateTime @default(now())
+
+  student User         @relation("StudentQueries", fields: [studentId], references: [id])
+  teacher User         @relation("TeacherReceivedQueries", fields: [teacherId], references: [id])
+  replies QueryReply[]
+}
+
+model QueryReply {
+  id        String   @id @default(cuid())
+  queryId   String
+  senderId  String
+  content   String   @db.Text
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  query  TeacherQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  sender User         @relation(fields: [senderId], references: [id])
+}
+
+model ParentLink {
+  id        String   @id @default(cuid())
+  parentId  String
+  studentId String
+  createdAt DateTime @default(now())
+
+  parent  User @relation("ParentLinks", fields: [parentId], references: [id])
+  student User @relation("StudentLinks", fields: [studentId], references: [id])
+
+  @@unique([parentId, studentId])
+}
+
+model AttendanceRecord {
+  id               String    @id @default(cuid())
+  liveClassId      String
+  studentId        String
+  status           String    @default("PRESENT") // PRESENT, ABSENT, LATE
+  joinTime         DateTime?
+  leaveTime        DateTime?
+  durationMinutes  Int?
+  isManualOverride Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  liveClass LiveClass @relation(fields: [liveClassId], references: [id], onDelete: Cascade)
+  student   User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([liveClassId, studentId])
+}
+
+//─── PHASE 3: AUTOMATED DEEP INGESTION ENGINE ───────────────────────────────
+
+// Requires PostgreSQL with pgvector extension enabled
+// Run in Supabase SQL Editor: CREATE EXTENSION IF NOT EXISTS vector;
+model DocumentChunk {
+  id       String   @id @default(cuid())
+  folderId String
+  content  String   @db.Text
+  tags     String[]
+
+  // Vector embedding field (1536 dimensions for OpenAI/Gemini embeddings)
+  embedding Unsupported("vector(1536)")?
+
+  createdAt DateTime        @default(now())
+  folder    KnowledgeFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+}
+
+// Job tracking table for the Admin UI (Inngest handles the actual queue execution)
+model IngestionJob {
+  id         String @id @default(cuid())
+  userId     String
+  sourceType String // "RECURSIVE_URL" or "MASSIVE_PDF"
+  sourceUrl  String @db.Text
+  status     String @default("PROCESSING") // PROCESSING, COMPLETED, FAILED
+
+  // LIVE PROGRESS TRACKING
+  totalItems     Int   @default(0)
+  processedItems Int   @default(0)
+  progress       Float @default(0) // Percentage 0 to 100
+
+  logs      Json? // Array of timestamped log strings for the live UI terminal
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENGAGEMENT & GAMIFICATION MODELS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Badge definitions
+model Badge {
+  id          String      @id @default(cuid())
+  name        String // "First Test", "7-Day Streak", etc.
+  description String
+  icon        String // Lucide icon name (e.g., "Trophy", "Flame")
+  criteria    Json // Flexible criteria definition
+  points      Int         @default(0)
+  isSecret    Boolean     @default(false)
+  category    String      @default("achievement") // achievement, milestone, special
+  createdAt   DateTime    @default(now())
+  userBadges  UserBadge[]
+}
+
+// User's earned badges
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+}
+
+// Points transactions (XP system)
+model PointsTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  points    Int // positive = earned, negative = penalty
+  reason    String // "Test completed", "Streak bonus", "Top scorer"
+  metadata  Json? // Additional context (testId, batchId, etc.)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Batch messaging system
+model Message {
+  id          String   @id @default(cuid())
+  batchId     String
+  senderId    String
+  content     String   @db.Text
+  isBroadcast Boolean  @default(false) // true = teacher announcement, false = student reply
+  createdAt   DateTime @default(now())
+  batch       Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QUESTION BANK REVAMP: Source Documents, Sample Papers, Solutions, etc.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Book chapter ingestion source
+model SourceDocument {
+  id           String            @id @default(cuid())
+  title        String // e.g., "RD Sharma Chapter 5 - Trigonometry.pdf"
+  sourceType   SourceType
+  documentCategory DocumentCategory @default(QUESTION_PAPER)
+  sourceUrl    String? // URL for web/YouTube sources
+  filePath     String? // Local path for uploaded files
+  thumbnailUrl String? // Preview image
+
+  // Chapter-level metadata
+  className   String? // e.g., "Class 12"
+  subject     String? // e.g., "Mathematics"
+  chapterName String? // e.g., "Chapter 5: Trigonometry"
+
+  // Extraction state
+  status                  ExtractionStatus @default(PENDING)
+  totalPages              Int?
+  processedPages          Int              @default(0)
+  totalQuestionsExtracted Int              @default(0)
+  totalSolutionsExtracted Int              @default(0)
+
+  // Tracking
+  ingestedBy   String // Admin userId
+  ingestedAt   DateTime  @default(now())
+  completedAt  DateTime?
+  errorMessage String?
+
+  // Relations
+  pages             DocumentPage[]
+  questions         Question[]
+  ingestedByUser    User           @relation("AdminIngestedDocs", fields: [ingestedBy], references: [id])
+  extractionSessions ExtractionSession[]
+  extractionSessionsWithSolutions ExtractionSession[] @relation("SessionSolutionDoc")
+
+  @@index([status])
+  @@index([ingestedBy])
+  @@index([className, subject])
+}
+
+// Individual pages of a book chapter
+model DocumentPage {
+  id         String @id @default(cuid())
+  documentId String
+  pageNumber Int // 1-based page number
+
+  // Raw OCR output from Mathpix
+  rawMarkdown String @db.Text
+  rawText     String @db.Text // Plain text version
+
+  // Extraction results
+  detectedQuestions Int      @default(0)
+  detectedSolutions Int      @default(0)
+  hasImages         Boolean  @default(false)
+  imageUrls         String[] // Extracted diagram/image URLs
+
+  // Processing
+  status       ExtractionStatus @default(PENDING)
+  errorMessage String?
+
+  document SourceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, pageNumber])
+  @@index([documentId])
+}
+
+// Sample/mock paper ingestion source
+model SamplePaper {
+  id    String @id @default(cuid())
+  title String // e.g., "JEE Main 2024 - Mathematics Sample Paper"
+
+  // Paper metadata
+  examName  String // e.g., "JEE Main", "CBSE Board"
+  year      Int // e.g., 2024
+  board     String? // e.g., "CBSE", "NTA", "ICSE"
+  timeLimit Int? // in minutes
+  maxMarks  Float?
+
+  // Sections: [{ name: "Section A", type: "MCQ", questionCount: 20, marksPerQuestion: 4 }, ...]
+  sections Json?
+
+  // Source
+  sourceType   SourceType // PDF, URL, IMAGE, MANUAL
+  sourceUrl    String?
+  filePath     String?
+  thumbnailUrl String?
+
+  // Extraction state
+  status                  ExtractionStatus @default(PENDING)
+  totalPages              Int?
+  processedPages          Int              @default(0)
+  totalQuestionsExtracted Int              @default(0)
+
+  // Tracking
+  ingestedBy   String // Admin userId
+  ingestedAt   DateTime  @default(now())
+  completedAt  DateTime?
+  errorMessage String?
+
+  // Relations
+  questions      Question[]
+  pages          SamplePaperPage[]
+  ingestedByUser User              @relation("AdminIngestedPapers", fields: [ingestedBy], references: [id])
+
+  @@index([status])
+  @@index([examName, year])
+  @@index([ingestedBy])
+}
+
+// Individual pages of a sample paper
+model SamplePaperPage {
+  id         String @id @default(cuid())
+  paperId    String
+  pageNumber Int // 1-based
+
+  // Raw OCR output
+  rawMarkdown String @db.Text
+  rawText     String @db.Text
+
+  // Extraction results
+  detectedQuestions Int      @default(0)
+  detectedSolutions Int      @default(0)
+  hasImages         Boolean  @default(false)
+  imageUrls         String[]
+
+  // Processing
+  status       ExtractionStatus @default(PENDING)
+  errorMessage String?
+
+  paper SamplePaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  @@unique([paperId, pageNumber])
+  @@index([paperId])
+}
+
+// Solutions (separate from questions for multi-step, cross-page matching)
+model Solution {
+  id         String @id @default(cuid())
+  questionId String @unique // One solution per question
+  content    String @db.Text // Full solution text (LaTeX supported)
+
+  // Multi-step breakdown: [{ stepNumber: 1, type: "FORMULA", content: "f(x) = x²", explanation: "Given function" }, ...]
+  steps Json?
+
+  // Source tracking
+  sourcePageId      String? // Which DocumentPage this was extracted from
+  sourcePaperPageId String? // Which SamplePaperPage this was extracted from
+  confidence        Float? // AI confidence this solution matches the question (0-100)
+  isVerified        Boolean @default(false) // Admin verified
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+// Question version history (audit trail)
+model QuestionVersion {
+  id         String @id @default(cuid())
+  questionId String
+  version    Int // 1, 2, 3...
+
+  // Snapshot of question at this version
+  content       String
+  options       Json?
+  correctAnswer String?
+  explanation   String?
+  type          String
+  difficulty    String
+  topic         String?
+  subTopic      String?
+  tags          String[]
+
+  changedBy    String // userId
+  changeReason String? // "AI extraction", "Manual edit", "Teacher correction"
+
+  createdAt DateTime @default(now())
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@index([questionId, version])
+}
+
+// Images/diagrams embedded in questions
+model QuestionImage {
+  id         String  @id @default(cuid())
+  questionId String
+  imageUrl   String // URL or base64 data URI
+  caption    String? // e.g., "Figure 1: Graph of f(x)"
+  imageType  String  @default("diagram") // diagram, graph, geometry, chart
+  orderIndex Int     @default(0)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+// Hierarchical tag taxonomy (Class → Subject → Topic → SubTopic)
+model TagTaxonomy {
+  id       String  @id @default(cuid())
+  name     String // e.g., "Calculus", "Class 12"
+  type     TagType // CLASS, SUBJECT, TOPIC, SUBTOPIC, EXAM_TYPE, CUSTOM
+  parentId String? // For hierarchy
+
+  description String?
+  isActive    Boolean @default(true)
+
+  // Usage tracking
+  questionCount Int @default(0)
+
+  // Taxonomy metadata
+  order      Int @default(0) // Sort order within parent
+  source     CurriculumSource @default(MANUAL) // How this entry was added
+  sourceUrl  String? // Reference URL for official curriculum
+  isApproved Boolean @default(true) // Requires admin approval if false
+  isLocked   Boolean @default(false) // Official entries cannot be edited/deleted by teachers
+  approvedBy String? // Admin user ID who approved
+  approvedAt DateTime?
+
+  // Board/exam association (for competitive exams)
+  boardType   BoardType?
+  
+  // Metadata
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  parent       TagTaxonomy?  @relation("TaxonomyHierarchy", fields: [parentId], references: [id])
+  children     TagTaxonomy[] @relation("TaxonomyHierarchy")
+  questionTags QuestionTag[]
+
+  @@unique([name, type, parentId])
+  @@index([type])
+  @@index([parentId])
+  @@index([boardType])
+}
+
+// Source type for taxonomy entries
+enum CurriculumSource {
+  OFFICIAL    // From official board/exam syllabus
+  MANUAL      // Manually added by admin
+}
+
+// Board/exam type for classification
+enum BoardType {
+  CBSE
+  NDA
+  CUET
+  JEE_MAIN
+}
+
+// Many-to-many join between Questions and TagTaxonomy
+model QuestionTag {
+  id         String @id @default(cuid())
+  questionId String
+  tagId      String
+
+  confidence Float? // AI tagging confidence (0-100)
+  isVerified Boolean @default(false) // Admin/teacher verified
+
+  question Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  tag      TagTaxonomy @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, tagId])
+  @@index([questionId])
+  @@index([tagId])
+}
+
+// User's extraction sessions for the manual PDF question composer
+model ExtractionSession {
+  id                String    @id @default(cuid())
+  userId            String
+  sourceDocumentId  String?
+  solutionDocumentId String?
+  status            String    @default("DRAFT") // DRAFT / COMPLETED / DISCARDED
+
+  // User-authored questions (template data, not yet Question records)
+  authoredQuestions Json? // [{ id, type, question, options, correctOption, solution, assertion?, reasoning?, passage?, subQuestions? }]
+
+  // Taxonomy snapshot at time of creation
+  topicIds    Json? // Array of KnowledgeFolder IDs for multi-topic association
+  topicId     String? // Primary topic (backward compat)
+  topicName   String?
+  subjectName String?
+  className   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user                    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceDocument          SourceDocument?  @relation(fields: [sourceDocumentId], references: [id])
+  solutionDocument        SourceDocument?  @relation("SessionSolutionDoc", fields: [solutionDocumentId], references: [id])
+
+  @@index([userId, status])
+}
+
+// Embedding store for approved questions (RAG-powered question generation)
+model QuestionEmbedding {
+  id         String   @id @default(cuid())
+  questionId String
+  content    String   @db.Text
+  embedding  Unsupported("vector(1536)")?
+  tags       String[]
+  createdAt  DateTime @default(now())
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}

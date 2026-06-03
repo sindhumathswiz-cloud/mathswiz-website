@@ -1,0 +1,192 @@
+{
+  "board": "CBSE",
+  "classes": [
+    {
+      "name": "Class 10",
+      "topics": [
+        {
+          "name": "Real Numbers",
+          "subtopics": ["Euclid's division lemma", "Fundamental Theorem of Arithmetic", "Revisiting rational and irrational numbers", "Decimal expansions"]
+        },
+        {
+          "name": "Polynomials",
+          "subtopics": ["Geometrical meaning of zeroes", "Relationship between zeroes and coefficients", "Division algorithm for polynomials"]
+        },
+        {
+          "name": "Pair of Linear Equations in Two Variables",
+          "subtopics": ["Graphical method of solution", "Algebraic methods: substitution, elimination, cross-multiplication", "Equations reducible to linear form", "Word problems"]
+        },
+        {
+          "name": "Quadratic Equations",
+          "subtopics": ["Standard form of quadratic equation", "Solution by factorisation", "Solution by completing the square", "Quadratic formula", "Nature of roots", "Word problems"]
+        },
+        {
+          "name": "Arithmetic Progressions",
+          "subtopics": ["General term of an AP", "Sum of n terms of an AP", "Arithmetic mean", "Applications in real life"]
+        },
+        {
+          "name": "Triangles",
+          "subtopics": ["Similarity of triangles", "Criteria for similarity (AAA, SSS, SAS)", "Pythagoras theorem and its converse", "Applications of similarity"]
+        },
+        {
+          "name": "Coordinate Geometry",
+          "subtopics": ["Distance formula", "Section formula", "Area of triangle", "Applications in geometry"]
+        },
+        {
+          "name": "Introduction to Trigonometry",
+          "subtopics": ["Trigonometric ratios", "Trigonometric ratios of complementary angles", "Trigonometric identities", "Values of trigonometric ratios for standard angles"]
+        },
+        {
+          "name": "Applications of Trigonometry",
+          "subtopics": ["Heights and distances", "Angle of elevation and depression", "Problems involving one or more right triangles"]
+        },
+        {
+          "name": "Circles",
+          "subtopics": ["Tangent to a circle", "Number of tangents from a point", "Length of tangent", "Tangent-secant theorem"]
+        },
+        {
+          "name": "Areas Related to Circles",
+          "subtopics": ["Area of sector and segment", "Length of an arc", "Area of combinations of plane figures"]
+        },
+        {
+          "name": "Surface Areas and Volumes",
+          "subtopics": ["Surface area of combinations of solids", "Volume of combinations of solids", "Conversion of solids", "Frustum of a cone"]
+        },
+        {
+          "name": "Statistics",
+          "subtopics": ["Mean of grouped data", "Mode of grouped data", "Median of grouped data", "Ogive: cumulative frequency curves"]
+        },
+        {
+          "name": "Probability",
+          "subtopics": ["Classical definition of probability", "Complementary events", "Sure and impossible events", "Problems based on dice, cards, coins"]
+        }
+      ]
+    },
+    {
+      "name": "Class 11",
+      "topics": [
+        {
+          "name": "Sets",
+          "subtopics": ["Types of sets", "Venn diagrams", "Operations on sets", "Complement of a set", "Practical problems on union and intersection"]
+        },
+        {
+          "name": "Relations and Functions",
+          "subtopics": ["Cartesian product of sets", "Relations: domain, range, codomain", "Functions: domain, codomain, range", "Types of functions: one-one, onto, bijective", "Algebra of real functions"]
+        },
+        {
+          "name": "Trigonometric Functions",
+          "subtopics": ["Angles and their measures", "Trigonometric functions of sum and difference of angles", "Trigonometric equations", "Graphs of trigonometric functions", "Sine and cosine formulae"]
+        },
+        {
+          "name": "Principle of Mathematical Induction",
+          "subtopics": ["Statement of the principle", "Proof by induction", "Applications to summation and divisibility"]
+        },
+        {
+          "name": "Complex Numbers and Quadratic Equations",
+          "subtopics": ["Algebra of complex numbers", "Modulus and conjugate", "Argand plane and polar representation", "De Moivre's theorem", "Quadratic equations with complex roots"]
+        },
+        {
+          "name": "Linear Inequalities",
+          "subtopics": ["Inequalities in one variable", "Inequalities in two variables", "Graphical solution of linear inequalities", "Solution of system of linear inequalities"]
+        },
+        {
+          "name": "Permutations and Combinations",
+          "subtopics": ["Fundamental principle of counting", "Permutations", "Combinations", "Applications in arrangement and selection"]
+        },
+        {
+          "name": "Binomial Theorem",
+          "subtopics": ["Binomial theorem for positive integer index", "General term and middle term", "Properties of binomial coefficients", "Applications of binomial theorem"]
+        },
+        {
+          "name": "Sequences and Series",
+          "subtopics": ["Arithmetic progression (AP)", "Geometric progression (GP)", "Special series: sum of squares and cubes", "Arithmetic and geometric means"]
+        },
+        {
+          "name": "Straight Lines",
+          "subtopics": ["Slope of a line", "Various forms of equation of a line", "Angle between two lines", "Distance of a point from a line", "Locus and its equation"]
+        },
+        {
+          "name": "Conic Sections",
+          "subtopics": ["Circle: equation, centre, radius", "Parabola: standard equation, focus, directrix", "Ellipse: standard equation, foci, eccentricity", "Hyperbola: standard equation, foci, asymptotes"]
+        },
+        {
+          "name": "Introduction to Three Dimensional Geometry",
+          "subtopics": ["Coordinate axes and planes", "Distance between two points", "Section formula", "Coordinates of a point in space"]
+        },
+        {
+          "name": "Limits and Derivatives",
+          "subtopics": ["Intuitive idea of limits", "Standard limits", "Algebra of limits", "Derivative of a function at a point", "Derivative of polynomial and trigonometric functions"]
+        },
+        {
+          "name": "Mathematical Reasoning",
+          "subtopics": ["Statements and logical connectives", "Negation, conjunction, disjunction", "Implication and its converse", "Validating statements", "Contrapositive and converse"]
+        },
+        {
+          "name": "Statistics",
+          "subtopics": ["Measures of dispersion", "Mean deviation", "Variance and standard deviation", "Analysis of frequency distributions"]
+        },
+        {
+          "name": "Probability",
+          "subtopics": ["Random experiments and events", "Axiomatic approach to probability", "Addition theorem of probability", "Conditional probability", "Multiplication theorem", "Bayes' theorem"]
+        }
+      ]
+    },
+    {
+      "name": "Class 12",
+      "topics": [
+        {
+          "name": "Relations and Functions",
+          "subtopics": ["Types of relations: reflexive, symmetric, transitive, equivalence", "Types of functions: injective, surjective, bijective", "Composition of functions", "Invertible functions", "Binary operations"]
+        },
+        {
+          "name": "Inverse Trigonometric Functions",
+          "subtopics": ["Principal values", "Domain and range of inverse trigonometric functions", "Properties of inverse trigonometric functions", "Simplification of expressions"]
+        },
+        {
+          "name": "Matrices",
+          "subtopics": ["Types of matrices", "Operations on matrices", "Transpose and symmetric matrices", "Elementary row operations", "Inverse of a matrix"]
+        },
+        {
+          "name": "Determinants",
+          "subtopics": ["Determinant of a square matrix", "Properties of determinants", "Minors and cofactors", "Adjoint and inverse", "Cramer's rule", "Area of triangle using determinant"]
+        },
+        {
+          "name": "Continuity and Differentiability",
+          "subtopics": ["Continuity of functions", "Differentiability", "Derivatives of implicit functions", "Logarithmic differentiation", "Derivatives of inverse trigonometric functions", "Mean value theorems"]
+        },
+        {
+          "name": "Application of Derivatives",
+          "subtopics": ["Rate of change", "Increasing and decreasing functions", "Tangents and normals", "Maxima and minima", "First and second derivative tests", "Word problems on optimisation"]
+        },
+        {
+          "name": "Integrals",
+          "subtopics": ["Integration as reverse of differentiation", "Methods of integration: substitution, by parts, partial fractions", "Definite integrals", "Properties of definite integrals", "Evaluation of definite integrals"]
+        },
+        {
+          "name": "Application of Integrals",
+          "subtopics": ["Area under simple curves", "Area between two curves", "Area bounded by curves and lines"]
+        },
+        {
+          "name": "Differential Equations",
+          "subtopics": ["Order and degree of differential equations", "Formation of differential equations", "Solution of first order and first degree DE", "Variable separable method", "Homogeneous differential equations", "Linear differential equations"]
+        },
+        {
+          "name": "Vector Algebra",
+          "subtopics": ["Types of vectors", "Addition and scalar multiplication of vectors", "Dot product", "Cross product", "Projection of a vector"]
+        },
+        {
+          "name": "Three Dimensional Geometry",
+          "subtopics": ["Direction cosines and direction ratios", "Equation of a line in space", "Angle between two lines", "Equation of a plane", "Distance of a point from a plane", "Angle between two planes"]
+        },
+        {
+          "name": "Linear Programming",
+          "subtopics": ["Linear programming problem formulation", "Graphical method of solution", "Feasible and optimal solutions", "Different types of LPP"]
+        },
+        {
+          "name": "Probability",
+          "subtopics": ["Conditional probability", "Multiplication theorem", "Bayes' theorem", "Random variables and probability distributions", "Mean and variance of a random variable", "Binomial distribution"]
+        }
+      ]
+    }
+  ]
+}

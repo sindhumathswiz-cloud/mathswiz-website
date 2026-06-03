@@ -1,0 +1,79 @@
+{
+  "board": "NDA",
+  "exam": "National Defence Academy Examination",
+  "sourceUrl": "https://www.upsc.gov.in/general-information/nda-na-examination-syllabus",
+  "paper": "Mathematics (Paper II)",
+  "topics": [
+    "Algebra",
+    "Matrices and Determinants",
+    "Trigonometry",
+    "Analytical Geometry of Two and Three Dimensions",
+    "Differential Calculus",
+    "Integral Calculus and Differential Equations",
+    "Vector Algebra",
+    "Statistics and Probability"
+  ],
+  "detailedSyllabus": {
+    "Algebra": [
+      "Concept of a set, operations on sets, Venn diagrams",
+      "De Morgan laws, Cartesian product, relation, equivalence relation",
+      "Linear equations, quadratic equations with real coefficients",
+      "Binary system of numbers, conversion to decimal and back",
+      "Arithmetic, geometric and harmonic progressions",
+      "Binomial theorem and its applications",
+      "Basic concepts of group theory"
+    ],
+    "Matrices and Determinants": [
+      "Types of matrices, operations on matrices",
+      "Adjoint and inverse of a square matrix",
+      "Determinant, properties of determinants",
+      "System of linear equations, consistency and inconsistency",
+      "Cramer's rule, Gaussian elimination"
+    ],
+    "Trigonometry": [
+      "Angles and their measures, trigonometric functions",
+      "Trigonometric identities and equations",
+      "Solutions of triangles, heights and distances",
+      "Inverse trigonometric functions"
+    ],
+    "Analytical Geometry of Two and Three Dimensions": [
+      "Rectangular Cartesian coordinate system",
+      "Distance formula, section formula, locus problems",
+      "Equation of a line in various forms",
+      "Angle between two lines, distance of a point from a line",
+      "Equation of a circle, tangent to a circle",
+      "Equation of parabola, ellipse and hyperbola",
+      "Direction cosines and direction ratios",
+      "Equation of a plane, distance from a point to a plane",
+      "Angle between two lines, line and plane"
+    ],
+    "Differential Calculus": [
+      "Functions, domain and range",
+      "Limit and continuity, differentiability",
+      "Derivatives of sum, product and quotient",
+      "Chain rule, derivatives of inverse functions",
+      "Second order derivatives, applications"
+    ],
+    "Integral Calculus and Differential Equations": [
+      "Integration as inverse of differentiation",
+      "Integrals of standard functions",
+      "Methods of integration, integration by parts",
+      "Definite integrals, area under curves",
+      "Formation of differential equations",
+      "Solutions of first order differential equations"
+    ],
+    "Vector Algebra": [
+      "Vectors, magnitude and direction",
+      "Addition and subtraction of vectors",
+      "Scalar and vector products",
+      "Applications to geometry and physics"
+    ],
+    "Statistics and Probability": [
+      "Measures of central tendency, dispersion",
+      "Mean, median, mode, standard deviation",
+      "Probability, classical and statistical definitions",
+      "Conditional probability, Bayes theorem",
+      "Binomial distribution, random experiments"
+    ]
+  }
+}

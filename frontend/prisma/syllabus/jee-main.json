@@ -1,0 +1,200 @@
+{
+  "board": "JEE_MAIN",
+  "exam": "Joint Entrance Examination Main",
+  "sourceUrl": "https://jeemain.nta.nic.in",
+  "topics": [
+    {
+      "name": "Sets, Relations and Functions",
+      "subtopics": [
+        "Sets and their representations",
+        "Union, intersection, complement of sets",
+        "Types of relations, equivalence relations",
+        "Functions, composition of functions",
+        "Binary operations",
+        "Inverse trigonometric functions"
+      ]
+    },
+    {
+      "name": "Complex Numbers",
+      "subtopics": [
+        "Modulus and argument of a complex number",
+        "Argand plane, polar representation",
+        "Algebra of complex numbers",
+        "Square root of a complex number",
+        "De Moivre's theorem and its applications"
+      ]
+    },
+    {
+      "name": "Matrices and Determinants",
+      "subtopics": [
+        "Types of matrices",
+        "Matrix operations",
+        "Transpose, adjoint, inverse of matrices",
+        "Determinant properties",
+        "System of linear equations",
+        "Cramer's rule and Gaussian elimination"
+      ]
+    },
+    {
+      "name": "Quadratic Equations",
+      "subtopics": [
+        "Relationship between roots and coefficients",
+        "Nature of roots",
+        "Transformation of quadratic equations",
+        "Solution of quadratic equations",
+        "Applications to word problems"
+      ]
+    },
+    {
+      "name": "Permutations and Combinations",
+      "subtopics": [
+        "Fundamental principle of counting",
+        "Permutations",
+        "Combinations",
+        "Binomial theorem",
+        "Pascal's triangle"
+      ]
+    },
+    {
+      "name": "Sequences and Series",
+      "subtopics": [
+        "Arithmetic progressions",
+        "Geometric progressions",
+        "Arithmetic and geometric means",
+        "Sum of n terms of AP and GP",
+        "Infinite geometric series",
+        "Special series (sum of squares, cubes)"
+      ]
+    },
+    {
+      "name": "Binomial Theorem",
+      "subtopics": [
+        "General term and middle term",
+        "Properties of binomial coefficients",
+        "Binomial theorem for positive integer index",
+        "Applications and evaluations"
+      ]
+    },
+    {
+      "name": "Coordinate Geometry",
+      "subtopics": [
+        "Cartesian system of coordinates",
+        "Distance formula, section formula",
+        "Locus and its equation",
+        "Slope of a line, angle between lines",
+        "Various forms of equation of a line",
+        "Family of lines",
+        "Circle and its equation",
+        "Parabola, ellipse, hyperbola"
+      ]
+    },
+    {
+      "name": "Three Dimensional Geometry",
+      "subtopics": [
+        "Direction cosines and ratios",
+        "Equation of a line in space",
+        "Angle between two lines",
+        "Equation of a plane",
+        "Distance of a point from a plane",
+        "Angle between a line and a plane"
+      ]
+    },
+    {
+      "name": "Vector Algebra",
+      "subtopics": [
+        "Vectors and scalars",
+        "Magnitude and direction",
+        "Vector addition and subtraction",
+        "Scalar and vector products",
+        "Triple product",
+        "Application to geometry and physics"
+      ]
+    },
+    {
+      "name": "Limits, Continuity and Differentiability",
+      "subtopics": [
+        "Limit of a function",
+        "Standard limits",
+        "Continuity of a function",
+        "Differentiability",
+        "Derivatives of various functions",
+        "L'Hospital's rule"
+      ]
+    },
+    {
+      "name": "Differential Calculus",
+      "subtopics": [
+        "Derivative as rate of change",
+        "Derivative of polynomial and trigonometric functions",
+        "Chain rule",
+        "Derivative of implicit functions",
+        "Second order derivatives",
+        "Applications: tangent and normal"
+      ]
+    },
+    {
+      "name": "Applications of Derivatives",
+      "subtopics": [
+        "Rate of change",
+        "Increasing and decreasing functions",
+        "Maxima and minima",
+        "First derivative test",
+        "Second derivative test",
+        "Word problems on maxima and minima"
+      ]
+    },
+    {
+      "name": "Integral Calculus",
+      "subtopics": [
+        "Integration as inverse of differentiation",
+        "Standard integrals",
+        "Integration by substitution",
+        "Integration by parts",
+        "Integration by partial fractions",
+        "Definite integrals",
+        "Area under curves"
+      ]
+    },
+    {
+      "name": "Differential Equations",
+      "subtopics": [
+        "Order and degree of differential equations",
+        "Formation of differential equations",
+        "Solution of first order differential equations",
+        "Homogeneous differential equations",
+        "Linear differential equations"
+      ]
+    },
+    {
+      "name": "Statistics and Probability",
+      "subtopics": [
+        "Measures of central tendency",
+        "Measures of dispersion",
+        "Standard deviation, variance",
+        "Probability",
+        "Conditional probability",
+        "Bayes theorem",
+        "Binomial distribution"
+      ]
+    },
+    {
+      "name": "Trigonometry",
+      "subtopics": [
+        "Trigonometric functions and identities",
+        "Values of trigonometric ratios",
+        "Trigonometric equations",
+        "Inverse trigonometric functions",
+        "Heights and distances"
+      ]
+    },
+    {
+      "name": "Mathematical Reasoning",
+      "subtopics": [
+        "Statements and logical operations",
+        "Negation, conjunction, disjunction",
+        "Implication and converse",
+        "Validating statements"
+      ]
+    }
+  ]
+}
