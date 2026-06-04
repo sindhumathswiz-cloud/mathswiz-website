@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { sanitizeLatex } from "@/lib/latex-sanitizer";
+import { checkBlockingDuplicate } from "@/lib/duplicate-checker";
+import { computeContentHash } from "@/lib/question-classifier";
 
 export const dynamic = 'force-dynamic';
 
@@ -131,13 +134,19 @@ export async function POST(req: Request) {
         const body = await req.json();
         const questions = Array.isArray(body) ? body : [body];
 
-        const mapType = (type: string): "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "INTEGER" | "TRUE_FALSE" | "SUBJECTIVE" => {
+        const mapType = (type: string): "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "INTEGER" | "TRUE_FALSE" | "SUBJECTIVE" | "FILL_IN_BLANKS" | "ASSERTION_REASONING" | "CASE_STUDY" | "VERY_SHORT_ANSWER" | "SHORT_ANSWER" | "LONG_ANSWER" => {
             if (!type) return "SINGLE_CHOICE";
             const t = type.toUpperCase().replace(/\s+/g, '_');
             if (t.includes("MULTIPLE")) return "MULTIPLE_CHOICE";
             if (t.includes("SUBJECTIVE")) return "SUBJECTIVE";
             if (t.includes("TRUE")) return "TRUE_FALSE";
             if (t.includes("INTEGER")) return "INTEGER";
+            if (t.includes("FILL")) return "FILL_IN_BLANKS";
+            if (t.includes("ASSERTION")) return "ASSERTION_REASONING";
+            if (t.includes("CASE")) return "CASE_STUDY";
+            if (t.includes("VERY_SHORT")) return "VERY_SHORT_ANSWER";
+            if (t.includes("SHORT")) return "SHORT_ANSWER";
+            if (t.includes("LONG")) return "LONG_ANSWER";
             return "SINGLE_CHOICE";
         };
 
@@ -152,13 +161,32 @@ export async function POST(req: Request) {
         const created = await prisma.$transaction(async (tx) => {
             const results: any[] = [];
             for (const q of questions) {
+                // Sanitize LaTeX in all text fields
+                const sanitizedContent = sanitizeLatex(q.content);
+                const sanitizedExplanation = sanitizeLatex(q.explanation);
+                const sanitizedCorrectAnswer = sanitizeLatex(q.correctAnswer);
+
+                // Skip content that is just a math expression without actual question text
+                if (!sanitizedContent || sanitizedContent.replace(/\$/g, '').trim().length < 10) continue;
+                if (!/[A-Za-z]{3,}/.test(sanitizedContent.replace(/\\[a-z]+/g, ''))) continue;
+
+                // Compute content hash for deduplication
+                const hash = computeContentHash(sanitizedContent || '');
+
+                // Check for blocking duplicates
+                const dupCheck = await checkBlockingDuplicate(sanitizedContent || '');
+                if (dupCheck.isDuplicate) {
+                    throw new Error(`DUPLICATE:${q.content?.substring(0, 80)}::${dupCheck.existingQuestionId}`);
+                }
+
                 const question = await tx.question.create({
                     data: {
-                        content: q.content,
+                        content: sanitizedContent || '',
                         options: q.options || [],
-                        correctAnswer: q.correctAnswer || "",
-                        explanation: q.explanation || "",
+                        correctAnswer: sanitizedCorrectAnswer || '',
+                        explanation: sanitizedExplanation || '',
                         tags: Array.isArray(q.tags) ? q.tags : [],
+                        contentHash: hash,
                         type: mapType(q.type),
                         difficulty: mapDifficulty(q.difficulty),
                         subject: q.subject || "Mathematics",
@@ -215,6 +243,16 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true, count: created.length, scope });
     } catch (error: any) {
+        const dupMatch = error.message?.match(/^DUPLICATE:(.+)::(.+)$/);
+        if (dupMatch) {
+            return NextResponse.json({
+                success: false,
+                duplicate: true,
+                question: dupMatch[1],
+                existingQuestionId: dupMatch[2],
+                error: 'Duplicate question detected. A question with identical content already exists.',
+            }, { status: 409 });
+        }
         console.error("Database Insert Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

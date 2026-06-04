@@ -161,7 +161,10 @@ export function IngestionHub() {
       });
       const data = await res.json();
 
-      if (data.success) {
+      if (res.status === 409) {
+        const dupCount = data.duplicates?.length || 0;
+        toast.success(`Imported ${questions.length - dupCount} questions (${dupCount} duplicates skipped)!`);
+      } else if (data.success) {
         toast.success(`Imported ${data.count} questions successfully!`);
       } else {
         toast.error(data.error || 'Failed to import questions');
@@ -244,7 +247,12 @@ export function IngestionHub() {
       });
       const data = await res.json();
 
-      if (data.success) {
+      if (res.status === 409) {
+        const dupCount = data.duplicates?.length || 0;
+        toast.success(`Saved ${extractedQuestions.length - dupCount} questions (${dupCount} duplicates skipped)!`);
+        setExtractedQuestions([]);
+        setShowResults(false);
+      } else if (data.success) {
         toast.success(`Saved ${data.count} questions to ${data.scope}!`);
         setExtractedQuestions([]);
         setShowResults(false);

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { sanitizeLatex } from "@/lib/latex-sanitizer";
+import { checkBlockingDuplicate } from "@/lib/duplicate-checker";
+import { computeContentHash } from "@/lib/question-classifier";
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,13 +56,24 @@ export async function POST(request: NextRequest) {
         const mappedType = typeMap[q.type] || "SINGLE_CHOICE";
         const mappedDifficulty = difficultyMap[q.difficulty] || "MEDIUM";
 
+        const sanitizedContent = sanitizeLatex(q.question);
+        const sanitizedExplanation = sanitizeLatex(q.solution);
+        const sanitizedCorrectAnswer = sanitizeLatex(q.correctOption);
+        const hash = computeContentHash(sanitizedContent || '');
+
+        const dupCheck = await checkBlockingDuplicate(sanitizedContent || '');
+        if (dupCheck.isDuplicate) {
+          throw new Error(`DUPLICATE:${q.question?.substring(0, 80)}::${dupCheck.existingQuestionId}`);
+        }
+
         const question = await tx.question.create({
           data: {
-            content: q.question || "",
+            content: sanitizedContent || "",
             options: q.options ? q.options.map((o: any) => o.text) : [],
-            correctAnswer: q.correctOption || "",
-            explanation: q.solution || "",
+            correctAnswer: sanitizedCorrectAnswer || "",
+            explanation: sanitizedExplanation || "",
             tags: q.tags || [],
+            contentHash: hash,
             type: mappedType as any,
             difficulty: mappedDifficulty as any,
             subject: subjectName || "Mathematics",
@@ -95,6 +109,16 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to approve questions";
+    const dupMatch = message?.match(/^DUPLICATE:(.+)::(.+)$/);
+    if (dupMatch) {
+      return NextResponse.json({
+        success: false,
+        duplicate: true,
+        question: dupMatch[1],
+        existingQuestionId: dupMatch[2],
+        error: 'Duplicate question detected. A question with identical content already exists.',
+      }, { status: 409 });
+    }
     console.error("[BULK-APPROVE] Error:", message);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }

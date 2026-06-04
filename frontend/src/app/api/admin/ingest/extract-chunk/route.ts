@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { sanitizeLatex } from "@/lib/latex-sanitizer";
+import { checkBlockingDuplicate } from "@/lib/duplicate-checker";
+import { computeContentHash } from "@/lib/question-classifier";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -39,7 +42,12 @@ export async function POST(request: NextRequest) {
           "tags": ["Tag1"]
         }
         
-        IMPORTANT: If you find standalone solutions/explanations that do not have a corresponding question in this text, output them with the "type" set to "[STANDALONE_SOLUTION]". Put the solution text into the "explanation" field.
+        CRITICAL RULES:
+        1. NEVER output standalone solutions/answers as separate items. If text contains only a solution/answer without a corresponding question, SKIP it entirely.
+        2. ALWAYS provide an "explanation" field with the step-by-step solution for EVERY question.
+        3. For SINGLE_CHOICE and ASSERTION_REASONING questions, identify the correct option and put the LETTER (e.g. "A", "B", "C", "D") in "correctAnswer". For integer/numerical answer questions, put the numeric answer in "correctAnswer". Fill "correctAnswer" for ALL questions that have a definitive answer.
+        4. Every "content" field MUST contain a full question sentence (not just a math expression). Minimum 10 characters of readable text.
+        5. Classify types as: SINGLE_CHOICE, INTEGER, SUBJECTIVE, TRUE_FALSE, FILL_IN_BLANKS, ASSERTION_REASONING, CASE_STUDY, VERY_SHORT_ANSWER, SHORT_ANSWER, LONG_ANSWER
         
         Return a JSON array of these objects. ONLY RETURN VALID JSON.`;
 
@@ -56,12 +64,30 @@ export async function POST(request: NextRequest) {
         let savedCount = 0;
         const userRole = (session.user as any).role;
         for (const q of extractedQuestions) {
+            // Skip standalone solutions that Gemini couldn't attach to a question
+            if (q.type === '[STANDALONE_SOLUTION]') continue;
+
+            const sanitizedContent = sanitizeLatex(q.content);
+            const sanitizedExplanation = sanitizeLatex(q.explanation);
+            const sanitizedCorrectAnswer = sanitizeLatex(q.correctAnswer);
+
+            // Skip content that is just a math expression without actual question text
+            if (!sanitizedContent || sanitizedContent.replace(/\$/g, '').trim().length < 10) continue;
+            // Skip if content has no letters (pure formula/answer with no question)
+            if (!/[A-Za-z]{3,}/.test(sanitizedContent.replace(/\\[a-z]+/g, ''))) continue;
+
+            if (sanitizedContent) {
+                const dupCheck = await checkBlockingDuplicate(sanitizedContent);
+                if (dupCheck.isDuplicate) continue;
+            }
+
             await prisma.question.create({
                 data: {
-                    content: q.content || "",
+                    content: sanitizedContent || "",
                     options: q.options || [],
-                    correctAnswer: q.correctAnswer || "",
-                    explanation: q.explanation || "",
+                    correctAnswer: sanitizedCorrectAnswer || "",
+                    explanation: sanitizedExplanation || "",
+                    contentHash: sanitizedContent ? computeContentHash(sanitizedContent) : null,
                     type: q.type || "SINGLE_CHOICE",
                     difficulty: q.difficulty || "MEDIUM",
                     subject: q.subject || "Mathematics",

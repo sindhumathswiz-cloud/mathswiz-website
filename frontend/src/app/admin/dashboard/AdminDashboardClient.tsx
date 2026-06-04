@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Users, 
     LayoutDashboard, 
@@ -114,6 +114,21 @@ export default function AdminDashboardClient({
     const [activeTab, setActiveTab] = useState<'Platform Overview' | 'User Directory' | 'Manage Website' | 'Approvals' | 'Lead CRM' | 'Curriculum Manager' | 'Test & Exam Engine' | 'Reports & Export' | 'System Features' | 'Fee Management' | 'Question Bank'>('Platform Overview');
     const [isCreateBatchOpen, setIsCreateBatchOpen] = useState(false);
     const [newBatch, setNewBatch] = useState({ name: '', code: '', teacherId: '', class: 'Class 12', startDate: '' });
+
+    const [questionBankStats, setQuestionBankStats] = useState(stats.questionBank);
+
+    const handleQuestionStatsChange = useCallback((apiStats: any) => {
+        if (!apiStats) return;
+        setQuestionBankStats(prev => ({
+            total: apiStats.total ?? prev?.total ?? 0,
+            approved: apiStats.approved ?? prev?.approved ?? 0,
+            pending: apiStats.pending ?? prev?.pending ?? 0,
+            draft: apiStats.draft ?? prev?.draft ?? 0,
+            public: prev?.public ?? 0,
+            teacherPrivate: prev?.teacherPrivate ?? 0,
+            pendingTeacherReview: prev?.pendingTeacherReview ?? 0,
+        }));
+    }, []);
 
     const handleAddLeadSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -381,7 +396,7 @@ export default function AdminDashboardClient({
                                 <Clock className="w-6 h-6 text-amber-400" />
                             </div>
                             <h3 className="text-xl font-black text-white mb-2">Question Review</h3>
-                            <p className="text-amber-200/60 text-xs font-bold max-w-xs">{stats.questionBank?.pendingTeacherReview || 0} teacher questions awaiting your approval.</p>
+                            <p className="text-amber-200/60 text-xs font-bold max-w-xs">{questionBankStats?.pendingTeacherReview || 0} teacher questions awaiting your approval.</p>
                         </div>
                         <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-amber-600 transition-colors">
                             <ArrowUpRight className="w-5 h-5" />
@@ -397,12 +412,12 @@ export default function AdminDashboardClient({
                                 <BookOpen className="w-6 h-6 text-slate-400" />
                             </div>
                             <h3 className="text-xl font-black text-white mb-2">Question Bank</h3>
-                            <p className="text-slate-400 text-xs font-bold max-w-xs">{stats.questionBank?.total || 0} questions in the repository.</p>
+                            <p className="text-slate-400 text-xs font-bold max-w-xs">{questionBankStats?.total || 0} questions in the repository.</p>
                             <div className="flex flex-wrap gap-1.5 mt-3">
-                                <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">{stats.questionBank?.approved || 0} Approved</span>
-                                <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">{stats.questionBank?.pending || 0} Pending</span>
-                                <span className="bg-slate-600/30 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold">{stats.questionBank?.draft || 0} Drafts</span>
-                                <span className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-[10px] font-bold">{stats.questionBank?.public || 0} Public</span>
+                                <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">{questionBankStats?.approved || 0} Approved</span>
+                                <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">{questionBankStats?.pending || 0} Pending</span>
+                                <span className="bg-slate-600/30 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold">{questionBankStats?.draft || 0} Drafts</span>
+                                <span className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-[10px] font-bold">{questionBankStats?.public || 0} Public</span>
                             </div>
                         </div>
                         <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white group-hover:bg-slate-700 transition-colors">
@@ -530,7 +545,7 @@ export default function AdminDashboardClient({
                     {/* Fee Management Tab */}
                     {activeTab === 'Question Bank' && (
                         <div className="animate-in fade-in duration-500 bg-white p-6 rounded-2xl border border-gray-200">
-                            <QuestionBankStats />
+                            <QuestionBankStats onStatsChange={handleQuestionStatsChange} />
                         </div>
                     )}
                     {activeTab === 'Fee Management' && (

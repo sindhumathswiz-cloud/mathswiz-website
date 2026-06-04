@@ -87,6 +87,9 @@ export function PdfComposer({ sessionId, onClose }: { sessionId: string; onClose
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isInserting, setIsInserting] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isGeneratingSolutions, setIsGeneratingSolutions] = useState(false);
+  const [validationResults, setValidationResults] = useState<any[] | null>(null);
   const [isMatchingSolutions, setIsMatchingSolutions] = useState(false);
   const [isExtractingAI, setIsExtractingAI] = useState(false);
   const [isParsingDirect, setIsParsingDirect] = useState(false);
@@ -360,6 +363,68 @@ export function PdfComposer({ sessionId, onClose }: { sessionId: string; onClose
     }
   };
 
+  const handleValidate = async () => {
+    const empty = questions.filter(q => !q.question.trim());
+    if (empty.length > 0) return toast.error(`${empty.length} question(s) have empty content`);
+    setIsValidating(true);
+    setValidationResults(null);
+    try {
+      const res = await fetch('/api/admin/ingest/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: questions.map(q => ({
+          content: q.question,
+          options: q.options,
+          correctAnswer: q.correctOption || null,
+          solution: q.solution,
+        })) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setValidationResults(data.results);
+        const issues = data.results.filter((r: any) => !r.valid).length;
+        if (issues === 0) toast.success('All questions validated successfully!');
+        else toast(`⚠️ ${issues} question(s) have issues flagged`, { duration: 5000 });
+      } else toast.error(data.error || 'Validation failed');
+    } catch (e: any) {
+      toast.error('Validation failed: ' + e.message);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleGenerateSolutions = async () => {
+    const missing = questions.filter(q => !q.solution.trim());
+    if (missing.length === 0) return toast.success('All questions already have solutions');
+    setIsGeneratingSolutions(true);
+    try {
+      const res = await fetch('/api/admin/ingest/generate-solution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: missing.map(q => ({
+          content: q.question,
+          options: q.options,
+          correctAnswer: q.correctOption || null,
+        })) }),
+      });
+      const data = await res.json();
+      if (data.success && data.solutions) {
+        let idx = 0;
+        setQuestions(prev => prev.map(q => {
+          if (!q.solution.trim() && data.solutions[idx]) {
+            return { ...q, solution: data.solutions[idx++] };
+          }
+          return q;
+        }));
+        toast.success(`Generated ${data.solutions.length} solution(s)`);
+      } else toast.error(data.error || 'Generation failed');
+    } catch (e: any) {
+      toast.error('Generation failed: ' + e.message);
+    } finally {
+      setIsGeneratingSolutions(false);
+    }
+  };
+
   const handleInsertAll = async () => {
     if (questions.length === 0) return toast.error('No questions to insert');
     
@@ -434,6 +499,12 @@ export function PdfComposer({ sessionId, onClose }: { sessionId: string; onClose
           body: JSON.stringify({ status: 'COMPLETED' }),
         });
         toast.success(`Inserted ${payload.length} questions to bank!`);
+        onClose();
+      } else if (res.status === 409) {
+        const dupData = await res.json();
+        const dupCount = dupData.duplicates?.length || 0;
+        const inserted = dupData.inserted?.length || (payload.length - dupCount);
+        toast.error(`${inserted} inserted, ${dupCount} duplicates skipped`, { duration: 5000 });
         onClose();
       } else {
         toast.error('Insertion failed');
@@ -741,6 +812,20 @@ export function PdfComposer({ sessionId, onClose }: { sessionId: string; onClose
               {isMatchingSolutions ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Match Solutions
             </button>
           )}
+          <button
+            onClick={handleValidate}
+            disabled={isValidating}
+            className="px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {isValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListChecks className="w-4 h-4" />} Validate
+          </button>
+          <button
+            onClick={handleGenerateSolutions}
+            disabled={isGeneratingSolutions}
+            className="px-4 py-2 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {isGeneratingSolutions ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Gen Solutions
+          </button>
           <button 
             onClick={saveDraft} 
             disabled={isSaving}

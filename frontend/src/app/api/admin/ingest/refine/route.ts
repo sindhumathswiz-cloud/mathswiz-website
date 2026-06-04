@@ -25,17 +25,20 @@ export async function POST(request: NextRequest) {
       const batch = questions.slice(i, i + batchSize);
       const problemsText = batch.map((q, j) => `--- Problem ${j + 1} ---\n${q.content}`).join('\n\n');
 
-      const systemPrompt = `You extract structured question data from raw math problem text. Return STRICT JSON: {"questions": [{"_tempId": "...", "type": "SINGLE_CHOICE" or "NUMERICAL" or "INTEGER" or "TRUE_FALSE" or "SUBJECTIVE", "options": ["A", "B", "C", "D"] or [], "correctAnswer": "...", "explanation": "..."}]}
+      const systemPrompt = `You extract structured question data from raw math problem text. Return STRICT JSON: {"questions": [{"_tempId": "...", "type": "SINGLE_CHOICE", "difficulty": "MEDIUM", "options": ["A", "B", "C", "D"] or [], "correctAnswer": "...", "explanation": "..."}]}
 
 Rules:
+- type must be one of: SINGLE_CHOICE, MULTIPLE_CHOICE, INTEGER, TRUE_FALSE, SUBJECTIVE, FILL_IN_BLANKS, ASSERTION_REASONING, CASE_STUDY, VERY_SHORT_ANSWER, SHORT_ANSWER, LONG_ANSWER
+- difficulty must be one of: EASY, MEDIUM, HARD
 - For MCQs: include options array and correctAnswer letter
 - For numerical/subjective: leave options as [] and put final answer in correctAnswer
+- For INTEGER: leave options as [] and put the numeric answer in correctAnswer
 - If the problem includes a solution, put it in explanation
 - Use $...$ for inline LaTeX and $$...$$ for display math
 - _tempId must match exactly what was provided
 - If no answer visible, leave correctAnswer as ""`;
 
-      const userPrompt = `Extract structured data from these problems. Preserve the _tempId:\n\n${problemsText}`;
+      const userPrompt = `Extract structured data from these problems. Include type (from the allowed types list) and difficulty. Preserve the _tempId:\n\n${problemsText}`;
 
       const raw = await fetchFromLLM(systemPrompt, userPrompt);
       const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();

@@ -267,6 +267,23 @@ function isAnySectionHeader(line: string): boolean {
   return line.trim().startsWith('##') || line.trim().startsWith('**');
 }
 
+// Additional solution indicator patterns (for inline/non-section solutions)
+const SOLUTION_HEADER_PATTERNS = [
+  /^##\s*(solution|solutions|answer|answers|answer\s+key|answerkey)/i,
+  /^\*\*(solutions?|answers?)\s*\*\*:?$/i,
+  /^SOLUTION/i,
+  /^ANSWER\s+KEY/i,
+  /^HINTS?\s+(AND\s+)?SOLUTIONS?/i,
+  /^EXERCISE.*SOLUTION/i,
+];
+
+const SOLUTION_INLINE_PATTERNS = [
+  /^(?:sol|solution|sol\.|solution:)/i,
+  /^(?:ans|answer|ans\.|answer:)/i,
+  /^correct\s+option/i,
+  /^hence\s+(option|choice)/i,
+];
+
 export function parseQuestionsFromMarkdown(markdown: string): ParsedQuestion[] {
   const rawBlocks = markdown.split(/\n\n+/).map(b => b.trim()).filter(Boolean);
 
@@ -288,9 +305,40 @@ export function parseQuestionsFromMarkdown(markdown: string): ParsedQuestion[] {
   let inAnswers = false;
   let inSolutions = false;
 
+  // First pass: aggressively extract all solution/answer content
+  // Detect ANY block that looks like a solution section (not just ## headers)
+  const questionBlocks: string[] = [];
+  for (const block of blocks) {
+    const firstLine = block.split('\n')[0].trim();
+    const firstLineLower = firstLine.toLowerCase();
+
+    const isSolutionHeader = SOLUTION_HEADER_PATTERNS.some(p => p.test(firstLine));
+    const isSolutionInline = SOLUTION_INLINE_PATTERNS.some(p => p.test(firstLineLower));
+
+    if (isSectionHeader(firstLine) || isSolutionHeader) {
+      if (/answers|answer\s+key/i.test(firstLine)) {
+        answerBlocks.push(block);
+      } else {
+        solutionBlocks.push(block);
+      }
+      inAnswers = /answers|answer key/i.test(firstLine);
+      inSolutions = !inAnswers && (isSectionHeader(firstLine) || isSolutionHeader);
+      continue;
+    }
+    if (inAnswers) { answerBlocks.push(block); continue; }
+    if (inSolutions) { solutionBlocks.push(block); continue; }
+
+    // Skip blocks that are purely numbered answer keys (e.g. "1. A  2. C  3. D")
+    if (block.split('\n').every(l => /^\d+\s*[\.\)]\s*[A-Da-d]\s*$/.test(l.trim()))) {
+      answerBlocks.push(block);
+      continue;
+    }
+    questionBlocks.push(block);
+  }
+
   // Pre-process: merge multi-block questions
   const mergedBlocks: string[] = [];
-  for (const block of blocks) {
+  for (const block of questionBlocks) {
     const firstLine = block.split('\n')[0].trim();
 
     // Section headers
@@ -346,6 +394,13 @@ export function parseQuestionsFromMarkdown(markdown: string): ParsedQuestion[] {
 
     const cleanedFirst = firstLine.replace(/^(\d+[.)]\s*)/, '').trim();
     const { cleaned: stemCleaned } = extractMetaTags(cleanedFirst);
+
+    // Check for answer/solution at end of question line (e.g. "Solve for x. [Ans: 5]")
+    let inlineAnswer = '';
+    const ansMatch = blockCleaned.match(/\[(?:Ans|Answer):\s*([^\]]+)\]/i);
+    if (ansMatch) {
+      inlineAnswer = ansMatch[1].trim();
+    }
 
     // Check for inline Sol. (VSA questions with embedded solution)
     let inlineSolution = '';
@@ -425,7 +480,7 @@ export function parseQuestionsFromMarkdown(markdown: string): ParsedQuestion[] {
       number: qNumber,
       questionText,
       options,
-      correctOption: qNumber !== undefined ? (answersMap[qNumber] || null) : null,
+      correctOption: qNumber !== undefined ? (answersMap[qNumber] || inlineAnswer || null) : (inlineAnswer || null),
       solution: qNumber !== undefined ? (solutionsMap[qNumber] || inlineSolution) : inlineSolution,
       sourceText: block,
       tags: blockTags,

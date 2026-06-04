@@ -391,6 +391,9 @@ model Question {
   correctAnswer String? // The correct option or integer value
   explanation   String? // Step-by-step solution (supports LaTeX)
 
+  // Content deduplication
+  contentHash String? // Hash of normalized content for fast duplicate lookup
+
   // Categorization & Taxonomy
   type       QuestionType @default(SINGLE_CHOICE)
   difficulty Difficulty   @default(MEDIUM)
@@ -438,6 +441,8 @@ model Question {
   versions       QuestionVersion[]
   questionTags   QuestionTag[]
   embeddings     QuestionEmbedding[]
+
+  @@index([contentHash])
 }
 
 enum TestMode {

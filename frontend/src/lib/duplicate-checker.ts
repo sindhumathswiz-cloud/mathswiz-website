@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { computeContentHash } from "./question-classifier";
 
 export interface DuplicateCheckResult {
   isDuplicate: boolean;
@@ -6,6 +7,13 @@ export interface DuplicateCheckResult {
   similarity: number;
   matchedQuestionId: string | null;
   matchedQuestionText: string | null;
+}
+
+export interface BlockingDuplicateResult {
+  isDuplicate: boolean;
+  existingQuestionId: string | null;
+  existingQuestionContent: string | null;
+  existingQuestionStatus: string | null;
 }
 
 // Normalize text for exact comparison
@@ -18,15 +26,44 @@ function normalizeText(text: string): string {
     .trim();
 }
 
-// Simple hash for exact matching
+// Simple hash for exact matching (legacy, kept for backward compat)
 function hashText(text: string): string {
-  let hash = 0;
-  const normalized = normalizeText(text);
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized.charCodeAt(i);
-    hash = ((hash << 5) - hash + char) | 0;
+  return computeContentHash(text);
+}
+
+// Fast blocking exact-match check using contentHash field
+export async function checkBlockingDuplicate(
+  content: string
+): Promise<BlockingDuplicateResult> {
+  const hash = computeContentHash(content);
+  const existing = await prisma.question.findFirst({
+    where: { contentHash: hash },
+    select: {
+      id: true,
+      content: true,
+      status: true,
+    },
+  });
+
+  if (existing) {
+    const normalized = normalizeText(content);
+    const existingNormalized = normalizeText(existing.content);
+    if (normalized === existingNormalized && normalized.length > 3) {
+      return {
+        isDuplicate: true,
+        existingQuestionId: existing.id,
+        existingQuestionContent: existing.content.substring(0, 200),
+        existingQuestionStatus: existing.status,
+      };
+    }
   }
-  return hash.toString(36);
+
+  return {
+    isDuplicate: false,
+    existingQuestionId: null,
+    existingQuestionContent: null,
+    existingQuestionStatus: null,
+  };
 }
 
 // Check a single question against the database

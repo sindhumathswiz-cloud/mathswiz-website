@@ -241,8 +241,7 @@ function detectDifficulty(question: string, options: { label: string; text: stri
 
 function isSolutionLine(line: string): boolean {
   const trimmed = line.trim();
-  return /^(?:Sol(?:ution)?|Ans(?:wer)?|Sol\.|Ans\.)\s*[\d]*\s*[:\s]/i.test(trimmed) ||
-         /^\*\*(?:Solution|Answer)\s*[\d]*\*\*/i.test(trimmed);
+  return /^(?:Sol(?:ution)?(?:\.|\s)*\s*(?:\d+\s*)?[:\s]|Ans(?:wer)?(?:\.|\s)*\s*(?:\d+\s*)?[:\s]|Solution\s*\d*\s*:|Sol\.\s*\d*\s:)/i.test(trimmed);
 }
 
 function isNoise(line: string): boolean {
@@ -497,11 +496,27 @@ function parseSolutionLines(lines: string[]): { number: string; solutionText: st
   for (const line of lines) {
     if (/^\d+$/.test(line) && line.length < 5) continue;
 
-    const solMatch = line.match(/^(?:(?:Q\.?\s*)?(?:Sol(?:ution)?\.?\s*|Ans(?:wer)?\.?\s*))?(\d{1,3})[\.\)\s:]\s*(.*)$/);
+    // Match patterns: "1. ", "1) ", "Q1. ", "Q1) ", "Sol 1. ", "Sol. 1: ", "Ans 1. ", "Solution 1. "
+    // Also: "1. Sol. ...", "1. Solution: ..."
+    const solMatch = line.match(/^(?:(?:Q\.?\s*)?(?:Sol(?:ution)?\.?\s*|Ans(?:wer)?\.?\s*|Solution\s+))?(\d{1,3})[\.\)\s:]\s*(.*)$/);
     if (solMatch && solMatch[1]) {
       finalize();
       currentNumber = solMatch[1];
       const textAfter = solMatch[2].trim();
+      // Strip leading "Sol.", "Solution:", etc. from the text
+      const cleanAfter = textAfter.replace(/^(?:Sol(?:ution)?\.?\s*:?\s*|Ans(?:wer)?\.?\s*:?\s*)/i, '').trim();
+      if (cleanAfter.length > 0) {
+        currentLines.push(cleanAfter);
+      }
+      continue;
+    }
+
+    // Also match "Sol. 1: ..." or "Solution 1: ..." where number comes after the keyword
+    const altMatch = line.match(/^(?:Sol(?:ution)?\.?\s*|Ans(?:wer)?\.?\s*|Solution\s+)(\d{1,3})[\.\)\s:]\s*(.*)$/i);
+    if (altMatch && altMatch[1]) {
+      finalize();
+      currentNumber = altMatch[1];
+      const textAfter = altMatch[2].trim();
       if (textAfter.length > 0) {
         currentLines.push(textAfter);
       }

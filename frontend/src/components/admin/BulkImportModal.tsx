@@ -19,21 +19,22 @@ export function BulkImportModal({ isOpen, onClose, onImportComplete }: BulkImpor
     const [isUploading, setIsUploading] = useState(false);
 
     const handleDownloadTemplate = () => {
-        const template = [
-            {
-                content: "If $f(x) = x^2$, then $f'(x)$ is:",
-                option_a: "$2x$",
-                option_b: "$x^2$",
-                option_c: "$2$",
-                option_d: "$0$",
-                correct_answer: "A",
-                explanation: "Power rule: $\\frac{d}{dx}(x^n) = nx^{n-1}$.",
-                subject: "Mathematics",
-                class: "12",
-                difficulty: "EASY",
-                topic: "Differentiation"
-            }
-        ];
+            const template = [
+                {
+                    content: "If $f(x) = x^2$, then $f'(x)$ is:",
+                    option_a: "$2x$",
+                    option_b: "$x^2$",
+                    option_c: "$2$",
+                    option_d: "$0$",
+                    correct_answer: "A",
+                    explanation: "Power rule: $\\frac{d}{dx}(x^n) = nx^{n-1}$.",
+                    solution: "",
+                    subject: "Mathematics",
+                    class: "12",
+                    difficulty: "EASY",
+                    topic: "Differentiation"
+                }
+            ];
         
         const ws = XLSX.utils.json_to_sheet(template);
         const wb = XLSX.utils.book_new();
@@ -88,7 +89,7 @@ export function BulkImportModal({ isOpen, onClose, onImportComplete }: BulkImpor
                     content: sanitizeLatex(row.content || row.question || row.Question || ""),
                     options,
                     correctAnswer: String(row.correct_answer || row.answer || row.Answer || "").toUpperCase().trim(),
-                    explanation: sanitizeLatex(row.explanation || row.Explanation || ""),
+                    explanation: sanitizeLatex(row.explanation || row.Explanation || row.solution || row.Solution || ""),
                     subject: row.subject || row.Subject || "Mathematics",
                     class: String(row.class || row.Class || "12"),
                     difficulty: (row.difficulty || row.Difficulty || "MEDIUM").toUpperCase(),
@@ -118,6 +119,15 @@ export function BulkImportModal({ isOpen, onClose, onImportComplete }: BulkImpor
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(previewData)
             });
+
+            if (res.status === 409) {
+                const dupData = await res.json();
+                const dupCount = dupData.duplicates?.length || 0;
+                toast.success(`Imported ${previewData.length - dupCount} questions (${dupCount} duplicates skipped)!`, { id: toastId });
+                onImportComplete();
+                onClose();
+                return;
+            }
 
             if (!res.ok) throw new Error("Upload failed");
             

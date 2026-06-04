@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, CheckCircle, AlertCircle, TrendingUp, Layers, Target, Award, GraduationCap, FileText, RefreshCw, ChevronRight, ArrowLeft, Search, X, Trash2, Edit3, Save, Tag, CheckSquare } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
@@ -70,7 +70,7 @@ interface Question {
 
 type DrillLevel = 'overview' | 'category' | 'questions';
 
-export default function QuestionBankStats() {
+export default function QuestionBankStats({ onStatsChange }: { onStatsChange?: (stats: QuestionStats) => void }) {
   const [stats, setStats] = useState<QuestionStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,6 +91,8 @@ export default function QuestionBankStats() {
   const [bulkSubject, setBulkSubject] = useState('');
   const [bulkClass, setBulkClass] = useState('');
   const [bulkPanelExpanded, setBulkPanelExpanded] = useState(false);
+  const [approveOnSave, setApproveOnSave] = useState(false);
+  const lastFilterRef = useRef<Record<string, string>>({});
   const [editForm, setEditForm] = useState<any>({
     content: '',
     options: ['', '', '', ''],
@@ -110,9 +112,9 @@ export default function QuestionBankStats() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/admin/questions/stats');
+      const res = await fetch(`/api/admin/questions/stats?t=${Date.now()}`);
       const data = await res.json();
-      if (data.success) setStats(data.stats);
+      if (data.success) { setStats(data.stats); if (onStatsChange) onStatsChange(data.stats); }
     } catch (e) {
       console.error('Failed to fetch stats:', e);
     } finally {
@@ -130,6 +132,7 @@ export default function QuestionBankStats() {
   };
 
   const fetchQuestions = async (filters: Record<string, string>) => {
+    lastFilterRef.current = filters;
     setQuestionsLoading(true);
     try {
       const params = new URLSearchParams();
@@ -183,27 +186,40 @@ export default function QuestionBankStats() {
   const handleSaveEdit = async () => {
     if (!editingQuestionId) return;
     try {
+      const payload: any = {
+        content: editForm.content,
+        options: editForm.options.some((o: string) => o.trim()) ? editForm.options : undefined,
+        correctAnswer: editForm.correctAnswer,
+        explanation: editForm.explanation,
+        tags: editForm.tags,
+        type: editForm.type,
+        difficulty: editForm.difficulty,
+        subject: editForm.subject,
+        'class': editForm.classLevel,
+        examType: editForm.examType,
+        taxonomyTagIds: selectedTaxonomyIds,
+      };
+      if (approveOnSave) payload.status = 'APPROVED';
       const res = await fetch(`/api/questions/${editingQuestionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: editForm.content,
-          options: editForm.options.some((o: string) => o.trim()) ? editForm.options : undefined,
-          correctAnswer: editForm.correctAnswer,
-          explanation: editForm.explanation,
-          tags: editForm.tags,
-          type: editForm.type,
-          difficulty: editForm.difficulty,
-          subject: editForm.subject,
-          'class': editForm.classLevel,
-          examType: editForm.examType,
-          taxonomyTagIds: selectedTaxonomyIds,
-        })
+        body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error('Failed to save');
-      toast.success('Question updated successfully!');
+      const data = await res.json();
+      toast.success(approveOnSave ? 'Question approved and saved!' : 'Question updated successfully!');
       setEditingQuestionId(null);
-      fetchQuestions({ [drillFilter]: drillCategory, status: 'APPROVED' });
+      setApproveOnSave(false);
+      if (data.question) {
+        if (approveOnSave) {
+          setQuestions(prev => prev.filter(q => q.id !== editingQuestionId));
+          const updated = { ...stats, approved: (stats?.approved || 0) + 1, draft: Math.max(0, (stats?.draft || 0) - 1) } as QuestionStats;
+          setStats(updated);
+          if (onStatsChange) onStatsChange(updated);
+        } else {
+          setQuestions(prev => prev.map(q => q.id === editingQuestionId ? { ...q, ...data.question } : q));
+        }
+      }
       fetchStats();
     } catch (e) {
       console.error(e);
@@ -257,7 +273,7 @@ export default function QuestionBankStats() {
       setBulkClass('');
       setSelectedQuestionIds([]);
       setBulkPanelExpanded(false);
-      fetchQuestions({ [drillFilter]: drillCategory, status: 'APPROVED' });
+      fetchQuestions(lastFilterRef.current);
       fetchStats();
     } catch (e: any) {
       console.error(e);
@@ -265,21 +281,68 @@ export default function QuestionBankStats() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedQuestionIds.length === 0) return;
+    const confirmed = window.confirm(`Delete ${selectedQuestionIds.length} selected question(s)? This cannot be undone.`);
+    if (!confirmed) return;
+    try {
+      const res = await fetch('/api/admin/questions/bulk-delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionIds: selectedQuestionIds })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error ${res.status}`);
+      }
+      toast.success(`Deleted ${selectedQuestionIds.length} questions`);
+      setSelectedQuestionIds([]);
+      setBulkPanelExpanded(false);
+      fetchQuestions(lastFilterRef.current);
+      fetchStats();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Failed to bulk delete');
+    }
+  };
+
   const handleCategoryClick = (category: string, filter: string) => {
     setDrillCategory(category);
     setDrillFilter(filter);
-    setDrillLevel('category');
-    fetchQuestions({ [filter]: category, status: 'APPROVED' });
   };
 
   const handleBack = () => {
     if (drillLevel === 'questions') {
-      setDrillLevel('category');
+      if (drillCategory) {
+        setDrillLevel('category');
+      } else {
+        setDrillLevel('overview');
+      }
       setExpandedQuestion(null);
     } else {
       setDrillLevel('overview');
       setDrillCategory('');
       setDrillFilter('');
+    }
+  };
+
+  const handleApproveQuestion = async (id: string) => {
+    try {
+      const res = await fetch(`/api/questions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'APPROVED' })
+      });
+      if (!res.ok) throw new Error('Failed to approve');
+      const data = await res.json();
+      toast.success('Question approved!');
+      setQuestions(prev => prev.filter(q => q.id !== id));
+      setExpandedQuestion(null);
+      setStats(prev => prev ? { ...prev, approved: prev.approved + 1, draft: Math.max(0, prev.draft - 1) } : prev);
+      fetchStats();
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to approve question');
     }
   };
 
@@ -409,9 +472,11 @@ export default function QuestionBankStats() {
             <button
               key={card.label}
               onClick={() => {
-                setDrillLevel('questions');
-                fetchQuestions(card.filter);
-              }}
+                  setDrillCategory('');
+                  setDrillFilter('');
+                  setDrillLevel('questions');
+                  fetchQuestions(card.filter);
+                }}
               className={`${card.bg} ${card.border} border rounded-xl p-4 text-left hover:shadow-md transition-shadow`}
             >
               <div className="flex items-center gap-2 mb-2">
@@ -437,7 +502,8 @@ export default function QuestionBankStats() {
                   <button
                     key={key}
                     onClick={() => {
-                      handleCategoryClick(key, bd.filter);
+                      setDrillCategory(key);
+                      setDrillFilter(bd.filter);
                       setDrillLevel('questions');
                       fetchQuestions({ [bd.filter]: key, status: 'APPROVED' });
                     }}
@@ -485,7 +551,18 @@ export default function QuestionBankStats() {
                 {editingQuestionId === q.id ? (
                   <div className="p-6 space-y-6">
                     <div className="flex justify-between items-center border-b pb-4">
-                      <h4 className="font-bold text-gray-900 text-lg">Edit Approved Question</h4>
+                      <div className="flex items-center gap-4">
+                        <h4 className="font-bold text-gray-900 text-lg">Edit Question</h4>
+                        <label className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg cursor-pointer select-none border border-emerald-200">
+                          <input
+                            type="checkbox"
+                            checked={approveOnSave}
+                            onChange={e => setApproveOnSave(e.target.checked)}
+                            className="w-3 h-3 accent-emerald-600"
+                          />
+                          Approve on save
+                        </label>
+                      </div>
                       <div className="flex gap-2">
                         <button onClick={handleSaveEdit} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2 shadow shadow-indigo-100">
                           <Save className="w-4 h-4" /> Save Changes
@@ -663,6 +740,11 @@ export default function QuestionBankStats() {
                             }`}>
                               {q.status.replace(/_/g, ' ')}
                             </span>
+                            {(q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE' || q.type === 'ASSERTION_REASONING') && !q.correctAnswer && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-700">
+                                No answer
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-gray-800 line-clamp-2"><LatexInline content={q.content} /></p>
                         </div>
@@ -672,24 +754,38 @@ export default function QuestionBankStats() {
                     {expandedQuestion === q.id && (
                       <div className="px-4 pb-4 border-t pt-3 space-y-3">
                         {q.options && q.options.length > 0 && (
-                          <div className="grid grid-cols-2 gap-2">
-                            {q.options.map((opt, i) => (
-                              <div
-                                key={i}
-                                className={`flex items-start gap-2 p-2 rounded text-sm ${
-                                  q.correctAnswer === String.fromCharCode(65 + i)
-                                    ? 'bg-emerald-50 border border-emerald-200'
-                                    : 'bg-gray-50'
-                                }`}
-                              >
-                                <span className={`font-bold text-xs ${
-                                  q.correctAnswer === String.fromCharCode(65 + i) ? 'text-emerald-700' : 'text-gray-500'
-                                }`}>
-                                  {String.fromCharCode(65 + i)}.
-                                </span>
-                                <span className="flex-1"><MathRenderer content={opt} /></span>
-                              </div>
-                            ))}
+                          <div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {q.options.map((opt, i) => {
+                                const letter = String.fromCharCode(65 + i);
+                                const isCorrect = q.correctAnswer
+                                  ? q.correctAnswer === letter
+                                    || q.correctAnswer.toUpperCase() === letter
+                                    || q.correctAnswer.includes(letter)
+                                    || q.correctAnswer.replace(/\$|\\|\(|\)/g, '').trim() === opt.replace(/\$|\\|\(|\)/g, '').trim()
+                                  : false;
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`flex items-start gap-2 p-2 rounded text-sm ${
+                                      isCorrect
+                                        ? 'bg-emerald-50 border border-emerald-200'
+                                        : 'bg-gray-50'
+                                    }`}
+                                  >
+                                    <span className={`font-bold text-xs ${
+                                      isCorrect ? 'text-emerald-700' : 'text-gray-500'
+                                    }`}>
+                                      {letter}.
+                                    </span>
+                                    <span className="flex-1"><MathRenderer content={opt} /></span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {!q.correctAnswer && (
+                              <p className="text-[10px] text-amber-500 mt-1 font-medium">Correct answer not set — edit to assign</p>
+                            )}
                           </div>
                         )}
                         {q.explanation && (
@@ -707,9 +803,20 @@ export default function QuestionBankStats() {
                             ))}
                           </div>
                         )}
-                        <div className="flex items-center justify-between pt-2 border-t">
+                        <div className="flex flex-wrap items-center justify-between pt-2 border-t gap-2">
                           <p className="text-[10px] text-gray-400">Added: {new Date(q.createdAt).toLocaleDateString()}</p>
                           <div className="flex gap-2">
+                            {(q.status === 'DRAFT' || q.status === 'PENDING_REVIEW') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleApproveQuestion(q.id);
+                                }}
+                                className="flex items-center gap-1 px-3 py-1 text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                              >
+                                <CheckCircle className="w-3 h-3" /> Approve
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -769,6 +876,9 @@ export default function QuestionBankStats() {
             </button>
             <button onClick={clearSelectedQuestions} className="px-3 py-2 text-sm text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition shrink-0">
               Clear
+            </button>
+            <button onClick={handleBulkDelete} className="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700 transition shrink-0">
+              <Trash2 className="w-3.5 h-3.5 inline-block mr-1" />Delete Selected
             </button>
           </div>
           {bulkPanelExpanded && (
