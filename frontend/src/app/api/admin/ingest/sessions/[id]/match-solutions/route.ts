@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { parseQuestionsFromMarkdown } from "@/lib/question-parser";
 import { fetchFromLLM } from "@/lib/llm";
 
 export async function POST(
@@ -133,8 +132,6 @@ export async function POST(
       const sourcePages = extractionSession.sourceDocument.pages;
       const allSourceText = sourcePages.map(p => p.rawMarkdown).join('\n\n');
 
-      const parsed = parseQuestionsFromMarkdown(allSourceText);
-
       for (const q of authoredQuestions) {
         const questionIdx = authoredQuestions.indexOf(q);
         const searchText = q.question || q.assertion || '';
@@ -147,20 +144,8 @@ export async function POST(
         let bestMatch = '';
         let bestScore = 0;
 
-        const qNumMatch = searchText.match(/^\s*(?:Q\.?\s*)?(\d+)/i);
-        const qNum = qNumMatch ? qNumMatch[1] : null;
-
-        // Try to find via parsed question number
-        if (qNum) {
-          const matchedParsed = parsed.find(p => p.number?.toString() === qNum);
-          if (matchedParsed?.solution) {
-            bestMatch = matchedParsed.solution;
-            bestScore = 80;
-          }
-        }
-
-        // Fallback: keyword overlap with full source text
-        if (!bestMatch) {
+        // Keyword overlap with full source text
+        {
           const keywords = searchText
             .replace(/\\[a-zA-Z]+/g, '')
             .replace(/[\$_{}()]/g, '')

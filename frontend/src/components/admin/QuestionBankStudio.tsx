@@ -8,7 +8,7 @@ import { Montserrat } from 'next/font/google';
 import MathRenderer from '@/components/MathRenderer';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
 import katex from 'katex';
-import { BulkImportModal } from './BulkImportModal';
+
 
 const montserrat = Montserrat({ subsets: ['latin'], weight: '800' });
 
@@ -67,7 +67,6 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
     const [isEditing, setIsEditing] = useState(false);
     const [isSplitView, setIsSplitView] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [selectedTaxonomyIds, setSelectedTaxonomyIds] = useState<string[]>([]);
     const [editForm, setEditForm] = useState<any>({
         content: '',
@@ -207,11 +206,7 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
     return (
         <div className="space-y-8 animate-in fade-in duration-300">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <BulkImportModal 
-                isOpen={isImportModalOpen} 
-                onClose={() => setIsImportModalOpen(false)} 
-                onImportComplete={fetchQuestions} 
-            />
+
             {/* Filters */}
             <div className="p-6 border-b border-gray-100 flex flex-wrap gap-4 items-center bg-gray-50">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mr-4">
@@ -253,12 +248,7 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                     </button>
                 )}
                 
-                <button
-                    onClick={() => setIsImportModalOpen(true)}
-                    className="ml-auto bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2 border border-emerald-200 shadow-sm"
-                >
-                    <FileSpreadsheet className="w-4 h-4" /> Bulk Excel Import
-                </button>
+
                 <Link
                     href="/admin/question-bank/bulk-import"
                     className="ml-3 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2"

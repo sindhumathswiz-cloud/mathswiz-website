@@ -3,7 +3,6 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { parseMathpixMarkdown } from "@/lib/mathpix-parser";
-import { checkDuplicates } from "@/lib/duplicate-checker";
 
 export async function POST(
   request: NextRequest,
@@ -112,14 +111,6 @@ export async function POST(
       );
     }
 
-    // Run duplicate checks (non-blocking, results attached to each question)
-    const duplicateChecks = await checkDuplicates(
-      parsedQuestions.map((q) => ({
-        text: q.question,
-        subject: extractionSession.topicName || undefined,
-      }))
-    );
-
     // Map parser types to composer types
     const typeMap: Record<string, string> = {
       SINGLE_CHOICE: "MCQ",
@@ -151,7 +142,7 @@ export async function POST(
       difficulty: q.difficulty,
       sourcePage: q.sourcePage,
       rawText: q.rawText,
-      duplicate: duplicateChecks[idx] || {
+      duplicate: {
         isDuplicate: false,
         matchType: "none",
         similarity: 0,
@@ -178,7 +169,7 @@ export async function POST(
         total: questions.length,
         withSolutions: questions.filter((q) => q.solution).length,
         withOptions: questions.filter((q) => q.options).length,
-        duplicates: questions.filter((q) => q.duplicate?.isDuplicate).length,
+        duplicates: 0,
         byType: questions.reduce((acc, q) => {
           acc[q.type] = (acc[q.type] || 0) + 1;
           return acc;

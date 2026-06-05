@@ -2,9 +2,6 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { sanitizeLatex } from "@/lib/latex-sanitizer";
-import { checkBlockingDuplicate } from "@/lib/duplicate-checker";
-import { computeContentHash } from "@/lib/question-classifier";
 
 export const dynamic = 'force-dynamic';
 
@@ -161,32 +158,13 @@ export async function POST(req: Request) {
         const created = await prisma.$transaction(async (tx) => {
             const results: any[] = [];
             for (const q of questions) {
-                // Sanitize LaTeX in all text fields
-                const sanitizedContent = sanitizeLatex(q.content);
-                const sanitizedExplanation = sanitizeLatex(q.explanation);
-                const sanitizedCorrectAnswer = sanitizeLatex(q.correctAnswer);
-
-                // Skip content that is just a math expression without actual question text
-                if (!sanitizedContent || sanitizedContent.replace(/\$/g, '').trim().length < 10) continue;
-                if (!/[A-Za-z]{3,}/.test(sanitizedContent.replace(/\\[a-z]+/g, ''))) continue;
-
-                // Compute content hash for deduplication
-                const hash = computeContentHash(sanitizedContent || '');
-
-                // Check for blocking duplicates
-                const dupCheck = await checkBlockingDuplicate(sanitizedContent || '');
-                if (dupCheck.isDuplicate) {
-                    throw new Error(`DUPLICATE:${q.content?.substring(0, 80)}::${dupCheck.existingQuestionId}`);
-                }
-
                 const question = await tx.question.create({
                     data: {
-                        content: sanitizedContent || '',
+                        content: q.content || '',
                         options: q.options || [],
-                        correctAnswer: sanitizedCorrectAnswer || '',
-                        explanation: sanitizedExplanation || '',
+                        correctAnswer: q.correctAnswer || '',
+                        explanation: q.explanation || '',
                         tags: Array.isArray(q.tags) ? q.tags : [],
-                        contentHash: hash,
                         type: mapType(q.type),
                         difficulty: mapDifficulty(q.difficulty),
                         subject: q.subject || "Mathematics",
@@ -243,16 +221,6 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true, count: created.length, scope });
     } catch (error: any) {
-        const dupMatch = error.message?.match(/^DUPLICATE:(.+)::(.+)$/);
-        if (dupMatch) {
-            return NextResponse.json({
-                success: false,
-                duplicate: true,
-                question: dupMatch[1],
-                existingQuestionId: dupMatch[2],
-                error: 'Duplicate question detected. A question with identical content already exists.',
-            }, { status: 409 });
-        }
         console.error("Database Insert Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

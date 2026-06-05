@@ -67,7 +67,7 @@ import { SystemFeatures } from "@/components/admin/SystemFeatures";
 import { FeeManagement } from "@/components/admin/FeeManagement";
 import { FeeStructureGenerator } from "@/components/admin/FeeStructureGenerator";
 import { ManageWebsiteStudio } from "@/components/admin/ManageWebsiteStudio";
-import { IngestionHub } from "@/components/admin/IngestionHub";
+
 import { QuestionReviewQueue } from "@/components/admin/QuestionReviewQueue";
 interface AdminDashboardClientProps {
     stats: {
