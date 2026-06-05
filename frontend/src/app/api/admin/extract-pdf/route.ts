@@ -6,6 +6,7 @@ import { cleanMathpixMarkdown } from "@/lib/mathpix-parser";
 import { chunkMarkdown } from "@/lib/markdown-chunker";
 import { structureQuestions } from "@/lib/structure-questions";
 import { dedupeByContent } from "@/lib/page-windows";
+import { computeContentHash } from "@/lib/question-classifier";
 import type { CanonicalQuestion } from "@/lib/extract-normalizer";
 
 export async function POST(request: NextRequest) {
@@ -86,7 +87,24 @@ export async function POST(request: NextRequest) {
             }
         }
         extracted = dedupeByContent(extracted);
-        console.log(`[EXTRACT-PDF] ${extracted.length} questions after dedupe.`);
+        console.log(`[EXTRACT-PDF] ${extracted.length} questions after in-batch dedupe.`);
+
+        // Cross-run dedupe: drop questions whose contentHash already exists in the
+        // DB (any status) so re-extracting a chapter doesn't pile up duplicates.
+        const hashed = extracted.map(q => ({ q, hash: computeContentHash(q.questionContent) }));
+        const existing = await prisma.question.findMany({
+            where: { contentHash: { in: hashed.map(h => h.hash) } },
+            select: { contentHash: true },
+        });
+        const existingHashes = new Set(existing.map(e => e.contentHash));
+        const seenInRun = new Set<string>();
+        const toSave = hashed.filter(({ hash }) => {
+            if (existingHashes.has(hash) || seenInRun.has(hash)) return false;
+            seenInRun.add(hash);
+            return true;
+        });
+        const skipped = extracted.length - toSave.length;
+        console.log(`[EXTRACT-PDF] ${toSave.length} new, ${skipped} duplicates skipped.`);
 
         // ── 3. Resolve class/subject/board from the selected taxonomy ──
         let resolvedClassName = "Class 12";
@@ -112,10 +130,11 @@ export async function POST(request: NextRequest) {
         const createdById = (session.user as any).id || 'admin';
         let savedCount = 0;
 
-        for (const q of extracted) {
+        for (const { q, hash } of toSave) {
             const created = await prisma.question.create({
                 data: {
                     content: q.questionContent,
+                    contentHash: hash,
                     options: q.options,
                     correctAnswer: q.correctAnswer,
                     explanation: q.explanation,
@@ -142,6 +161,7 @@ export async function POST(request: NextRequest) {
             success: true,
             savedCount,
             totalFound: extracted.length,
+            duplicatesSkipped: skipped,
             rawMarkdown: rawText.substring(0, 50000)
         });
     } catch (error: any) {

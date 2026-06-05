@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { debounce } from 'lodash';
 import {
@@ -30,6 +30,7 @@ import { buildPageWindows, dedupeByContent } from '@/lib/page-windows';
 import { chapterFromFilename } from '@/lib/chapter-classifier';
 import QuestionTags from '@/components/QuestionTags';
 import QAFlags from '@/components/QAFlags';
+import { analyzeQuestion } from '@/lib/question-qa';
 import useSWR from 'swr';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
 import GlobalMathToolbar from '@/components/GlobalMathToolbar';
@@ -240,7 +241,7 @@ export default function BulkImportStudio() {
     const { data: session } = useSession();
 
     // Primary tab: pdf | word | drafts | excel | manual
-    const [mainTab, setMainTab] = useState<'pdf' | 'word' | 'drafts' | 'excel' | 'manual'>('pdf');
+    const [mainTab, setMainTab] = useState<'pdf' | 'word' | 'drafts' | 'excel' | 'manual' | 'qa'>('pdf');
     const [selectedTaxonomyIds, setSelectedTaxonomyIds] = useState<string[]>([]);
 
     // Workspace mode (PDF only)
@@ -293,10 +294,19 @@ export default function BulkImportStudio() {
     const [draftQuestions, setDraftQuestions] = useState<ExtractedQuestion[]>([]);
     const [isSyncPaused, setIsSyncPaused] = useState(false);
     const [isEditingDraft, setIsEditingDraft] = useState(false);
+
+    // Drafts that fail automated QA (broken LaTeX, missing answer/options, etc.)
+    const flaggedDrafts = useMemo(
+        () => draftQuestions.filter(q => analyzeQuestion({
+            content: q.content, options: q.options, correctAnswer: q.correctAnswer,
+            explanation: q.explanation, type: q.type,
+        }).length > 0),
+        [draftQuestions]
+    );
     
     const { data: draftsData, isLoading: isDraftsLoading, mutate: mutateDrafts } = useSWR(
-        mainTab === 'drafts' && !isSyncPaused && !isEditingDraft
-            ? `/api/admin/questions?status=DRAFT${selectedTaxonomyIds.length > 0 ? `&taxonomyIds=${encodeURIComponent(JSON.stringify(selectedTaxonomyIds))}` : ''}` 
+        (mainTab === 'drafts' || mainTab === 'qa') && !isSyncPaused && !isEditingDraft
+            ? `/api/admin/questions?status=DRAFT${selectedTaxonomyIds.length > 0 ? `&taxonomyIds=${encodeURIComponent(JSON.stringify(selectedTaxonomyIds))}` : ''}`
             : null,
         fetcher,
         { refreshInterval: 5000, revalidateOnFocus: false }
@@ -1049,7 +1059,7 @@ export default function BulkImportStudio() {
                 <GlobalMathToolbar />
             </div>
 
-            <div className={`${mainTab === 'drafts' ? 'max-w-[98vw] mx-4' : 'max-w-4xl mx-auto'} mt-10 px-8 w-full pb-20`}>
+            <div className={`${mainTab === 'drafts' || mainTab === 'qa' ? 'max-w-[98vw] mx-4' : 'max-w-4xl mx-auto'} mt-10 px-8 w-full pb-20`}>
                 <Link href="/admin/dashboard" className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-semibold">
                     <ArrowLeft className="w-4 h-4 mr-2"/> Back to Admin Dashboard
                 </Link>
@@ -1061,7 +1071,8 @@ export default function BulkImportStudio() {
                         { key: 'excel' as const, label: 'Excel / CSV', icon: <FileText className="w-4 h-4" />, color: 'bg-emerald-600', badge: undefined },
                         { key: 'manual' as const, label: 'Manual Entry', icon: <PenLine className="w-4 h-4" />, color: 'bg-slate-600', badge: undefined },
                         { key: 'drafts' as const, label: 'Pending Drafts', icon: <Clock className="w-4 h-4" />, color: 'bg-amber-600', badge: draftQuestions.length },
-                    ] as { key: 'pdf' | 'word' | 'excel' | 'manual' | 'drafts'; label: string; icon: React.ReactNode; color: string; badge: number | undefined }[]).map(({ key, label, icon, color, badge }) => (
+                        { key: 'qa' as const, label: 'QA Issues', icon: <AlertTriangle className="w-4 h-4" />, color: 'bg-red-600', badge: flaggedDrafts.length },
+                    ] as { key: 'pdf' | 'word' | 'excel' | 'manual' | 'drafts' | 'qa'; label: string; icon: React.ReactNode; color: string; badge: number | undefined }[]).map(({ key, label, icon, color, badge }) => (
                         <button key={key} onClick={() => setMainTab(key)}
                             className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${mainTab === key ? `${color} text-white shadow-lg` : 'text-slate-400 hover:text-white'}`}>
                             {icon} {label}
@@ -1541,6 +1552,45 @@ export default function BulkImportStudio() {
                                 )}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* â”€â”€ Tab: QA Issues â”€â”€ */}
+                {mainTab === 'qa' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6">
+                        <div className="flex items-center gap-3 mb-6 flex-wrap">
+                            <AlertTriangle className="w-5 h-5 text-red-400" />
+                            <h2 className="text-lg font-black text-white">QA Issues</h2>
+                            {!isDraftsLoading && <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">{flaggedDrafts.length}</span>}
+                            <p className="text-slate-400 text-xs font-semibold">Drafts auto-flagged for broken LaTeX, missing answers/options, answer mismatches, or missing data. Fix &amp; save, or delete.</p>
+                        </div>
+
+                        {isDraftsLoading && (
+                            <div className="flex flex-col items-center justify-center h-64 gap-4">
+                                <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+                                <p className="text-red-400 text-sm font-black uppercase tracking-widest">Scanning drafts...</p>
+                            </div>
+                        )}
+                        {!isDraftsLoading && flaggedDrafts.length === 0 && (
+                            <div className="flex flex-col items-center justify-center h-64 opacity-40 gap-4 bg-slate-900 rounded-3xl border border-slate-800">
+                                <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+                                <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No QA issues â€” all drafts look clean!</p>
+                            </div>
+                        )}
+                        {!isDraftsLoading && flaggedDrafts.length > 0 && (
+                            <div className="space-y-8 pb-16 overflow-y-auto custom-scrollbar" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
+                                {flaggedDrafts.map((q, idx) => (
+                                    <ReviewCard key={q.id} q={q} idx={idx} isDraft
+                                        onUpdate={updateDraftCard} onUpdateOption={updateDraftOption}
+                                        onAddTag={addDraftTag} onRemoveTag={removeDraftTag}
+                                        onDelete={() => deleteDraftQuestion(q)}
+                                        onSave={saveDraftQuestion}
+                                        onStitch={stitchDraftSolution}
+                                        stitchTargets={draftQuestions.filter(x => x.id !== q.id).map((x) => ({ id: x.id, label: `Draft (${x.content.substring(0, 25)}...)` }))}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
