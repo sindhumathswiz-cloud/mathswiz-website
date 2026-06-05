@@ -93,6 +93,12 @@ export function analyzeQuestion(q: QAQuestion): QAIssue[] {
         issues.push({ severity: 'warn', code: 'MISSING_ANSWER', message: 'No answer key set' });
     }
 
+    // 6b. Missing explanation. An MCQ (or any question with options) with no
+    // worked explanation is low quality for a teaching platform — flag it.
+    if ((MCQ_TYPES.has(type) || options.length >= 2) && explanation.length < 5) {
+        issues.push({ severity: 'warn', code: 'MISSING_EXPLANATION', message: 'No explanation / solution provided' });
+    }
+
     // 7. Messed-up answer: a letter answer pointing to an option that doesn't exist
     if (MCQ_TYPES.has(type) && /^[A-Z]$/.test(answer)) {
         const idx = answer.charCodeAt(0) - 65;

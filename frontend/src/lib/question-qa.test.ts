@@ -9,8 +9,18 @@ describe('analyzeQuestion', () => {
       content: 'What is $2+2$?',
       options: ['$3$', '$4$', '$5$', '$6$'],
       correctAnswer: 'B',
+      explanation: 'Adding $2+2$ gives $4$, which is option B.',
       type: 'SINGLE_CHOICE',
     })).toEqual([]);
+  });
+
+  it('flags an MCQ with options but no explanation', () => {
+    expect(codes({
+      content: 'What is $2+2$?',
+      options: ['$3$', '$4$', '$5$', '$6$'],
+      correctAnswer: 'B',
+      type: 'SINGLE_CHOICE',
+    })).toContain('MISSING_EXPLANATION');
   });
 
   it('passes a clean subjective question with no answer', () => {
