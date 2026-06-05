@@ -56,13 +56,35 @@ export function repairJson(s: string): string {
 }
 
 /**
+ * Escape LaTeX-command backslashes that JSON.parse would otherwise consume
+ * SILENTLY (without throwing), corrupting the value:
+ *   \right -> \r (carriage return) + "ight"   ← the "ight" bug
+ *   \theta -> \t (tab) + "heta",  \beta -> \b, \frac -> \f
+ * These start with a valid JSON escape char, so the parse succeeds and the
+ * repair-on-failure path never runs. We must fix them BEFORE parsing.
+ *
+ * \r, \b, \f before a letter are never intended control chars in math content,
+ * so always double them. \t and \n are ambiguous (real tab/newline vs
+ * \times/\neq), so only double them before known LaTeX command names — that way
+ * genuine "\n" newlines and "\t" tabs in explanations are preserved.
+ */
+export function fixLatexCommandEscapes(s: string): string {
+  let r = s;
+  r = r.replace(/(?<!\\)\\([rbf])(?=[a-zA-Z])/g, '\\\\$1');
+  r = r.replace(/(?<!\\)\\t(?=imes|heta|an|au|ext|riangle|op|ilde|herefore|frac|o[^a-zA-Z]|o$)/g, '\\\\t');
+  r = r.replace(/(?<!\\)\\n(?=abla|eq|ot|leq|geq|mid|earrow|warrow|u[^a-zA-Z]|u$|i[^a-zA-Z]|i$|e[^a-zA-Z]|e$)/g, '\\\\n');
+  return r;
+}
+
+/**
  * Parse LLM JSON, returning the parsed value or `null` if it is unrecoverable.
  * Callers should treat `null` as "this chunk failed" rather than crashing the
  * whole batch.
  */
 export function parseLLMJson<T = unknown>(raw: string | null | undefined): T | null {
   if (!raw) return null;
-  const stripped = stripFences(raw);
+  // Always fix silently-corrupting LaTeX escapes first, then parse.
+  const stripped = fixLatexCommandEscapes(stripFences(raw));
 
   try {
     return JSON.parse(stripped) as T;

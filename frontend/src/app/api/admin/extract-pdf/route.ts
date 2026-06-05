@@ -77,53 +77,100 @@ export async function POST(request: NextRequest) {
         //       regex parser); dedupe the chunk overlap ──
         const chunks = chunkMarkdown(cleanedText, 6000, 1);
         console.log(`[EXTRACT-PDF] Structuring ${chunks.length} chunks via LLM (Gemini 3.5-flash, Groq fallback)...`);
-        let extracted: CanonicalQuestion[] = [];
-        for (let i = 0; i < chunks.length; i++) {
-            try {
-                const qs = await structureQuestions(chunks[i]);
-                extracted.push(...qs);
-            } catch (e: any) {
-                console.error(`[EXTRACT-PDF] Chunk ${i + 1}/${chunks.length} failed: ${e.message}`);
+
+        // Process chunks concurrently (Gemini's free tier has ample TPM headroom)
+        // via a fixed-size worker pool. ~4x faster than sequential on big chapters.
+        // Order is preserved by writing into results[i]; progress is logged.
+        const CONCURRENCY = 4;
+        const results: CanonicalQuestion[][] = new Array(chunks.length);
+        let completed = 0;
+        const worker = async (start: number) => {
+            for (let i = start; i < chunks.length; i += CONCURRENCY) {
+                try {
+                    results[i] = await structureQuestions(chunks[i]);
+                } catch (e: any) {
+                    results[i] = [];
+                    console.error(`[EXTRACT-PDF] Chunk ${i + 1}/${chunks.length} failed: ${e.message}`);
+                }
+                console.log(`[EXTRACT-PDF] chunk ${++completed}/${chunks.length} done`);
             }
-        }
-        extracted = dedupeByContent(extracted);
+        };
+        await Promise.all(
+            Array.from({ length: Math.min(CONCURRENCY, chunks.length) }, (_, k) => worker(k))
+        );
+        let extracted: CanonicalQuestion[] = dedupeByContent(results.flat());
         console.log(`[EXTRACT-PDF] ${extracted.length} questions after in-batch dedupe.`);
 
-        // Cross-run dedupe: drop questions whose contentHash already exists in the
-        // DB (any status) so re-extracting a chapter doesn't pile up duplicates.
+        // ── 3. Resolve class/subject/board + topic names from the selected taxonomy ──
+        let resolvedClassName = "Class 12";
+        let resolvedSubjectName = "Mathematics";
+        let board: string | null = null;
+        const topicNames: string[] = [];
+        if (taxonomyIds.length > 0) {
+            const selected = await prisma.tagTaxonomy.findMany({
+                where: { id: { in: taxonomyIds } },
+                include: { parent: { include: { parent: { include: { parent: true } } } } }
+            });
+            for (const t of selected) {
+                if (t.type === 'TOPIC') topicNames.push(t.name);
+                let node: any = t;
+                while (node) {
+                    if (node.type === 'CLASS') resolvedClassName = node.name;
+                    if (node.type === 'SUBJECT') resolvedSubjectName = node.name;
+                    if (node.boardType) board = node.boardType;
+                    node = node.parent;
+                }
+            }
+        }
+        const examType = board === 'JEE_MAIN' ? 'JEE' : (board && board !== 'CBSE') ? board : 'Board';
+
+        // ── 3b. Clear this chapter's existing DRAFTs so re-extraction is a clean
+        // slate (never touches APPROVED). Matches drafts tagged with the selected
+        // taxonomy OR carrying the topic name as a free-text field (old pipeline). ──
+        let clearedDrafts = 0;
+        if (taxonomyIds.length > 0) {
+            const tagged = (await prisma.questionTag.findMany({
+                where: { tagId: { in: taxonomyIds } },
+                select: { questionId: true },
+            })).map(t => t.questionId);
+            const staleIds = (await prisma.question.findMany({
+                where: {
+                    status: 'DRAFT',
+                    OR: [
+                        ...(tagged.length ? [{ id: { in: tagged } }] : []),
+                        ...(topicNames.length ? [{ topic: { in: topicNames, mode: 'insensitive' as const } }] : []),
+                    ],
+                },
+                select: { id: true },
+            })).map(d => d.id);
+            // Never delete a draft referenced by a test/response (FK is RESTRICT).
+            const blocked = new Set([
+                ...(await prisma.testQuestion.findMany({ where: { questionId: { in: staleIds } }, select: { questionId: true } })).map(t => t.questionId),
+                ...(await prisma.testResponse.findMany({ where: { questionId: { in: staleIds } }, select: { questionId: true } })).map(t => t.questionId),
+            ]);
+            const deletable = staleIds.filter(id => !blocked.has(id));
+            if (deletable.length) {
+                clearedDrafts = (await prisma.question.deleteMany({ where: { id: { in: deletable } } })).count;
+            }
+        }
+        console.log(`[EXTRACT-PDF] Cleared ${clearedDrafts} existing drafts for this chapter.`);
+
+        // ── 3c. Cross-run dedupe against APPROVED only — never re-add an
+        // already-published question, but DON'T block on drafts (just cleared). ──
         const hashed = extracted.map(q => ({ q, hash: computeContentHash(q.questionContent) }));
-        const existing = await prisma.question.findMany({
-            where: { contentHash: { in: hashed.map(h => h.hash) } },
+        const approved = await prisma.question.findMany({
+            where: { status: 'APPROVED', contentHash: { in: hashed.map(h => h.hash) } },
             select: { contentHash: true },
         });
-        const existingHashes = new Set(existing.map(e => e.contentHash));
+        const approvedHashes = new Set(approved.map(e => e.contentHash));
         const seenInRun = new Set<string>();
         const toSave = hashed.filter(({ hash }) => {
-            if (existingHashes.has(hash) || seenInRun.has(hash)) return false;
+            if (approvedHashes.has(hash) || seenInRun.has(hash)) return false;
             seenInRun.add(hash);
             return true;
         });
         const skipped = extracted.length - toSave.length;
-        console.log(`[EXTRACT-PDF] ${toSave.length} new, ${skipped} duplicates skipped.`);
-
-        // ── 3. Resolve class/subject/board from the selected taxonomy ──
-        let resolvedClassName = "Class 12";
-        let resolvedSubjectName = "Mathematics";
-        let board: string | null = null;
-        if (taxonomyIds.length > 0) {
-            const firstTaxonomy = await prisma.tagTaxonomy.findUnique({
-                where: { id: taxonomyIds[0] },
-                include: { parent: { include: { parent: { include: { parent: true } } } } }
-            });
-            let node: any = firstTaxonomy;
-            while (node) {
-                if (node.type === 'CLASS') resolvedClassName = node.name;
-                if (node.type === 'SUBJECT') resolvedSubjectName = node.name;
-                if (node.boardType) board = node.boardType;
-                node = node.parent;
-            }
-        }
-        const examType = board === 'JEE_MAIN' ? 'JEE' : (board && board !== 'CBSE') ? board : 'Board';
+        console.log(`[EXTRACT-PDF] ${toSave.length} new, ${skipped} already-approved/in-run duplicates skipped.`);
 
         // ── 4. Save as DRAFT + tag with the selected chapter ──
         const userRole = (session.user as any).role;
@@ -162,6 +209,7 @@ export async function POST(request: NextRequest) {
             savedCount,
             totalFound: extracted.length,
             duplicatesSkipped: skipped,
+            clearedDrafts,
             rawMarkdown: rawText.substring(0, 50000)
         });
     } catch (error: any) {

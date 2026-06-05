@@ -41,6 +41,27 @@ describe('parseLLMJson', () => {
     expect(out?.questions[0].correctAnswer).toBe('$1$');
   });
 
+  // ── Silent-corruption cases (parse succeeds but mangles the value) ──
+  it('fixes \\right that JSON.parse would turn into a carriage return ("ight" bug)', () => {
+    const out = parseLLMJson<{ q: string }>('{"q":"$\\left(x^{5}\\right)$"}');
+    expect(out?.q).toBe('$\\left(x^{5}\\right)$');
+  });
+
+  it('fixes \\times / \\theta / \\beta / \\frac silent corruption', () => {
+    const out = parseLLMJson<{ q: string }>('{"q":"$\\beta \\times \\theta = \\frac{1}{2}$"}');
+    expect(out?.q).toBe('$\\beta \\times \\theta = \\frac{1}{2}$');
+  });
+
+  it('fixes \\neq / \\nabla', () => {
+    const out = parseLLMJson<{ q: string }>('{"q":"$a \\neq b, \\nabla f$"}');
+    expect(out?.q).toBe('$a \\neq b, \\nabla f$');
+  });
+
+  it('still preserves a genuine \\n newline (not a LaTeX command)', () => {
+    const out = parseLLMJson<{ a: string }>('{"a":"line1\\nline2"}');
+    expect(out?.a).toBe('line1\nline2');
+  });
+
   it('returns null for unrecoverable junk', () => {
     expect(parseLLMJson('not json at all')).toBeNull();
     expect(parseLLMJson('')).toBeNull();

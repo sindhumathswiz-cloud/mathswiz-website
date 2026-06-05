@@ -53,6 +53,16 @@ function geminiKeys(): string[] {
   ].filter(Boolean) as string[];
 }
 
+// Reject if a single model call takes too long, so a hung request fails that
+// chunk instead of stalling the whole document.
+const CALL_TIMEOUT_MS = 120_000;
+function withTimeout<T>(p: Promise<T>, ms = CALL_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('LLM call timed out')), ms)),
+  ]);
+}
+
 // Newest GA flash first; fall back to the prior GA flash if a key/model is busy.
 const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
 
@@ -69,7 +79,7 @@ async function callGemini(prompt: string): Promise<string> {
           model: modelName,
           generationConfig: { responseMimeType: 'application/json', temperature: 0 },
         });
-        const result = await model.generateContent(prompt);
+        const result = await withTimeout(model.generateContent(prompt));
         return result.response.text();
       } catch (e) {
         lastErr = e; // model unavailable or per-key rate limit — try next key/model
