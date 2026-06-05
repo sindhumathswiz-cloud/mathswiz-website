@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
                     correctAnswer: q.correctAnswer,
                     explanation: q.explanation,
                     type: q.type, // already validated by the normalizer against the enum
-                    difficulty: 'MEDIUM',
+                    difficulty: q.difficulty, // classified by the LLM, validated by the normalizer
                     subject: resolvedSubjectName,
                     class: resolvedClassName,
                     examType,

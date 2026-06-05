@@ -18,7 +18,7 @@ function buildPrompt(rawText: string): string {
   return `You are a world-class assistant that extracts math questions from raw OCR'd text into strict JSON.
 
 ### OUTPUT
-Return ONLY a JSON object: { "questions": [ { "type", "content", "options", "correctAnswer", "explanation", "tags" } ] }
+Return ONLY a JSON object: { "questions": [ { "type", "difficulty", "content", "options", "correctAnswer", "explanation", "tags" } ] }
 
 ### LaTeX RULES
 - Wrap every variable, equation, function and fraction in $ (inline) or $$ (display). 'Solve for x' -> 'Solve for $x$'.
@@ -29,6 +29,7 @@ Return ONLY a JSON object: { "questions": [ { "type", "content", "options", "cor
 ### FIELD RULES
 - content: the FULL question stem (prose + math). Never put the solution here. CRITICAL: if the question refers to a matrix, determinant, table, figure, system of equations, or specific values, you MUST include the ACTUAL data verbatim (e.g. the full $\\begin{bmatrix}...\\end{bmatrix}$). NEVER replace it with a vague phrase like "a given matrix A", "the following matrix", or "the matrix shown" — if the data exists in the source text, copy it into content.
 - type: classify as ONE of SINGLE_CHOICE, MULTIPLE_CHOICE, INTEGER, TRUE_FALSE, ASSERTION_REASONING, CASE_STUDY, FILL_IN_BLANKS, SHORT_ANSWER, LONG_ANSWER, SUBJECTIVE. Most CBSE board questions are SUBJECTIVE / SHORT_ANSWER / LONG_ANSWER with NO options — do NOT invent options for them.
+- difficulty: EASY, MEDIUM, or HARD. Judge by the demand: recall / direct one-step formula / 1-2 mark MCQ = EASY; standard multi-step application / 3 marks = MEDIUM; multi-concept problems, derivations, or "prove/show that" / 4-6 marks = HARD. Do NOT default everything to MEDIUM — assess each question.
 - options: array of option texts WITHOUT the "(A)" labels; use [] for non-MCQ.
 - correctAnswer: include ONLY if the source provides or clearly states it (an answer key, a "Sol."/"Ans." line, or a marking scheme). If the answer is not present, return "". NEVER guess or solve to fabricate one. For MCQ use the option LETTER; otherwise the answer value.
 - explanation: any worked solution / "Detailed Solution" / marking scheme text belonging to this question. Never inside content.

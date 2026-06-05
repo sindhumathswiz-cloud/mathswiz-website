@@ -92,6 +92,13 @@ describe('normalizeExtractedQuestion', () => {
     expect(normalizeExtractedQuestion({ question: 'Find $x$.', type: 'nonsense' }).type).toBe('SUBJECTIVE');
   });
 
+  it('carries a valid difficulty and defaults invalid/missing to MEDIUM', () => {
+    expect(normalizeExtractedQuestion({ question: 'Q', difficulty: 'hard' }).difficulty).toBe('HARD');
+    expect(normalizeExtractedQuestion({ question: 'Q', difficulty: 'Easy' }).difficulty).toBe('EASY');
+    expect(normalizeExtractedQuestion({ question: 'Q', difficulty: 'tricky' }).difficulty).toBe('MEDIUM');
+    expect(normalizeExtractedQuestion({ question: 'Q' }).difficulty).toBe('MEDIUM');
+  });
+
   it('keeps integer/subjective answers verbatim when there are no options', () => {
     const q = normalizeExtractedQuestion({ question: 'Value of $x$?', answer: '$x=5$' });
     expect(q.correctAnswer).toBe('$x=5$');

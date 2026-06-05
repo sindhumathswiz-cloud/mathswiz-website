@@ -8,7 +8,7 @@ interface MathRendererProps {
     content: string;
 }
 
-function sanitizeLatex(text: string): string {
+export function sanitizeLatex(text: string): string {
     let result = text;
 
     // Step 1: Convert Mathpix delimiters to remark-math compatible ones

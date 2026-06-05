@@ -29,6 +29,7 @@ import MathRenderer from '@/components/MathRenderer';
 import { buildPageWindows, dedupeByContent } from '@/lib/page-windows';
 import { chapterFromFilename } from '@/lib/chapter-classifier';
 import QuestionTags from '@/components/QuestionTags';
+import QAFlags from '@/components/QAFlags';
 import useSWR from 'swr';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
 import GlobalMathToolbar from '@/components/GlobalMathToolbar';
@@ -2187,6 +2188,8 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
                             </div>
                         </div>
                     </div>
+
+                    <QAFlags q={{ content: q.content, options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation, type: q.type }} />
 
                     <FieldRow label="Problem Statement" value={q.content} onChange={v => onUpdate(q.id, 'content', v)} rows={4} tags={q.tags} />
                     

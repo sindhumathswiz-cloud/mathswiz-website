@@ -31,13 +31,23 @@ const VALID_TYPES = new Set<CanonicalType>([
   'SHORT_ANSWER', 'LONG_ANSWER',
 ]);
 
+export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+const VALID_DIFFICULTY = new Set<Difficulty>(['EASY', 'MEDIUM', 'HARD']);
+
 export interface CanonicalQuestion {
   questionContent: string;
   type: CanonicalType;
+  difficulty: Difficulty;
   options: string[];
   correctAnswer: string;
   explanation: string;
   tags: string[];
+}
+
+/** Normalize a difficulty value to the enum, defaulting to MEDIUM. */
+export function normalizeDifficulty(raw: unknown): Difficulty {
+  const d = String(raw ?? '').toUpperCase();
+  return VALID_DIFFICULTY.has(d as Difficulty) ? (d as Difficulty) : 'MEDIUM';
 }
 
 /**
@@ -146,6 +156,7 @@ export function normalizeExtractedQuestion(raw: unknown): CanonicalQuestion {
   return {
     questionContent,
     type,
+    difficulty: normalizeDifficulty(obj.difficulty),
     options,
     correctAnswer: normalizeAnswer(firstString(obj, ANSWER_KEYS), options),
     explanation: firstString(obj, EXPLANATION_KEYS),
