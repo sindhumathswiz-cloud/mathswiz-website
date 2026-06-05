@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionTags from '@/components/QuestionTags';
 import { 
     ChevronLeft, ChevronRight, CheckCircle, XCircle, 
     Bot, Sparkles, Timer, Zap, Trophy, Target, BookOpen,
@@ -269,6 +270,7 @@ export default function PracticeArenaClient({ initialQuestions, subjects, curren
                         <div className="text-lg font-medium text-gray-800 leading-relaxed">
                             <MathRenderer content={currentQ?.content || ''} />
                         </div>
+                        <QuestionTags tags={currentQ?.tags} />
                     </div>
 
                     {/* Options */}

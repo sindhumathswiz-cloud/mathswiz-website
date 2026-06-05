@@ -94,8 +94,8 @@ export async function POST(req: Request) {
                     status: "APPROVED", 
                     type: searchType, 
                     difficulty: searchDiff, 
-                    topic: { contains: topic, mode: 'insensitive' }, 
-                    ...(subtopic ? { subTopic: { contains: subtopic, mode: 'insensitive' } } : {}) 
+                    topic: { equals: topic, mode: 'insensitive' },
+                    ...(subtopic ? { subTopic: { equals: subtopic, mode: 'insensitive' } } : {})
                 },
                 take: requestedCount
             });

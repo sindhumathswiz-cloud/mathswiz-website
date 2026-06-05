@@ -26,6 +26,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import MathRenderer from '@/components/MathRenderer';
+import { buildPageWindows, dedupeByContent } from '@/lib/page-windows';
+import { chapterFromFilename } from '@/lib/chapter-classifier';
+import QuestionTags from '@/components/QuestionTags';
 import useSWR from 'swr';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
 import GlobalMathToolbar from '@/components/GlobalMathToolbar';
@@ -207,8 +210,8 @@ const mapExtracted = (q: any, prefix: string, idx: number): ExtractedQuestion =>
     options: Array.isArray(q.options) ? [...q.options, ...Array(4).fill('')].slice(0, 4).map(sanitizeLaTeX) : ['', '', '', ''],
     correctAnswer: sanitizeLaTeX(q.correctAnswer || ''),
     explanation: sanitizeLaTeX(q.explanation || ''),
-    type: 'SINGLE_CHOICE',
-    difficulty: 'MEDIUM',
+    type: q.type || 'SINGLE_CHOICE',
+    difficulty: q.difficulty || 'MEDIUM',
     subject: 'Mathematics',
     classLevel: 'Class 12',
     examType: 'Board',
@@ -333,7 +336,27 @@ export default function BulkImportStudio() {
         if (!file) return;
         if (fileInputRef.current) fileInputRef.current.value = '';
 
-        if (selectedTaxonomyIds.length === 0) {
+        // Auto-detect the chapter from the filename when none was selected,
+        // and pre-select it (the user can still override in "Select Topic").
+        let taxIds = selectedTaxonomyIds;
+        if (taxIds.length === 0) {
+            const guess = chapterFromFilename(file.name);
+            if (guess) {
+                try {
+                    const r = await fetch(`/api/taxonomy/resolve-chapter?name=${encodeURIComponent(guess)}`);
+                    const d = await r.json();
+                    if (d.topicId) {
+                        taxIds = [d.topicId];
+                        setSelectedTaxonomyIds(taxIds);
+                        toast.success(`Auto-detected chapter: ${d.topicName}. Change it in "Select Topic" if wrong.`);
+                    } else if (d.canonical) {
+                        toast.error(`Detected "${d.canonical}" but it isn't in the taxonomy. Please select a Topic manually.`);
+                    }
+                } catch { /* fall through to the manual prompt */ }
+            }
+        }
+
+        if (taxIds.length === 0) {
             toast.error("Please select at least one Topic or Sub-Topic first.");
             return;
         }
@@ -370,7 +393,7 @@ export default function BulkImportStudio() {
             try {
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('taxonomyIds', JSON.stringify(selectedTaxonomyIds));
+                formData.append('taxonomyIds', JSON.stringify(taxIds));
                 
                 const res = await fetch('/api/admin/extract-pdf', {
                     method: 'POST',
@@ -407,9 +430,11 @@ export default function BulkImportStudio() {
         setIsExtracting(true);
         let allQuestions: ExtractedQuestion[] = [];
         try {
+            // ── Phase 1: OCR every page to LaTeX text (Mathpix), in page order ──
+            const pageTexts: string[] = [];
             for (let i = 1; i <= doc.numPages; i++) {
                 setCurrentPage(i);
-                showMsg('success', `Extracting page ${i} of ${doc.numPages}...`);
+                showMsg('success', `Reading page ${i} of ${doc.numPages}...`);
                 const page = await doc.getPage(i);
                 const viewport = page.getViewport({ scale: 2.0 });
                 const canvas = document.createElement('canvas');
@@ -420,7 +445,7 @@ export default function BulkImportStudio() {
 
                 try {
                     const textContent = await page.getTextContent();
-                    const raw = textContent.items.map((i: any) => i.str).join(' ');
+                    const raw = textContent.items.map((it: any) => it.str).join(' ');
                     setRawTextDump(prev => {
                         const idx = prev.findIndex(r => r.page === i);
                         if (idx >= 0) { const n = [...prev]; n[idx] = { page: i, text: raw }; return n; }
@@ -428,20 +453,36 @@ export default function BulkImportStudio() {
                     });
                 } catch (_) { }
 
+                const ocrRes = await fetch('/api/extract', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'image', fileBase64: base64 })
+                });
+                const ocrData = await ocrRes.json();
+                if (ocrData.error) throw new Error(`Page ${i} OCR: ${ocrData.error}`);
+                pageTexts.push(ocrData.text || '');
+            }
+
+            // ── Phase 2: structure in overlapping windows so a question and its
+            // solution spilling onto the next page reach the LLM together ──
+            const windows = buildPageWindows(pageTexts, 4, 1);
+            for (let w = 0; w < windows.length; w++) {
+                const win = windows[w];
+                showMsg('success', `Structuring pages ${win.startPage}-${win.endPage} (${w + 1}/${windows.length})...`);
                 const res = await fetch('/api/admin/extract-mathpix', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fileBase64: base64, mimeType: 'image/jpeg' })
+                    body: JSON.stringify({ type: 'text', rawText: win.text })
                 });
                 const data = await res.json();
                 if (data.error) throw new Error(data.error + (data.details ? ' | ' + data.details : ''));
 
-                const arr = Array.isArray(data) ? data : [data];
-                const mapped = arr.map((q, idx) => mapExtracted(q, `p${i}`, idx));
-                allQuestions = [...allQuestions, ...mapped];
-                setQuestions(prev => [...prev, ...mapped]);
+                const arr = Array.isArray(data) ? data : [];
+                const mapped = arr.map((q: any, idx: number) => mapExtracted(q, `w${win.startPage}`, idx));
+                // Dedupe across the window overlap.
+                allQuestions = dedupeByContent([...allQuestions, ...mapped]);
+                setQuestions(prev => dedupeByContent([...prev, ...mapped]));
             }
             await setCachedOCR(fileHash, allQuestions);
-            showMsg('success', `Finished extracting ${doc.numPages} pages! Saved to cache.`);
+            showMsg('success', `Extracted ${allQuestions.length} questions from ${doc.numPages} pages! Saved to cache.`);
             checkDuplicatesForQueue(allQuestions);
         } catch (err: any) {
             showMsg('error', `Extraction stopped at page ${currentPage}: ${err.message}`);
@@ -2147,7 +2188,7 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
                         </div>
                     </div>
 
-                    <FieldRow label="Problem Statement" value={q.content} onChange={v => onUpdate(q.id, 'content', v)} rows={4} />
+                    <FieldRow label="Problem Statement" value={q.content} onChange={v => onUpdate(q.id, 'content', v)} rows={4} tags={q.tags} />
                     
                     <div>
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Answer Options</label>
@@ -2230,8 +2271,8 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
 }
 
 // â”€â”€â”€ FieldRow (side-by-side LaTeX textarea | MathRenderer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function FieldRow({ label, value, onChange, rows, compact }: {
-    label: string; value: string; onChange: (v: string) => void; rows: number; compact?: boolean;
+function FieldRow({ label, value, onChange, rows, compact, tags }: {
+    label: string; value: string; onChange: (v: string) => void; rows: number; compact?: boolean; tags?: string[];
 }) {
     return (
         <div className={compact ? '' : 'space-y-1'}>
@@ -2242,6 +2283,7 @@ function FieldRow({ label, value, onChange, rows, compact }: {
                 <div className="bg-white rounded-xl p-3 text-xs text-slate-900 overflow-auto select-none pointer-events-none border border-slate-200"
                     style={{ minHeight: `${rows * 1.75}rem` }} onContextMenu={e => e.preventDefault()}>
                     <MathRenderer content={value || '*(empty)*'} />
+                    {tags && <QuestionTags tags={tags} />}
                 </div>
             </div>
         </div>
