@@ -2285,7 +2285,8 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
                     <div className="grid grid-cols-4 gap-4">
                         <div className="col-span-1 space-y-1">
                             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Answer Key</label>
-                            <input value={q.correctAnswer} onChange={e => onUpdate(q.id, 'correctAnswer', e.target.value.toUpperCase())} placeholder="A"
+                            <input value={q.correctAnswer} onChange={e => onUpdate(q.id, 'correctAnswer', e.target.value.toUpperCase())}
+                                placeholder={q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE' ? 'A' : 'Ans'}
                                 className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl py-3 text-sm text-center text-indigo-400 font-black outline-none focus:border-indigo-500 transition-colors" />
                         </div>
                         <div className="col-span-3">
