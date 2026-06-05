@@ -8,7 +8,7 @@ interface MathRendererProps {
     content: string;
 }
 
-function sanitizeLatex(text: string): string {
+export function sanitizeLatex(text: string): string {
     let result = text;
 
     // Step 1: Convert Mathpix delimiters to remark-math compatible ones
@@ -20,11 +20,31 @@ function sanitizeLatex(text: string): string {
     result = result.replace(/\\begin{pmatrix}/g, '\\begin{bmatrix}');
     result = result.replace(/\\end{pmatrix}/g, '\\end{bmatrix}');
 
+    // Step 2a: Fix bare column-spec environments. Mathpix/LLM sometimes drop the
+    // 'array' and use the column spec as the env name (\begin{ccc}, \begin{l}),
+    // or mismatch \begin{ccc}...\end{array}. KaTeX errors ("No such environment").
+    // [lcr|]+ only matches column specs, never a real env (array, cases, matrix…).
+    result = result.replace(/\\begin\{([lcr|]+)\}/g, '\\begin{array}{$1}');
+    result = result.replace(/\\end\{([lcr|]+)\}/g, '\\end{array}');
+
     // Step 2b: Wrap bare aligned/gathered environments in display math
     result = result.replace(/(?<!\$\$)\s*\\begin{aligned}([\s\S]*?)\\end{aligned}(?!\s*\$\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
     result = result.replace(/(?<!\$\$)\s*\\begin{gathered}([\s\S]*?)\\end{gathered}(?!\s*\$\$)/g, '\n$$\\begin{gathered}$1\\end{gathered}$$\n');
     result = result.replace(/(?<!\$\$)\s*\\begin{align}([\s\S]*?)\\end{align}(?!\s*\$\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
     result = result.replace(/(?<!\$\$)\s*\\begin{align\*}([\s\S]*?)\\end{align\*}(?!\s*\$\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
+
+    // Step 2c: Normalize display math. remark-math only treats $$...$$ as a
+    // display block when the $$ are on their OWN lines — inline
+    // "$$\begin{aligned}...\end{aligned}$$" silently fails to render (KaTeX gets
+    // the body without its wrapper → red error). Put every $$ on its own line.
+    // Also wrap bare &-alignment in an aligned env so KaTeX accepts it.
+    result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_full: string, innerRaw: string) => {
+      let inner = innerRaw.trim();
+      if (inner.includes('&') && !/\\begin\{/.test(inner)) {
+        inner = `\\begin{aligned}${inner}\\end{aligned}`;
+      }
+      return `\n\n$$\n${inner}\n$$\n\n`;
+    });
 
     // Step 3: Add \limits to common operators for vertical alignment
     result = result.replace(/\\lim_\{/g, '\\lim\\limits_{');

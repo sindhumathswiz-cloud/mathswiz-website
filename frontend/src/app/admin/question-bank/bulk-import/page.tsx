@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { debounce } from 'lodash';
 import {
@@ -26,6 +26,11 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import MathRenderer from '@/components/MathRenderer';
+import { buildPageWindows, dedupeByContent } from '@/lib/page-windows';
+import { chapterFromFilename } from '@/lib/chapter-classifier';
+import QuestionTags from '@/components/QuestionTags';
+import QAFlags from '@/components/QAFlags';
+import { analyzeQuestion } from '@/lib/question-qa';
 import useSWR from 'swr';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
 import GlobalMathToolbar from '@/components/GlobalMathToolbar';
@@ -207,8 +212,8 @@ const mapExtracted = (q: any, prefix: string, idx: number): ExtractedQuestion =>
     options: Array.isArray(q.options) ? [...q.options, ...Array(4).fill('')].slice(0, 4).map(sanitizeLaTeX) : ['', '', '', ''],
     correctAnswer: sanitizeLaTeX(q.correctAnswer || ''),
     explanation: sanitizeLaTeX(q.explanation || ''),
-    type: 'SINGLE_CHOICE',
-    difficulty: 'MEDIUM',
+    type: q.type || 'SINGLE_CHOICE',
+    difficulty: q.difficulty || 'MEDIUM',
     subject: 'Mathematics',
     classLevel: 'Class 12',
     examType: 'Board',
@@ -236,7 +241,7 @@ export default function BulkImportStudio() {
     const { data: session } = useSession();
 
     // Primary tab: pdf | word | drafts | excel | manual
-    const [mainTab, setMainTab] = useState<'pdf' | 'word' | 'drafts' | 'excel' | 'manual'>('pdf');
+    const [mainTab, setMainTab] = useState<'pdf' | 'word' | 'drafts' | 'excel' | 'manual' | 'qa'>('pdf');
     const [selectedTaxonomyIds, setSelectedTaxonomyIds] = useState<string[]>([]);
 
     // Workspace mode (PDF only)
@@ -289,10 +294,19 @@ export default function BulkImportStudio() {
     const [draftQuestions, setDraftQuestions] = useState<ExtractedQuestion[]>([]);
     const [isSyncPaused, setIsSyncPaused] = useState(false);
     const [isEditingDraft, setIsEditingDraft] = useState(false);
+
+    // Drafts that fail automated QA (broken LaTeX, missing answer/options, etc.)
+    const flaggedDrafts = useMemo(
+        () => draftQuestions.filter(q => analyzeQuestion({
+            content: q.content, options: q.options, correctAnswer: q.correctAnswer,
+            explanation: q.explanation, type: q.type,
+        }).length > 0),
+        [draftQuestions]
+    );
     
     const { data: draftsData, isLoading: isDraftsLoading, mutate: mutateDrafts } = useSWR(
-        mainTab === 'drafts' && !isSyncPaused && !isEditingDraft
-            ? `/api/admin/questions?status=DRAFT${selectedTaxonomyIds.length > 0 ? `&taxonomyIds=${encodeURIComponent(JSON.stringify(selectedTaxonomyIds))}` : ''}` 
+        (mainTab === 'drafts' || mainTab === 'qa') && !isSyncPaused && !isEditingDraft
+            ? `/api/admin/questions?status=DRAFT${selectedTaxonomyIds.length > 0 ? `&taxonomyIds=${encodeURIComponent(JSON.stringify(selectedTaxonomyIds))}` : ''}`
             : null,
         fetcher,
         { refreshInterval: 5000, revalidateOnFocus: false }
@@ -333,7 +347,27 @@ export default function BulkImportStudio() {
         if (!file) return;
         if (fileInputRef.current) fileInputRef.current.value = '';
 
-        if (selectedTaxonomyIds.length === 0) {
+        // Auto-detect the chapter from the filename when none was selected,
+        // and pre-select it (the user can still override in "Select Topic").
+        let taxIds = selectedTaxonomyIds;
+        if (taxIds.length === 0) {
+            const guess = chapterFromFilename(file.name);
+            if (guess) {
+                try {
+                    const r = await fetch(`/api/taxonomy/resolve-chapter?name=${encodeURIComponent(guess)}`);
+                    const d = await r.json();
+                    if (d.topicId) {
+                        taxIds = [d.topicId];
+                        setSelectedTaxonomyIds(taxIds);
+                        toast.success(`Auto-detected chapter: ${d.topicName}. Change it in "Select Topic" if wrong.`);
+                    } else if (d.canonical) {
+                        toast.error(`Detected "${d.canonical}" but it isn't in the taxonomy. Please select a Topic manually.`);
+                    }
+                } catch { /* fall through to the manual prompt */ }
+            }
+        }
+
+        if (taxIds.length === 0) {
             toast.error("Please select at least one Topic or Sub-Topic first.");
             return;
         }
@@ -370,7 +404,7 @@ export default function BulkImportStudio() {
             try {
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('taxonomyIds', JSON.stringify(selectedTaxonomyIds));
+                formData.append('taxonomyIds', JSON.stringify(taxIds));
                 
                 const res = await fetch('/api/admin/extract-pdf', {
                     method: 'POST',
@@ -407,9 +441,11 @@ export default function BulkImportStudio() {
         setIsExtracting(true);
         let allQuestions: ExtractedQuestion[] = [];
         try {
+            // ── Phase 1: OCR every page to LaTeX text (Mathpix), in page order ──
+            const pageTexts: string[] = [];
             for (let i = 1; i <= doc.numPages; i++) {
                 setCurrentPage(i);
-                showMsg('success', `Extracting page ${i} of ${doc.numPages}...`);
+                showMsg('success', `Reading page ${i} of ${doc.numPages}...`);
                 const page = await doc.getPage(i);
                 const viewport = page.getViewport({ scale: 2.0 });
                 const canvas = document.createElement('canvas');
@@ -420,7 +456,7 @@ export default function BulkImportStudio() {
 
                 try {
                     const textContent = await page.getTextContent();
-                    const raw = textContent.items.map((i: any) => i.str).join(' ');
+                    const raw = textContent.items.map((it: any) => it.str).join(' ');
                     setRawTextDump(prev => {
                         const idx = prev.findIndex(r => r.page === i);
                         if (idx >= 0) { const n = [...prev]; n[idx] = { page: i, text: raw }; return n; }
@@ -428,20 +464,36 @@ export default function BulkImportStudio() {
                     });
                 } catch (_) { }
 
+                const ocrRes = await fetch('/api/extract', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'image', fileBase64: base64 })
+                });
+                const ocrData = await ocrRes.json();
+                if (ocrData.error) throw new Error(`Page ${i} OCR: ${ocrData.error}`);
+                pageTexts.push(ocrData.text || '');
+            }
+
+            // ── Phase 2: structure in overlapping windows so a question and its
+            // solution spilling onto the next page reach the LLM together ──
+            const windows = buildPageWindows(pageTexts, 4, 1);
+            for (let w = 0; w < windows.length; w++) {
+                const win = windows[w];
+                showMsg('success', `Structuring pages ${win.startPage}-${win.endPage} (${w + 1}/${windows.length})...`);
                 const res = await fetch('/api/admin/extract-mathpix', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fileBase64: base64, mimeType: 'image/jpeg' })
+                    body: JSON.stringify({ type: 'text', rawText: win.text })
                 });
                 const data = await res.json();
                 if (data.error) throw new Error(data.error + (data.details ? ' | ' + data.details : ''));
 
-                const arr = Array.isArray(data) ? data : [data];
-                const mapped = arr.map((q, idx) => mapExtracted(q, `p${i}`, idx));
-                allQuestions = [...allQuestions, ...mapped];
-                setQuestions(prev => [...prev, ...mapped]);
+                const arr = Array.isArray(data) ? data : [];
+                const mapped = arr.map((q: any, idx: number) => mapExtracted(q, `w${win.startPage}`, idx));
+                // Dedupe across the window overlap.
+                allQuestions = dedupeByContent([...allQuestions, ...mapped]);
+                setQuestions(prev => dedupeByContent([...prev, ...mapped]));
             }
             await setCachedOCR(fileHash, allQuestions);
-            showMsg('success', `Finished extracting ${doc.numPages} pages! Saved to cache.`);
+            showMsg('success', `Extracted ${allQuestions.length} questions from ${doc.numPages} pages! Saved to cache.`);
             checkDuplicatesForQueue(allQuestions);
         } catch (err: any) {
             showMsg('error', `Extraction stopped at page ${currentPage}: ${err.message}`);
@@ -1007,7 +1059,7 @@ export default function BulkImportStudio() {
                 <GlobalMathToolbar />
             </div>
 
-            <div className={`${mainTab === 'drafts' ? 'max-w-[98vw] mx-4' : 'max-w-4xl mx-auto'} mt-10 px-8 w-full pb-20`}>
+            <div className={`${mainTab === 'drafts' || mainTab === 'qa' ? 'max-w-[98vw] mx-4' : 'max-w-4xl mx-auto'} mt-10 px-8 w-full pb-20`}>
                 <Link href="/admin/dashboard" className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-semibold">
                     <ArrowLeft className="w-4 h-4 mr-2"/> Back to Admin Dashboard
                 </Link>
@@ -1019,7 +1071,8 @@ export default function BulkImportStudio() {
                         { key: 'excel' as const, label: 'Excel / CSV', icon: <FileText className="w-4 h-4" />, color: 'bg-emerald-600', badge: undefined },
                         { key: 'manual' as const, label: 'Manual Entry', icon: <PenLine className="w-4 h-4" />, color: 'bg-slate-600', badge: undefined },
                         { key: 'drafts' as const, label: 'Pending Drafts', icon: <Clock className="w-4 h-4" />, color: 'bg-amber-600', badge: draftQuestions.length },
-                    ] as { key: 'pdf' | 'word' | 'excel' | 'manual' | 'drafts'; label: string; icon: React.ReactNode; color: string; badge: number | undefined }[]).map(({ key, label, icon, color, badge }) => (
+                        { key: 'qa' as const, label: 'QA Issues', icon: <AlertTriangle className="w-4 h-4" />, color: 'bg-red-600', badge: flaggedDrafts.length },
+                    ] as { key: 'pdf' | 'word' | 'excel' | 'manual' | 'drafts' | 'qa'; label: string; icon: React.ReactNode; color: string; badge: number | undefined }[]).map(({ key, label, icon, color, badge }) => (
                         <button key={key} onClick={() => setMainTab(key)}
                             className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${mainTab === key ? `${color} text-white shadow-lg` : 'text-slate-400 hover:text-white'}`}>
                             {icon} {label}
@@ -1499,6 +1552,45 @@ export default function BulkImportStudio() {
                                 )}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* â”€â”€ Tab: QA Issues â”€â”€ */}
+                {mainTab === 'qa' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6">
+                        <div className="flex items-center gap-3 mb-6 flex-wrap">
+                            <AlertTriangle className="w-5 h-5 text-red-400" />
+                            <h2 className="text-lg font-black text-white">QA Issues</h2>
+                            {!isDraftsLoading && <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">{flaggedDrafts.length}</span>}
+                            <p className="text-slate-400 text-xs font-semibold">Drafts auto-flagged for broken LaTeX, missing answers/options, answer mismatches, or missing data. Fix &amp; save, or delete.</p>
+                        </div>
+
+                        {isDraftsLoading && (
+                            <div className="flex flex-col items-center justify-center h-64 gap-4">
+                                <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+                                <p className="text-red-400 text-sm font-black uppercase tracking-widest">Scanning drafts...</p>
+                            </div>
+                        )}
+                        {!isDraftsLoading && flaggedDrafts.length === 0 && (
+                            <div className="flex flex-col items-center justify-center h-64 opacity-40 gap-4 bg-slate-900 rounded-3xl border border-slate-800">
+                                <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+                                <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No QA issues â€” all drafts look clean!</p>
+                            </div>
+                        )}
+                        {!isDraftsLoading && flaggedDrafts.length > 0 && (
+                            <div className="space-y-8 pb-16 overflow-y-auto custom-scrollbar" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
+                                {flaggedDrafts.map((q, idx) => (
+                                    <ReviewCard key={q.id} q={q} idx={idx} isDraft
+                                        onUpdate={updateDraftCard} onUpdateOption={updateDraftOption}
+                                        onAddTag={addDraftTag} onRemoveTag={removeDraftTag}
+                                        onDelete={() => deleteDraftQuestion(q)}
+                                        onSave={saveDraftQuestion}
+                                        onStitch={stitchDraftSolution}
+                                        stitchTargets={draftQuestions.filter(x => x.id !== q.id).map((x) => ({ id: x.id, label: `Draft (${x.content.substring(0, 25)}...)` }))}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -2147,7 +2239,9 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
                         </div>
                     </div>
 
-                    <FieldRow label="Problem Statement" value={q.content} onChange={v => onUpdate(q.id, 'content', v)} rows={4} />
+                    <QAFlags q={{ content: q.content, options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation, type: q.type }} />
+
+                    <FieldRow label="Problem Statement" value={q.content} onChange={v => onUpdate(q.id, 'content', v)} rows={4} tags={q.tags} />
                     
                     <div>
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Answer Options</label>
@@ -2230,8 +2324,8 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
 }
 
 // â”€â”€â”€ FieldRow (side-by-side LaTeX textarea | MathRenderer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function FieldRow({ label, value, onChange, rows, compact }: {
-    label: string; value: string; onChange: (v: string) => void; rows: number; compact?: boolean;
+function FieldRow({ label, value, onChange, rows, compact, tags }: {
+    label: string; value: string; onChange: (v: string) => void; rows: number; compact?: boolean; tags?: string[];
 }) {
     return (
         <div className={compact ? '' : 'space-y-1'}>
@@ -2242,6 +2336,7 @@ function FieldRow({ label, value, onChange, rows, compact }: {
                 <div className="bg-white rounded-xl p-3 text-xs text-slate-900 overflow-auto select-none pointer-events-none border border-slate-200"
                     style={{ minHeight: `${rows * 1.75}rem` }} onContextMenu={e => e.preventDefault()}>
                     <MathRenderer content={value || '*(empty)*'} />
+                    {tags && <QuestionTags tags={tags} />}
                 </div>
             </div>
         </div>

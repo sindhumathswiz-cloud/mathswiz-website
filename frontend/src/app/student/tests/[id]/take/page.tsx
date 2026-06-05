@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionTags from '@/components/QuestionTags';
 import { 
     ChevronRight, 
     ChevronLeft, 
@@ -31,6 +32,7 @@ interface TestQuestion {
     difficulty?: string;
     subject?: string;
     class?: string;
+    tags?: string[];
 }
 
 interface Section {
@@ -501,9 +503,10 @@ export default function TestTakingUI() {
                                 transition={{ duration: 0.2 }}
                                 className="max-w-4xl mx-auto"
                             >
-                                <div className="text-xl font-bold text-slate-900 leading-relaxed mb-12">
+                                <div className="text-xl font-bold text-slate-900 leading-relaxed mb-4">
                                     <MathRenderer content={currentQ.content} />
                                 </div>
+                                <QuestionTags tags={currentQ.tags} className="mb-10" />
 
                                 <div className="grid grid-cols-1 gap-4">
                                     {stableOptions.map((optObj: any, idx: number) => {

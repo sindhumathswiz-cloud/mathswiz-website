@@ -18,6 +18,7 @@ import {
     HelpCircle
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionTags from '@/components/QuestionTags';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -176,9 +177,10 @@ export default function PracticeArena() {
                             <div className="mb-6">
                                 <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase rounded-full tracking-widest">{question.subject} &bull; {question.topic}</span>
                             </div>
-                            <div className="text-xl font-bold text-slate-900 leading-relaxed mb-12">
+                            <div className="text-xl font-bold text-slate-900 leading-relaxed mb-4">
                                 <MathRenderer content={question.content} />
                             </div>
+                            <QuestionTags tags={question.tags} className="mb-10" />
 
                             <div className="grid grid-cols-1 gap-4">
                                 {options.map((opt: string, idx: number) => {

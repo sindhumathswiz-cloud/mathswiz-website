@@ -1,4 +1,11 @@
 .env
+
+# Secrets (downloaded env with live API keys)
+env.download
+
+# Source textbooks (large, copyrighted) and generated chapter splits
+/*.pdf
+chapters/
 .env.local
 .env*.local
 .github/
