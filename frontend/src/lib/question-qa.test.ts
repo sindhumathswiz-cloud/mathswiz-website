@@ -26,8 +26,31 @@ describe('analyzeQuestion', () => {
   it('passes a clean subjective question with no answer', () => {
     expect(analyzeQuestion({
       content: 'Prove that $\\sqrt{2}$ is irrational.',
+      explanation: 'Assume $\\sqrt 2 = p/q$ in lowest terms and derive a contradiction.',
       type: 'LONG_ANSWER',
     })).toEqual([]);
+  });
+
+  it('flags a subjective question with an empty explanation', () => {
+    expect(codes({ content: 'Compute $A^{-1}$ and show the result.', type: 'LONG_ANSWER' }))
+      .toContain('MISSING_EXPLANATION');
+  });
+
+  it('flags a placeholder explanation ("Try yourself...")', () => {
+    expect(codes({
+      content: 'Find the number of children and the amount donated.',
+      explanation: 'Try yourself similar to Q. No. 3 of 3 marks.',
+      type: 'LONG_ANSWER',
+    })).toContain('PLACEHOLDER_EXPLANATION');
+  });
+
+  it('flags a bare letter answer when the question has no options', () => {
+    expect(codes({
+      content: 'Compute $A^{-1}$ and show that $2A^{-1}=9I-A$.',
+      correctAnswer: 'A',
+      explanation: 'Full worked solution goes here.',
+      type: 'LONG_ANSWER',
+    })).toContain('LETTER_ANSWER_NO_OPTIONS');
   });
 
   it('flags empty content', () => {

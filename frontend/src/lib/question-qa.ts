@@ -26,6 +26,9 @@ export interface QAQuestion {
 const MCQ_TYPES = new Set(['SINGLE_CHOICE', 'MULTIPLE_CHOICE']);
 const OBJECTIVE_TYPES = new Set(['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'INTEGER', 'TRUE_FALSE']);
 
+// "Explanations" that textbooks use as placeholders instead of a real solution.
+const PLACEHOLDER_EXPLANATION = /try\s+(it\s+)?yourself|do\s+(it\s+)?yourself|similar to (the above|q\.?\s*no|question|previous)|refer to (the )?(above|previous|q\b)|same as (the )?(above|q\b)|left as an exercise|as in q\.?\s*no/i;
+
 /** Extract $$...$$ and $...$ math blocks from a string. */
 function mathBlocks(s: string): string[] {
     if (!s) return [];
@@ -93,10 +96,20 @@ export function analyzeQuestion(q: QAQuestion): QAIssue[] {
         issues.push({ severity: 'warn', code: 'MISSING_ANSWER', message: 'No answer key set' });
     }
 
-    // 6b. Missing explanation. An MCQ (or any question with options) with no
-    // worked explanation is low quality for a teaching platform — flag it.
-    if ((MCQ_TYPES.has(type) || options.length >= 2) && explanation.length < 5) {
+    // 6b. Missing explanation — every question on a teaching platform should
+    // ship with a worked solution.
+    if (explanation.length < 5) {
         issues.push({ severity: 'warn', code: 'MISSING_EXPLANATION', message: 'No explanation / solution provided' });
+    } else if (PLACEHOLDER_EXPLANATION.test(explanation)) {
+        // 6c. A placeholder copied verbatim from the book ("Try yourself...",
+        // "Similar to Q. No. 3") is not a real solution.
+        issues.push({ severity: 'warn', code: 'PLACEHOLDER_EXPLANATION', message: 'Explanation is a placeholder, not a real solution' });
+    }
+
+    // 6d. A bare option letter ("A") set as the answer on a question with no
+    // options is meaningless — almost always a spurious MCQ letter.
+    if (/^[A-Da-d]$/.test(answer) && options.length < 2) {
+        issues.push({ severity: 'error', code: 'LETTER_ANSWER_NO_OPTIONS', message: 'Answer is an option letter but the question has no options' });
     }
 
     // 7. Messed-up answer: a letter answer pointing to an option that doesn't exist
