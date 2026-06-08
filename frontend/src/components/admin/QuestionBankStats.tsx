@@ -66,6 +66,8 @@ interface Question {
   status: string;
   tags: string[];
   createdAt: string;
+  contentHash?: string;
+  duplicateOf?: { id: string; content: string; status: string } | null;
 }
 
 type DrillLevel = 'overview' | 'category' | 'questions';
@@ -745,6 +747,11 @@ export default function QuestionBankStats({ onStatsChange }: { onStatsChange?: (
                                 No answer
                               </span>
                             )}
+                            {q.duplicateOf && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-700" title={`Duplicate of ${q.duplicateOf.status}: ${q.duplicateOf.content.substring(0, 80)}`}>
+                                Duplicate
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-gray-800 line-clamp-2"><LatexInline content={q.content} /></p>
                         </div>
@@ -786,6 +793,12 @@ export default function QuestionBankStats({ onStatsChange }: { onStatsChange?: (
                             {!q.correctAnswer && (
                               <p className="text-[10px] text-amber-500 mt-1 font-medium">Correct answer not set — edit to assign</p>
                             )}
+                          </div>
+                        )}
+                        {q.duplicateOf && (
+                          <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                            <p className="text-xs font-bold text-orange-700 mb-1">Duplicate of {q.duplicateOf.status} question:</p>
+                            <p className="text-xs text-orange-800 line-clamp-2"><LatexInline content={q.duplicateOf.content} /></p>
                           </div>
                         )}
                         {q.explanation && (

@@ -22,6 +22,7 @@ import {
     Zap,
     Link2,
     Image,
+    Search,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -294,6 +295,19 @@ export default function BulkImportStudio() {
     const [draftQuestions, setDraftQuestions] = useState<ExtractedQuestion[]>([]);
     const [isSyncPaused, setIsSyncPaused] = useState(false);
     const [isEditingDraft, setIsEditingDraft] = useState(false);
+
+    // Combined source text from draft questions' originalRawText (for side panel)
+    const draftSourceText = useMemo(() => {
+        if (rawMarkdown) return rawMarkdown;
+        const sources = draftQuestions.map(q => q.originalRawText).filter(Boolean) as string[];
+        const unique = [...new Set(sources)];
+        return unique.join('\n\n' + '─'.repeat(60) + '\n\n');
+    }, [rawMarkdown, draftQuestions]);
+
+    const showLeftPanel = useMemo(() =>
+        showRawMarkdown && (rawMarkdown || draftQuestions.some(q => q.originalRawText)),
+        [showRawMarkdown, rawMarkdown, draftQuestions]
+    );
 
     // Drafts that fail automated QA (broken LaTeX, missing answer/options, etc.)
     const flaggedDrafts = useMemo(
@@ -1469,7 +1483,7 @@ export default function BulkImportStudio() {
                                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncPaused ? '' : 'animate-spin'}`} /> 
                                     {isSyncPaused ? 'Sync Paused' : 'Auto-Sync On'}
                                 </button>
-                                {rawMarkdown && (
+                                {(rawMarkdown || draftQuestions.some(q => q.originalRawText)) && (
                                     <button 
                                         onClick={() => setShowRawMarkdown(!showRawMarkdown)}
                                         className={`flex items-center gap-2 border text-xs font-bold transition-all px-4 py-2 rounded-xl ${
@@ -1507,12 +1521,12 @@ export default function BulkImportStudio() {
                         {/* Split View: Raw Markdown (left) + Draft Questions (right) */}
                         <div className="flex gap-4">
                             {/* Left Panel: Raw Markdown */}
-                            {showRawMarkdown && rawMarkdown && (
-                                <SourcePanel rawMarkdown={rawMarkdown} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="amber" pdfUrl={pdfUrl} pageNumber={currentPage} />
+                            {showLeftPanel && draftSourceText && (
+                                <SourcePanel rawMarkdown={draftSourceText} fullRawText={fullRawText} sourceViewMode={sourceViewMode} setSourceViewMode={setSourceViewMode} color="amber" pdfUrl={pdfUrl} pageNumber={currentPage} />
                             )}
                             
                             {/* Right Panel: Draft Questions */}
-                            <div className={`${showRawMarkdown && rawMarkdown ? 'w-1/2' : 'w-full'} transition-all`}>
+                            <div className={`${showLeftPanel && draftSourceText ? 'w-1/2' : 'w-full'} transition-all`}>
                                 {isDraftsLoading && (
                                     <div className="flex flex-col items-center justify-center h-64 gap-4">
                                         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
@@ -1779,6 +1793,14 @@ function QueuePanel({ questions, isExtracting, onUpdate, onUpdateOption, onAddTa
 }
 
 // â”€â”€â”€ Source Panel (side-by-side extracted markdown viewer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function convertMathpixDelimiters(text: string): string {
+    return text
+        .replace(/\\\[/g, '$$$$')
+        .replace(/\\\]/g, '$$$$')
+        .replace(/\\\(/g, '$')
+        .replace(/\\\)/g, '$');
+}
+
 function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMode, color = 'indigo', pdfUrl, pageNumber = 1 }: {
     rawMarkdown: string;
     fullRawText?: string;
@@ -1791,6 +1813,7 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
     const [sourceSource, setSourceSource] = useState<'markdown' | 'original'>('markdown');
     const [pdfCanvas, setPdfCanvas] = useState<HTMLCanvasElement | null>(null);
     const displayText = sourceSource === 'original' && fullRawText ? fullRawText : rawMarkdown;
+    const renderedText = useMemo(() => convertMathpixDelimiters(displayText), [displayText]);
     const borderColors: Record<string, string> = {
         indigo: 'border-indigo-500/30', emerald: 'border-emerald-500/30',
         amber: 'border-amber-500/30', violet: 'border-violet-500/30',
@@ -1808,6 +1831,61 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
     const tc = textColors[color] || textColors.indigo;
     const hasBoth = !!fullRawText && rawMarkdown !== fullRawText;
     const hasPdf = !!pdfUrl;
+
+    // Search state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentMatch, setCurrentMatch] = useState(0);
+    const contentRef = useRef<HTMLDivElement>(null);
+
+    const matches = useMemo(() => {
+        if (!searchQuery || !displayText) return [] as number[];
+        const indices: number[] = [];
+        const lower = displayText.toLowerCase();
+        const q = searchQuery.toLowerCase();
+        let idx = lower.indexOf(q);
+        while (idx !== -1) { indices.push(idx); idx = lower.indexOf(q, idx + 1); }
+        return indices;
+    }, [searchQuery, displayText]);
+
+    useEffect(() => {
+        if (matches.length === 0 || currentMatch < 0) return;
+        const el = contentRef.current?.querySelector(`[data-match="${currentMatch}"]`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [currentMatch, matches]);
+
+    const goToMatch = (dir: 1 | -1) => {
+        if (matches.length === 0) return;
+        setCurrentMatch(prev => {
+            const next = prev + dir;
+            if (next < 0) return matches.length - 1;
+            if (next >= matches.length) return 0;
+            return next;
+        });
+    };
+
+    const escapeRE = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const highlightedContent = useMemo(() => {
+        if (!searchQuery || !displayText) return null;
+        const parts = displayText.split(new RegExp(`(${escapeRE(searchQuery)})`, 'gi'));
+        const result: React.ReactNode[] = [];
+        let offset = 0;
+        parts.forEach((part, i) => {
+            if (part.toLowerCase() === searchQuery.toLowerCase()) {
+                const matchIdx = matches.indexOf(offset);
+                result.push(
+                    <span key={i} data-match={matchIdx}
+                        className={`rounded px-0.5 ${matchIdx === currentMatch ? 'bg-yellow-400 text-slate-900 font-bold' : 'bg-yellow-500/30 text-slate-200'}`}>
+                        {part}
+                    </span>
+                );
+            } else {
+                result.push(<span key={i}>{part}</span>);
+            }
+            offset += part.length;
+        });
+        return result;
+    }, [searchQuery, displayText, matches, currentMatch]);
 
     // Render PDF page to canvas when sourceViewMode === 'pdf'
     useEffect(() => {
@@ -1873,6 +1951,43 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
                     )}
                 </div>
             </div>
+
+            {/* Search bar */}
+            {displayText.length > 0 && (
+                <div className={`flex items-center gap-2 px-4 py-2 border-b ${bc} ${bg}`}>
+                    <Search className={`w-3.5 h-3.5 ${tc} shrink-0`} />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => { setSearchQuery(e.target.value); setCurrentMatch(0); }}
+                        placeholder="Search in source text..."
+                        className="flex-1 bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-yellow-500/50"
+                    />
+                    {matches.length > 0 && (
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 shrink-0">
+                            <span>{currentMatch + 1}/{matches.length}</span>
+                            <button onClick={() => goToMatch(-1)}
+                                className="p-1 hover:bg-slate-700 rounded transition-colors">
+                                <ChevronLeft className="w-3 h-3" />
+                            </button>
+                            <button onClick={() => goToMatch(1)}
+                                className="p-1 hover:bg-slate-700 rounded transition-colors">
+                                <ChevronRight className="w-3 h-3" />
+                            </button>
+                        </div>
+                    )}
+                    {searchQuery && matches.length === 0 && (
+                        <span className="text-[10px] font-bold text-red-400 shrink-0">No matches</span>
+                    )}
+                    {searchQuery && (
+                        <button onClick={() => { setSearchQuery(''); setCurrentMatch(0); }}
+                            className="p-1 hover:bg-slate-700 rounded transition-colors shrink-0">
+                            <X className="w-3 h-3 text-slate-400" />
+                        </button>
+                    )}
+                </div>
+            )}
+
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                 {sourceViewMode === 'pdf' ? (
                     pdfCanvas ? (
@@ -1885,16 +2000,22 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
                         </div>
                     )
                 ) : sourceViewMode === 'raw' ? (
-                    <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed select-all">
-                        {displayText}
-                    </pre>
+                    searchQuery ? (
+                        <div className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed select-all">
+                            {highlightedContent}
+                        </div>
+                    ) : (
+                        <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed select-all">
+                            {displayText}
+                        </pre>
+                    )
                 ) : (
                     <div className="text-sm text-slate-200 leading-relaxed prose max-w-none prose-invert">
                         <ReactMarkdown
                             remarkPlugins={[remarkMath]}
                             rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
                         >
-                            {displayText}
+                            {renderedText}
                         </ReactMarkdown>
                     </div>
                 )}

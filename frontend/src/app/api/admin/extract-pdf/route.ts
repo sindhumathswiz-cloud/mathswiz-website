@@ -77,28 +77,36 @@ export async function POST(request: NextRequest) {
         //       regex parser); dedupe the chunk overlap ──
         const chunks = chunkMarkdown(cleanedText, 6000, 1);
         console.log(`[EXTRACT-PDF] Structuring ${chunks.length} chunks via LLM (Gemini 3.5-flash, Groq fallback)...`);
-        let extracted: CanonicalQuestion[] = [];
+        let extracted: { q: CanonicalQuestion; sourceChunk: string }[] = [];
         for (let i = 0; i < chunks.length; i++) {
             try {
                 const qs = await structureQuestions(chunks[i]);
-                extracted.push(...qs);
+                for (const q of qs) extracted.push({ q, sourceChunk: chunks[i] });
             } catch (e: any) {
                 console.error(`[EXTRACT-PDF] Chunk ${i + 1}/${chunks.length} failed: ${e.message}`);
             }
         }
-        extracted = dedupeByContent(extracted);
+        // In-batch dedupe: keep the first occurrence and its source chunk
+        const deduped = new Set<string>();
+        extracted = extracted.filter(({ q }) => {
+            const key = q.questionContent.toLowerCase().replace(/\s+/g, ' ');
+            if (deduped.has(key)) return false;
+            deduped.add(key);
+            return true;
+        });
         console.log(`[EXTRACT-PDF] ${extracted.length} questions after in-batch dedupe.`);
 
         // Cross-run dedupe: drop questions whose contentHash already exists in the
         // DB (any status) so re-extracting a chapter doesn't pile up duplicates.
-        const hashed = extracted.map(q => ({ q, hash: computeContentHash(q.questionContent) }));
+        const hashed = extracted.map(({ q }) => ({ q, hash: computeContentHash(q.questionContent) }));
         const existing = await prisma.question.findMany({
             where: { contentHash: { in: hashed.map(h => h.hash) } },
             select: { contentHash: true },
         });
         const existingHashes = new Set(existing.map(e => e.contentHash));
         const seenInRun = new Set<string>();
-        const toSave = hashed.filter(({ hash }) => {
+        const toSave = extracted.filter(({ q }) => {
+            const hash = computeContentHash(q.questionContent);
             if (existingHashes.has(hash) || seenInRun.has(hash)) return false;
             seenInRun.add(hash);
             return true;
@@ -130,7 +138,8 @@ export async function POST(request: NextRequest) {
         const createdById = (session.user as any).id || 'admin';
         let savedCount = 0;
 
-        for (const { q, hash } of toSave) {
+        for (const { q, sourceChunk } of toSave) {
+            const hash = computeContentHash(q.questionContent);
             const created = await prisma.question.create({
                 data: {
                     content: q.questionContent,
@@ -146,7 +155,7 @@ export async function POST(request: NextRequest) {
                     tags: q.tags ?? [],
                     status: "DRAFT",
                     scope: userRole === 'TEACHER' ? 'TEACHER_PRIVATE' : 'PUBLIC',
-                    originalRawText: q.questionContent,
+                    originalRawText: sourceChunk,
                     createdById,
                     ...(folderId ? { knowledgeFolderId: folderId } : {}),
                 }

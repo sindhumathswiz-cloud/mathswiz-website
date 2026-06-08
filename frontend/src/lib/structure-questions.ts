@@ -37,7 +37,9 @@ Return ONLY a JSON object: { "questions": [ { "type", "difficulty", "content", "
 
 ### SEGMENTATION
 - Emit exactly ONE object per distinct QUESTION (usually starting with "Q.N" or a number).
-- Attach a "Sol."/"Detailed Solution"/marking-scheme block to ITS question's explanation. Do NOT emit a solution, a lone equation, or an option as its own question.
+- PRESERVE the original question/solution number (e.g., "1.", "Q1", "Question 1", "Sol. 1") in the content field — do NOT strip it.
+- Attach a "Sol."/"Detailed Solution"/marking-scheme block to ITS question's explanation. If a solution appears in a DIFFERENT section or page from its question, use the question number printed before the solution to match them together. Do NOT create a separate question entry for the solution — it belongs to the matching question's explanation.
+- Multiple choice answer keys (e.g. "Ans: 1. (B) 2. (C)") are NOT questions — they belong in the correctAnswer field of their matched question.
 
 ### INPUT TEXT
 ${rawText}

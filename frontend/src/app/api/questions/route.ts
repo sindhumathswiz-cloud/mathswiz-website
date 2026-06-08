@@ -78,6 +78,22 @@ export async function GET(req: Request) {
 
         // Merge taxonomy tag names into each question's tags array
         // Also populate topic/subTopic/class/subject from taxonomy types if empty
+        // And detect duplicates by contentHash
+        const nonNullHash = questions.filter(q => q.contentHash).map(q => q.contentHash as string);
+        const dupMap = new Map<string, { id: string; content: string; status: string }>();
+        if (nonNullHash.length > 0) {
+            const dupRows = await prisma.question.findMany({
+                where: { contentHash: { in: nonNullHash } },
+                select: { id: true, content: true, status: true, contentHash: true },
+            });
+            // For each hash, pick the first non-matching ID as the duplicate target
+            for (const row of dupRows) {
+                if (!dupMap.has(row.contentHash!)) {
+                    dupMap.set(row.contentHash!, { id: row.id, content: row.content, status: row.status });
+                }
+            }
+        }
+
         const enriched = questions.map(q => {
             const taxonomyNames = q.questionTags
                 .map(qt => qt.tag.name)
@@ -93,6 +109,15 @@ export async function GET(req: Request) {
             const topicTax = q.questionTags.find(qt => qt.tag.type === 'TOPIC');
             const subTopicTax = q.questionTags.find(qt => qt.tag.type === 'SUBTOPIC');
 
+            // Duplicate detection
+            let duplicateOf = null;
+            if (q.contentHash && dupMap.has(q.contentHash)) {
+                const candidate = dupMap.get(q.contentHash)!;
+                if (candidate.id !== q.id) {
+                    duplicateOf = candidate;
+                }
+            }
+
             const { questionTags, ...rest } = q;
             return {
                 ...rest,
@@ -102,6 +127,7 @@ export async function GET(req: Request) {
                 subject: rest.subject || subjectTax?.tag.name || '',
                 topic: rest.topic || topicTax?.tag.name || '',
                 subTopic: rest.subTopic || subTopicTax?.tag.name || '',
+                duplicateOf,
             };
         });
 
