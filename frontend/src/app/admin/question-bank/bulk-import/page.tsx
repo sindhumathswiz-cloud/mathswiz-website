@@ -2010,7 +2010,7 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
                         </pre>
                     )
                 ) : (
-                    <div className="text-sm text-slate-200 leading-relaxed prose max-w-none prose-invert">
+                    <div className="text-sm text-slate-200 leading-relaxed prose max-w-none prose-invert select-text">
                         <ReactMarkdown
                             remarkPlugins={[remarkMath]}
                             rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
