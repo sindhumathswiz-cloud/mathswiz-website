@@ -71,10 +71,15 @@ async function callGemini(prompt: string): Promise<string> {
           model: modelName,
           generationConfig: { responseMimeType: 'application/json', temperature: 0 },
         });
-        const result = await model.generateContent(prompt);
-        return result.response.text();
+        const result = await Promise.race([
+          model.generateContent(prompt).then(r => r.response.text()),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini request timed out after 25s')), 25000)
+          ),
+        ]);
+        return result;
       } catch (e) {
-        lastErr = e; // model unavailable or per-key rate limit — try next key/model
+        lastErr = e;
       }
     }
   }
@@ -84,25 +89,32 @@ async function callGemini(prompt: string): Promise<string> {
 // FALLBACK: Groq gpt-oss-120b (only if Gemini is unavailable).
 async function callGroq(prompt: string): Promise<string> {
   if (!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY not set');
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'openai/gpt-oss-120b',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      temperature: 0,
-    }),
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(`Groq error: ${err.error?.message || response.statusText}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-120b',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`Groq error: ${err.error?.message || response.statusText}`);
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content ?? '';
+  } finally {
+    clearTimeout(timeout);
   }
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content ?? '';
 }
 
 export async function structureQuestions(rawText: string): Promise<CanonicalQuestion[]> {

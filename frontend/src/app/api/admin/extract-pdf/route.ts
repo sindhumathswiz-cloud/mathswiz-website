@@ -42,11 +42,19 @@ export async function POST(request: NextRequest) {
             rm_spaces: true
         }));
 
-        const mathpixRes = await fetch("https://api.mathpix.com/v3/pdf", {
-            method: "POST",
-            headers: { "app_id": process.env.MATHPIX_APP_ID, "app_key": process.env.MATHPIX_APP_KEY },
-            body: mathpixFormData as any
-        });
+        const mathpixController = new AbortController();
+        const mathpixTimeout = setTimeout(() => mathpixController.abort(), 30000);
+        let mathpixRes;
+        try {
+            mathpixRes = await fetch("https://api.mathpix.com/v3/pdf", {
+                method: "POST",
+                headers: { "app_id": process.env.MATHPIX_APP_ID, "app_key": process.env.MATHPIX_APP_KEY },
+                body: mathpixFormData as any,
+                signal: mathpixController.signal,
+            });
+        } finally {
+            clearTimeout(mathpixTimeout);
+        }
         const mathpixData = await mathpixRes.json();
         if (mathpixData.error) throw new Error(mathpixData.error);
         if (!mathpixData.pdf_id) throw new Error("No pdf_id returned from Mathpix");
@@ -56,9 +64,17 @@ export async function POST(request: NextRequest) {
         let pollCount = 0;
         while (!isCompleted && pollCount < 60) {
             await new Promise(r => setTimeout(r, 3000));
-            const statusRes = await fetch(`https://api.mathpix.com/v3/pdf/${pdfId}`, {
-                headers: { "app_id": process.env.MATHPIX_APP_ID!, "app_key": process.env.MATHPIX_APP_KEY! }
-            });
+            const statusController = new AbortController();
+            const statusTimeout = setTimeout(() => statusController.abort(), 15000);
+            let statusRes;
+            try {
+                statusRes = await fetch(`https://api.mathpix.com/v3/pdf/${pdfId}`, {
+                    headers: { "app_id": process.env.MATHPIX_APP_ID!, "app_key": process.env.MATHPIX_APP_KEY! },
+                    signal: statusController.signal,
+                });
+            } finally {
+                clearTimeout(statusTimeout);
+            }
             const statusData = await statusRes.json();
             if (statusData.status === 'completed') isCompleted = true;
             else if (statusData.status === 'error') throw new Error("Mathpix PDF processing failed");
@@ -66,9 +82,17 @@ export async function POST(request: NextRequest) {
         }
         if (!isCompleted) throw new Error("Mathpix processing timed out");
 
-        const mdRes = await fetch(`https://api.mathpix.com/v3/pdf/${pdfId}.md`, {
-            headers: { "app_id": process.env.MATHPIX_APP_ID!, "app_key": process.env.MATHPIX_APP_KEY! }
-        });
+        const mdController = new AbortController();
+        const mdTimeout = setTimeout(() => mdController.abort(), 30000);
+        let mdRes;
+        try {
+            mdRes = await fetch(`https://api.mathpix.com/v3/pdf/${pdfId}.md`, {
+                headers: { "app_id": process.env.MATHPIX_APP_ID!, "app_key": process.env.MATHPIX_APP_KEY! },
+                signal: mdController.signal,
+            });
+        } finally {
+            clearTimeout(mdTimeout);
+        }
         const rawText = await mdRes.text();
         const cleanedText = cleanMathpixMarkdown(rawText);
         console.log(`[EXTRACT-PDF] Got ${cleanedText.length} chars of markdown.`);
