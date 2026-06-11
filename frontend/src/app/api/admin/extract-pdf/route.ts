@@ -101,13 +101,17 @@ export async function POST(request: NextRequest) {
         //       regex parser); dedupe the chunk overlap ──
         const chunks = chunkMarkdown(cleanedText, 6000, 1);
         console.log(`[EXTRACT-PDF] Structuring ${chunks.length} chunks via LLM (Gemini 3.5-flash, Groq fallback)...`);
+        const chunkResults = await Promise.allSettled(
+            chunks.map((c, i) =>
+                structureQuestions(c).then(qs => ({ qs, sourceChunk: c, idx: i }))
+            )
+        );
         let extracted: { q: CanonicalQuestion; sourceChunk: string }[] = [];
-        for (let i = 0; i < chunks.length; i++) {
-            try {
-                const qs = await structureQuestions(chunks[i]);
-                for (const q of qs) extracted.push({ q, sourceChunk: chunks[i] });
-            } catch (e: any) {
-                console.error(`[EXTRACT-PDF] Chunk ${i + 1}/${chunks.length} failed: ${e.message}`);
+        for (const result of chunkResults) {
+            if (result.status === 'fulfilled') {
+                for (const q of result.value.qs) extracted.push({ q, sourceChunk: result.value.sourceChunk });
+            } else {
+                console.error(`[EXTRACT-PDF] Chunk failed: ${result.reason?.message ?? result.reason}`);
             }
         }
         // In-batch dedupe: keep the first occurrence and its source chunk

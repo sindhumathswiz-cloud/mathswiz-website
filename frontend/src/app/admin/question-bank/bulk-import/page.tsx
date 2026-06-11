@@ -424,7 +424,7 @@ export default function BulkImportStudio() {
                 formData.append('taxonomyIds', JSON.stringify(taxIds));
                 
                 const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 180000); // 3 min timeout
+                const timeout = setTimeout(() => controller.abort(), 600000); // 10 min timeout
                 const res = await fetch('/api/admin/extract-pdf', {
                     method: 'POST',
                     body: formData,

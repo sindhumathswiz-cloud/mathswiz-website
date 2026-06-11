@@ -74,7 +74,7 @@ async function callGemini(prompt: string): Promise<string> {
         const result = await Promise.race([
           model.generateContent(prompt).then(r => r.response.text()),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Gemini request timed out after 25s')), 25000)
+            setTimeout(() => reject(new Error('Gemini request timed out after 60s')), 60000)
           ),
         ]);
         return result;
@@ -90,7 +90,7 @@ async function callGemini(prompt: string): Promise<string> {
 async function callGroq(prompt: string): Promise<string> {
   if (!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY not set');
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), 60000);
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
