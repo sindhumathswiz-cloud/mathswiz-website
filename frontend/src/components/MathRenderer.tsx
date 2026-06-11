@@ -84,8 +84,14 @@ export function sanitizeLatex(text: string): string {
     }).join('');
 
     // Step 7: Fix common Mathpix LaTeX issues
+    // \begin{matrix} → \begin{bmatrix} (KaTeX doesn't support matrix without amsmath)
+    result = result.replace(/\\begin{matrix}/g, '\\begin{bmatrix}');
+    result = result.replace(/\\end{matrix}/g, '\\end{bmatrix}');
+    // Ensure \\ before \end{aligned}, \end{cases}, \end{array}, etc.
+    result = result.replace(/([^\\])\\end\{(aligned|cases|array|bmatrix|matrix|gathered|align|align\*)\}/g, '$1\\\\\\end{$2}');
+    // Remove stray empty display math $$ $$
+    result = result.replace(/\$\$\s*\$\$/g, '');
     // \cosec → \operatorname{cosec} (KaTeX doesn't have \cosec)
-    result = result.replace(/\\cosec/g, '\\operatorname{cosec}');
     // \text { with space before brace → \text{ (KaTeX requires no space)
     result = result.replace(/\\text\s+\{/g, '\\text{');
     result = result.replace(/\\textbf\s+\{/g, '\\textbf{');
@@ -96,6 +102,22 @@ export function sanitizeLatex(text: string): string {
     result = result.replace(/\\,\s*(?=[^a-zA-Z])/g, ' ');
     // Fix \, \! \; \: at end of math
     result = result.replace(/(\\[,;:\!])\s+([}\])])/g, '$1$2');
+
+    // Step 8: Balance braces — if there are more { than }, add missing } at end
+    let open = 0;
+    for (const ch of result) { if (ch === '{') open++; else if (ch === '}') open--; }
+    if (open > 0) result += '}'.repeat(open);
+
+    // Step 9: Second pass of auto-wrap (step 6c) for any bare LaTeX commands
+    // that might have been exposed after delimiter conversion / environmental fixes.
+    const segs2 = result.split(/(\$\$[\s\S]*?\$\$|\$[^$]*?\$)/g);
+    result = segs2.map(seg => {
+      if (seg.startsWith('$')) return seg;
+      if (LATEX_CMD.test(seg) || /[\u2200-\u22FF\u2A00-\u2AFF]/.test(seg)) {
+        return '$' + seg.trim() + '$';
+      }
+      return seg;
+    }).join('');
 
     return result;
 }

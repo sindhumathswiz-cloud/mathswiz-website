@@ -57,7 +57,30 @@ export async function GET(req: NextRequest) {
             }
         });
 
-        return NextResponse.json({ success: true, questions });
+        // Enrich drafts with duplicateOf: for each question with a contentHash,
+        // find the matching APPROVED question so the UI can flag duplicates.
+        const hashedQuestions = questions.filter(q => q.contentHash);
+        const hashes = [...new Set(hashedQuestions.map(q => q.contentHash as string))];
+        let approvedByHash = new Map<string, { id: string; content: string; status: string }>();
+        if (hashes.length > 0) {
+            const approved = await prisma.question.findMany({
+                where: { status: 'APPROVED', contentHash: { in: hashes } },
+                select: { id: true, content: true, status: true, contentHash: true },
+            });
+            for (const aq of approved) {
+                if (aq.contentHash && !approvedByHash.has(aq.contentHash)) {
+                    approvedByHash.set(aq.contentHash, { id: aq.id, content: aq.content, status: aq.status });
+                }
+            }
+        }
+        const enriched = questions.map(q => ({
+            ...q,
+            duplicateOf: q.contentHash && approvedByHash.has(q.contentHash)
+                ? approvedByHash.get(q.contentHash)!
+                : null,
+        }));
+
+        return NextResponse.json({ success: true, questions: enriched });
     } catch (err: any) {
         console.error("[ADMIN-QUESTIONS-API] Error:", err);
         return NextResponse.json({ success: false, error: err.message }, { status: 500 });

@@ -5,7 +5,7 @@
  * together when they straddle a chunk boundary (duplicates are removed later via
  * dedupeByContent).
  */
-export function chunkMarkdown(md: string, targetChars = 6000, overlapBlocks = 1): string[] {
+export function chunkMarkdown(md: string, targetChars = 8000, overlapBlocks = 2): string[] {
   if (!md || !md.trim()) return [];
   const blocks = md.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
   if (blocks.length === 0) return [];

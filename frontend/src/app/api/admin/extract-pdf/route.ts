@@ -96,11 +96,38 @@ export async function POST(request: NextRequest) {
         });
         console.log(`[EXTRACT-PDF] ${extracted.length} questions after in-batch dedupe.`);
 
-        // Cross-run dedupe: drop questions whose contentHash already exists in the
-        // DB (any status) so re-extracting a chapter doesn't pile up duplicates.
+        // Post-LLM solution reconciliation: if a question has no explanation but
+        // another question (from a different chunk) has an explanation that starts
+        // with the same question number, merge them.
+        const qNumRe = /^(?:Sol\.?\s*|Solution\s*)?(\d+)[\.\)\s]/;
+        const contentNum = (c: string) => { const m = qNumRe.exec(c.trim()); return m ? m[1] : null; };
+        // Build a map from question number → explanation
+        const solByNum = new Map<string, string>();
+        for (const { q } of extracted) {
+          const num = contentNum(q.explanation || '');
+          if (num && q.explanation) {
+            if (!solByNum.has(num)) solByNum.set(num, q.explanation);
+          }
+        }
+        for (const item of extracted) {
+          if (!item.q.explanation) {
+            const num = contentNum(item.q.questionContent);
+            if (num && solByNum.has(num)) {
+              item.q.explanation = solByNum.get(num)!;
+            }
+          }
+        }
+        // Remove standalone solution-only entries (where content starts with "Sol." and explanation is empty after merge)
+        extracted = extracted.filter(({ q }) => {
+          const c = q.questionContent.trim();
+          return !/^Sol\.?\s/i.test(c);
+        });
+
+        // Cross-run dedupe: drop questions whose contentHash already exists in an
+        // APPROVED question, so re-extracting a chapter skips already-processed content.
         const hashed = extracted.map(({ q }) => ({ q, hash: computeContentHash(q.questionContent) }));
         const existing = await prisma.question.findMany({
-            where: { contentHash: { in: hashed.map(h => h.hash) } },
+            where: { status: 'APPROVED', contentHash: { in: hashed.map(h => h.hash) } },
             select: { contentHash: true },
         });
         const existingHashes = new Set(existing.map(e => e.contentHash));

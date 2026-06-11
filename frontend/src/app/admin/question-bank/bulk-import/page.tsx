@@ -80,10 +80,11 @@ interface ExtractedQuestion {
     tags: string[];
     tagInput: string;
     originalRawText?: string;
-    isDuplicate?: boolean;       // true if question already exists in DB
-    duplicateChecked?: boolean;  // true once the check has completed
-    duplicateMatchId?: string;   // ID of the matched existing question
-    duplicateMatchContent?: string; // text of the matched question for comparison
+    duplicateOf?: { id: string; content: string; status: string } | null;
+    isDuplicate?: boolean;
+    duplicateChecked?: boolean;
+    duplicateMatchId?: string | null;
+    duplicateMatchContent?: string | null;
     duplicateMatchData?: DuplicateMatchData;
 }
 
@@ -123,6 +124,7 @@ const mapDbQuestion = (q: {
     examType?: string; 
     tags?: string[]; 
     originalRawText?: string;
+    duplicateOf?: { id: string; content: string; status: string } | null;
 }): ExtractedQuestion => ({
     id: q.id,
     dbId: q.id,
@@ -138,6 +140,7 @@ const mapDbQuestion = (q: {
     tags: Array.isArray(q.tags) ? q.tags : [],
     tagInput: '',
     originalRawText: q.originalRawText || '',
+    duplicateOf: q.duplicateOf || null,
 });
 
 // â”€â”€â”€ Caching Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -242,7 +245,7 @@ export default function BulkImportStudio() {
     const { data: session } = useSession();
 
     // Primary tab: pdf | word | drafts | excel | manual
-    const [mainTab, setMainTab] = useState<'pdf' | 'word' | 'drafts' | 'excel' | 'manual' | 'qa'>('pdf');
+    const [mainTab, setMainTab] = useState<'pdf' | 'word' | 'drafts' | 'excel' | 'manual' | 'qa' | 'auto'>('pdf');
     const [selectedTaxonomyIds, setSelectedTaxonomyIds] = useState<string[]>([]);
 
     // Workspace mode (PDF only)
@@ -1073,7 +1076,7 @@ export default function BulkImportStudio() {
                 <GlobalMathToolbar />
             </div>
 
-            <div className={`${mainTab === 'drafts' || mainTab === 'qa' ? 'max-w-[98vw] mx-4' : 'max-w-4xl mx-auto'} mt-10 px-8 w-full pb-20`}>
+            <div className={`${mainTab === 'drafts' || mainTab === 'qa' || mainTab === 'auto' ? 'max-w-[98vw] mx-4' : 'max-w-4xl mx-auto'} mt-10 px-8 w-full pb-20`}>
                 <Link href="/admin/dashboard" className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-semibold">
                     <ArrowLeft className="w-4 h-4 mr-2"/> Back to Admin Dashboard
                 </Link>
@@ -1086,7 +1089,8 @@ export default function BulkImportStudio() {
                         { key: 'manual' as const, label: 'Manual Entry', icon: <PenLine className="w-4 h-4" />, color: 'bg-slate-600', badge: undefined },
                         { key: 'drafts' as const, label: 'Pending Drafts', icon: <Clock className="w-4 h-4" />, color: 'bg-amber-600', badge: draftQuestions.length },
                         { key: 'qa' as const, label: 'QA Issues', icon: <AlertTriangle className="w-4 h-4" />, color: 'bg-red-600', badge: flaggedDrafts.length },
-                    ] as { key: 'pdf' | 'word' | 'excel' | 'manual' | 'drafts' | 'qa'; label: string; icon: React.ReactNode; color: string; badge: number | undefined }[]).map(({ key, label, icon, color, badge }) => (
+                        { key: 'auto' as const, label: 'Auto-Populate', icon: <Zap className="w-4 h-4" />, color: 'bg-green-600', badge: undefined },
+                    ] as { key: 'pdf' | 'word' | 'excel' | 'manual' | 'drafts' | 'qa' | 'auto'; label: string; icon: React.ReactNode; color: string; badge: number | undefined }[]).map(({ key, label, icon, color, badge }) => (
                         <button key={key} onClick={() => setMainTab(key)}
                             className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${mainTab === key ? `${color} text-white shadow-lg` : 'text-slate-400 hover:text-white'}`}>
                             {icon} {label}
@@ -1607,9 +1611,269 @@ export default function BulkImportStudio() {
                         )}
                     </div>
                 )}
+
+                {/* ——— Tab: Auto-Populate ——— */}
+                {mainTab === 'auto' && (
+                    <AutoPopulatePanel />
+                )}
             </div>
 
 
+        </div>
+    );
+}
+
+// â”€â”€â”€ Auto-Populate Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function AutoPopulatePanel() {
+    const [selBoards, setSelBoards] = useState<string[]>([]);
+    const [selClassIds, setSelClassIds] = useState<string[]>([]);
+    const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+    const [loadingClasses, setLoadingClasses] = useState(false);
+    const [coverageData, setCoverageData] = useState<any[] | null>(null);
+    const [loadingCoverage, setLoadingCoverage] = useState(false);
+    const [targetPerTopic, setTargetPerTopic] = useState(5);
+    const [useScrape, setUseScrape] = useState(true);
+    const [useGenerate, setUseGenerate] = useState(true);
+    const [isRunning, setIsRunning] = useState(false);
+    const [progress, setProgress] = useState<string[]>([]);
+    const [results, setResults] = useState<{ totalCreated: number; totalErrors: number; details: any[] } | null>(null);
+
+    const BOARDS = ['CBSE', 'NDA', 'CUET', 'JEE_MAIN'] as const;
+
+    const toggleBoard = (b: string) => {
+        setSelBoards(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
+        setSelClassIds([]);
+        setClasses([]);
+        setCoverageData(null);
+    };
+
+    const toggleClass = (id: string) => {
+        setSelClassIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+        setCoverageData(null);
+    };
+
+    // Fetch classes when board changes
+    useEffect(() => {
+        if (selBoards.length === 0) { setClasses([]); setSelClassIds([]); return; }
+        setLoadingClasses(true);
+        fetch(`/api/taxonomy/cascade?board=${selBoards[0]}`)
+            .then(r => r.json())
+            .then(data => { if (data.classes) setClasses(data.classes); })
+            .catch(() => toast.error('Failed to load classes'))
+            .finally(() => setLoadingClasses(false));
+    }, [selBoards]);
+
+    const loadCoverage = async () => {
+        if (selClassIds.length === 0) { toast.error('Select at least one class'); return; }
+        setLoadingCoverage(true);
+        setCoverageData(null);
+        try {
+            const res = await fetch('/api/admin/coverage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ board: selBoards, classIds: selClassIds }),
+            });
+            const data = await res.json();
+            if (data.topics) setCoverageData(data.topics);
+            else toast.error(data.error || 'Failed to load coverage');
+        } catch { toast.error('Failed to load coverage'); }
+        finally { setLoadingCoverage(false); }
+    };
+
+    const startAutoPopulate = async () => {
+        if (selBoards.length === 0 || selClassIds.length === 0) {
+            toast.error('Select boards and classes first');
+            return;
+        }
+        if (!useScrape && !useGenerate) {
+            toast.error('Enable at least one method (Scrape or Generate)');
+            return;
+        }
+        setIsRunning(true);
+        setProgress([]);
+        setResults(null);
+
+        const addProgress = (msg: string) => setProgress(prev => [...prev, msg]);
+
+        try {
+            addProgress('Starting auto-populate job...');
+            const res = await fetch('/api/admin/auto-populate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    boards: selBoards,
+                    classes: selClassIds,
+                    targetPerTopic,
+                    scrape: useScrape,
+                    generate: useGenerate,
+                }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setResults(data);
+            addProgress(`Done — ${data.totalCreated} created, ${data.totalErrors} errors`);
+            if (data.details) {
+                data.details.forEach((d: any) => {
+                    addProgress(`${d.topic}: ${d.created} created, ${d.errors} errors`);
+                });
+            }
+        } catch (err: any) {
+            addProgress(`Error: ${err.message}`);
+            toast.error(err.message);
+        }
+        finally { setIsRunning(false); }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-8">
+                <div className="flex items-center gap-3 mb-6">
+                    <Zap className="w-5 h-5 text-green-400" />
+                    <h2 className="text-lg font-black text-white">Auto-Populate Question Bank</h2>
+                </div>
+                <p className="text-slate-400 text-xs font-semibold mb-8">
+                    Auto-fill under-covered topics by scraping NCERT PDFs and/or generating questions via AI.
+                    Questions are saved as DRAFT for your review.
+                </p>
+
+                {/* Board Selection */}
+                <div className="mb-6">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Target Boards</label>
+                    <div className="flex flex-wrap gap-2">
+                        {BOARDS.map(b => (
+                            <button key={b} onClick={() => toggleBoard(b)}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all border ${
+                                    selBoards.includes(b)
+                                        ? 'bg-green-600 border-green-500 text-white shadow-lg shadow-green-900/40'
+                                        : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600 hover:text-white'
+                                }`}
+                            >
+                                {b.replace('_', ' ')}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Class Selection */}
+                {selBoards.length > 0 && (
+                    <div className="mb-6">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Target Classes</label>
+                        <div className="flex flex-wrap gap-2">
+                            {loadingClasses ? (
+                                <span className="text-xs text-slate-500 flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Loading...</span>
+                            ) : classes.length === 0 ? (
+                                <span className="text-xs text-slate-500">No classes found</span>
+                            ) : (
+                                classes.map(cls => (
+                                    <button key={cls.id} onClick={() => toggleClass(cls.id)}
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all border ${
+                                            selClassIds.includes(cls.id)
+                                                ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/40'
+                                                : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600 hover:text-white'
+                                        }`}
+                                    >
+                                        {cls.name}
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Coverage Check */}
+                {selClassIds.length > 0 && (
+                    <div className="mb-6">
+                        {!coverageData && (
+                            <button onClick={loadCoverage} disabled={loadingCoverage}
+                                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl text-xs font-black text-white transition-all flex items-center gap-2"
+                            >
+                                {loadingCoverage ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                                {loadingCoverage ? 'Checking coverage...' : 'Check Topic Coverage'}
+                            </button>
+                        )}
+                        {coverageData && (
+                            <div className="space-y-2 mt-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Topic Coverage</span>
+                                    <button onClick={() => setCoverageData(null)} className="text-[10px] text-slate-500 hover:text-white">Reset</button>
+                                </div>
+                                <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+                                    {coverageData.map((t: any, i: number) => (
+                                        <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold ${
+                                            t.questionCount >= targetPerTopic ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                                        }`}>
+                                            <span className="truncate">{t.topicName}</span>
+                                            <span className="shrink-0 ml-2">{t.questionCount} / {targetPerTopic} Qs</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Options */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block">Target per Topic</label>
+                        <input type="number" min={1} max={50} value={targetPerTopic}
+                            onChange={e => setTargetPerTopic(Number(e.target.value))}
+                            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-green-500"
+                        />
+                    </div>
+                    <div className="flex items-end gap-3">
+                        <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl cursor-pointer hover:border-slate-600 transition-colors">
+                            <input type="checkbox" checked={useScrape} onChange={e => setUseScrape(e.target.checked)}
+                                className="w-4 h-4 accent-green-500" />
+                            <span className="text-xs font-bold text-slate-300">Scrape NCERT</span>
+                        </label>
+                        <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl cursor-pointer hover:border-slate-600 transition-colors">
+                            <input type="checkbox" checked={useGenerate} onChange={e => setUseGenerate(e.target.checked)}
+                                className="w-4 h-4 accent-purple-500" />
+                            <span className="text-xs font-bold text-slate-300">Generate AI</span>
+                        </label>
+                    </div>
+                </div>
+
+                {/* Start Button */}
+                <button onClick={startAutoPopulate} disabled={isRunning || selBoards.length === 0 || selClassIds.length === 0}
+                    className="w-full px-6 py-4 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-2xl text-sm font-black text-white transition-all flex items-center justify-center gap-3"
+                >
+                    {isRunning ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+                    {isRunning ? 'Running...' : 'Start Auto-Populate'}
+                </button>
+            </div>
+
+            {/* Progress & Results */}
+            {(progress.length > 0 || results) && (
+                <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6">
+                    <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-green-400" /> Progress Log
+                    </h3>
+                    <div className="max-h-80 overflow-y-auto space-y-1 custom-scrollbar font-mono">
+                        {progress.map((p, i) => (
+                            <div key={i} className={`text-xs px-3 py-1.5 rounded-lg ${
+                                p.startsWith('Error') ? 'bg-red-500/10 text-red-400' : 'text-slate-300'
+                            }`}>
+                                {p.startsWith('Error') ? <AlertCircle className="w-3 h-3 inline mr-1" /> : <ChevronRight className="w-3 h-3 inline mr-1" />}
+                                {p}
+                            </div>
+                        ))}
+                    </div>
+                    {results && (
+                        <div className="mt-4 flex gap-4 flex-wrap">
+                            <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                                <span className="text-xs font-black text-emerald-400">{results.totalCreated} Created</span>
+                            </div>
+                            {results.totalErrors > 0 && (
+                                <div className="px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-xl">
+                                    <span className="text-xs font-black text-red-400">{results.totalErrors} Errors</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
@@ -2046,7 +2310,7 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
     isSelected, onToggleSelect, isEditing, onToggleEdit, onStitch, stitchTargets, fullRawText
 }: ReviewCardProps) {
     const editing = isEditing ?? true; // drafts are always in edit mode; queue cards default to view mode
-    const isDup = !!q.isDuplicate;
+    const isDup = !!q.duplicateOf;
     const [showOriginal, setShowOriginal] = useState(false);
     const [showComparison, setShowComparison] = useState(false);
 
@@ -2155,6 +2419,31 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+            {q.duplicateOf && (
+                <div className="mx-4 mb-4 border border-orange-500/30 bg-orange-950/20 rounded-2xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 bg-orange-500/10 border-b border-orange-500/20">
+                        <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest flex items-center gap-2">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Duplicate of Approved Question
+                        </span>
+                        <button onClick={() => setShowComparison(!showComparison)}
+                            className="bg-orange-500/20 hover:bg-orange-500/40 border border-orange-500/40 text-orange-400 px-2 py-0.5 rounded text-[9px] font-bold transition-all">
+                            {showComparison ? 'Hide' : 'Show Existing'}
+                        </button>
+                    </div>
+                    {showComparison && (
+                        <div className="p-4 space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                            <p className="text-xs text-orange-300 font-mono bg-slate-900/50 rounded-xl p-3 border border-slate-800">
+                                {q.duplicateOf.content.length > 500
+                                    ? q.duplicateOf.content.substring(0, 500) + '...'
+                                    : q.duplicateOf.content}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-mono">
+                                ID: {q.duplicateOf.id} | Status: {q.duplicateOf.status}
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}{/* Card header */}
             <div className={`flex items-center justify-between px-4 py-3 border-b border-slate-800 ${isDup ? 'bg-red-500/10' : 'bg-slate-800/40'}`}>
@@ -2455,8 +2744,8 @@ function FieldRow({ label, value, onChange, rows, compact, tags }: {
             <div className="grid grid-cols-2 gap-2">
                 <textarea value={value} onChange={e => onChange(e.target.value)} rows={rows} placeholder="LaTeX source..."
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs font-mono text-slate-300 resize-none outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all custom-scrollbar" />
-                <div className="bg-white rounded-xl p-3 text-xs text-slate-900 overflow-auto select-none pointer-events-none border border-slate-200"
-                    style={{ minHeight: `${rows * 1.75}rem` }} onContextMenu={e => e.preventDefault()}>
+                <div className="bg-white rounded-xl p-3 text-xs text-slate-900 overflow-auto select-text border border-slate-200"
+                    style={{ minHeight: `${rows * 1.75}rem` }}>
                     <MathRenderer content={value || '*(empty)*'} />
                     {tags && <QuestionTags tags={tags} />}
                 </div>
