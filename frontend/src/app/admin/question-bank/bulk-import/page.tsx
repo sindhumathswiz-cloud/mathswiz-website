@@ -320,13 +320,25 @@ export default function BulkImportStudio() {
         }).length > 0),
         [draftQuestions]
     );
+
+    // Pre-compute stitch targets map for all drafts (O(n) instead of O(n²) per render)
+    const stitchTargetsMap = useMemo(() => {
+        const map = new Map<string, { id: string; label: string }[]>();
+        for (const q of draftQuestions) {
+            const targets = draftQuestions
+                .filter(x => x.id !== q.id)
+                .map(x => ({ id: x.id, label: `Draft (${x.content.substring(0, 25)}...)` }));
+            map.set(q.id, targets);
+        }
+        return map;
+    }, [draftQuestions]);
     
     const { data: draftsData, isLoading: isDraftsLoading, mutate: mutateDrafts } = useSWR(
         (mainTab === 'drafts' || mainTab === 'qa') && !isSyncPaused && !isEditingDraft
             ? `/api/admin/questions?status=DRAFT${selectedTaxonomyIds.length > 0 ? `&taxonomyIds=${encodeURIComponent(JSON.stringify(selectedTaxonomyIds))}` : ''}`
             : null,
         fetcher,
-        { refreshInterval: 5000, revalidateOnFocus: false }
+        { refreshInterval: 30000, revalidateOnFocus: false, dedupingInterval: 10000 }
     );
     // Removed redundant useEffect (merged into fetchFolders above)
 
@@ -781,21 +793,21 @@ export default function BulkImportStudio() {
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, tags: q.tags.filter(t => t !== tag) } : q));
 
     // â”€â”€ Draft card state helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const updateDraftCard = (id: string, field: keyof ExtractedQuestion, value: any) =>
-        setDraftQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q));
-    const updateDraftOption = (id: string, oIdx: number, value: string) =>
+    const updateDraftCard = useCallback((id: string, field: keyof ExtractedQuestion, value: any) =>
+        setDraftQuestions(prev => prev.map(q => q.id === id ? { ...q, [field]: value } : q)), []);
+    const updateDraftOption = useCallback((id: string, oIdx: number, value: string) =>
         setDraftQuestions(prev => prev.map(q => {
             if (q.id !== id) return q;
             const opts = [...q.options]; opts[oIdx] = value; return { ...q, options: opts };
-        }));
-    const addDraftTag = (id: string) =>
+        })), []);
+    const addDraftTag = useCallback((id: string) =>
         setDraftQuestions(prev => prev.map(q => {
             if (q.id !== id || !q.tagInput.trim()) return q;
             if (q.tags.includes(q.tagInput.trim())) return { ...q, tagInput: '' };
             return { ...q, tags: [...q.tags, q.tagInput.trim()], tagInput: '' };
-        }));
-    const removeDraftTag = (id: string, tag: string) =>
-        setDraftQuestions(prev => prev.map(q => q.id === id ? { ...q, tags: q.tags.filter(t => t !== tag) } : q));
+        })), []);
+    const removeDraftTag = useCallback((id: string, tag: string) =>
+        setDraftQuestions(prev => prev.map(q => q.id === id ? { ...q, tags: q.tags.filter(t => t !== tag) } : q)), []);
 
     // â”€â”€ Save newly extracted questions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const saveQuestion = async (q: ExtractedQuestion, status: 'DRAFT' | 'APPROVED') => {
@@ -969,15 +981,19 @@ export default function BulkImportStudio() {
         } catch (err: any) { showMsg('error', err.message); }
     };
 
-    const deleteDraftQuestion = async (q: ExtractedQuestion) => {
-        if (!q.dbId) return setDraftQuestions(prev => prev.filter(x => x.id !== q.id));
+    const draftRef = useRef(draftQuestions);
+    draftRef.current = draftQuestions;
+    const deleteDraftQuestion = async (id: string) => {
+        const q = draftRef.current.find(x => x.id === id);
+        if (!q) return;
+        if (!q.dbId) return setDraftQuestions(prev => prev.filter(x => x.id !== id));
         if (!window.confirm('Delete this draft from the database? This cannot be undone.')) return;
         try {
             const res = await fetch(`/api/questions/${q.dbId}`, { method: 'DELETE' });
             if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed'); }
-            setDraftQuestions(prev => prev.filter(x => x.id !== q.id));
+            setDraftQuestions(prev => prev.filter(x => x.id !== id));
             mutateDrafts();
-            showMsg('success', 'âœ“ Draft deleted.');
+            showMsg('success', '\u0153\u201c Draft deleted.');
         } catch (err: any) { showMsg('error', err.message); }
     };
 
@@ -1564,10 +1580,10 @@ export default function BulkImportStudio() {
                                             <ReviewCard key={q.id} q={q} idx={idx} isDraft
                                                 onUpdate={updateDraftCard} onUpdateOption={updateDraftOption}
                                                 onAddTag={addDraftTag} onRemoveTag={removeDraftTag}
-                                                onDelete={() => deleteDraftQuestion(q)}
+                                                onDelete={deleteDraftQuestion}
                                                 onSave={saveDraftQuestion}
                                                 onStitch={stitchDraftSolution}
-                                                stitchTargets={draftQuestions.filter(x => x.id !== q.id).map((x, iIdx) => ({ id: x.id, label: `Draft #${draftQuestions.findIndex(dq => dq.id === x.id) + 1} (${x.content.substring(0,25)}...)` }))}
+                                                stitchTargets={stitchTargetsMap.get(q.id) ?? []}
                                             />
                                         ))}
                                     </div>
@@ -1605,10 +1621,10 @@ export default function BulkImportStudio() {
                                     <ReviewCard key={q.id} q={q} idx={idx} isDraft
                                         onUpdate={updateDraftCard} onUpdateOption={updateDraftOption}
                                         onAddTag={addDraftTag} onRemoveTag={removeDraftTag}
-                                        onDelete={() => deleteDraftQuestion(q)}
+                                        onDelete={deleteDraftQuestion}
                                         onSave={saveDraftQuestion}
                                         onStitch={stitchDraftSolution}
-                                        stitchTargets={draftQuestions.filter(x => x.id !== q.id).map((x) => ({ id: x.id, label: `Draft (${x.content.substring(0, 25)}...)` }))}
+                                        stitchTargets={stitchTargetsMap.get(q.id) ?? []}
                                     />
                                 ))}
                             </div>
@@ -2310,7 +2326,7 @@ interface ReviewCardProps {
     fullRawText?: string;
 }
 
-function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRemoveTag, onDelete, onSave,
+const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRemoveTag, onDelete, onSave,
     isSelected, onToggleSelect, isEditing, onToggleEdit, onStitch, stitchTargets, fullRawText
 }: ReviewCardProps) {
     const editing = isEditing ?? true; // drafts are always in edit mode; queue cards default to view mode
@@ -2736,7 +2752,7 @@ function ReviewCard({ q, idx, isDraft, onUpdate, onUpdateOption, onAddTag, onRem
             )}
         </div>
     );
-}
+});
 
 // â”€â”€â”€ FieldRow (side-by-side LaTeX textarea | MathRenderer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function FieldRow({ label, value, onChange, rows, compact, tags }: {
