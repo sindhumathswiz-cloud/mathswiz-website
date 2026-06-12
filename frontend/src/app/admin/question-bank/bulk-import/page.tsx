@@ -1722,7 +1722,7 @@ function AutoPopulatePanel() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     boards: selBoards,
-                    classes: selClassIds,
+                    classes: classes.filter(c => selClassIds.includes(c.id)).map(c => c.name),
                     targetPerTopic,
                     scrape: useScrape,
                     generate: useGenerate,
@@ -1734,7 +1734,9 @@ function AutoPopulatePanel() {
             addProgress(`Done — ${data.totalCreated} created, ${data.totalErrors} errors`);
             if (data.details) {
                 data.details.forEach((d: any) => {
-                    addProgress(`${d.topic}: ${d.created} created, ${d.errors} errors`);
+                    const created = (d.scraped || 0) + (d.generated || 0);
+                    const errs = d.errors?.length || 0;
+                    addProgress(`${d.topicName || d.topic}: ${created} created, ${errs} errors`);
                 });
             }
         } catch (err: any) {
