@@ -35,6 +35,9 @@ export async function getTopicCoverage(
     orderBy: { order: "asc" },
   });
 
+  console.log(`[COVERAGE] Board=${board}: found ${classes.length} classes`);
+  for (const c of classes) console.log(`  CLASS: ${c.name} (id=${c.id}, boardType=${c.boardType})`);
+
   const result: CoverageReport = {
     board,
     classes: [],
@@ -46,8 +49,19 @@ export async function getTopicCoverage(
     const classTopics: TopicCoverage[] = [];
     let classTotal = 0;
 
+    // Hierarchy: CLASS → SUBJECT → TOPIC
+    const subjects = await prisma.tagTaxonomy.findMany({
+      where: { type: "SUBJECT", parentId: cls.id, isActive: true },
+      select: { id: true, name: true },
+    });
+    console.log(`[COVERAGE] Class ${cls.name}: ${subjects.length} subjects found`);
+    if (subjects.length === 0) {
+      result.classes.push({ className: cls.name, topics: [], totalApproved: 0, totalTarget: 0 });
+      continue;
+    }
+
     const topics = await prisma.tagTaxonomy.findMany({
-      where: { type: "TOPIC", parentId: cls.id, isActive: true },
+      where: { type: "TOPIC", parentId: { in: subjects.map(s => s.id) }, isActive: true },
       orderBy: { order: "asc" },
       include: {
         _count: { select: { questionTags: true } },

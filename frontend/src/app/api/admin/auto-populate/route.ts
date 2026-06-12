@@ -36,11 +36,18 @@ export async function POST(request: NextRequest) {
     const createdById = (session.user as any).id || "admin";
 
     for (const board of boards) {
+      console.log(`[AUTO-POPULATE] Board: ${board}, classes: ${JSON.stringify(classes)}`);
       const report = await getTopicCoverage(board, targetPerTopic);
+      console.log(`[AUTO-POPULATE] Coverage: ${report.classes.length} classes, ${report.classes.reduce((s, c) => s + c.topics.length, 0)} topics, ${report.totalApproved} approved`);
       const underCovered = getUnderCoveredTopics(report, 1);
+      console.log(`[AUTO-POPULATE] Under-covered: ${underCovered.length} topics`);
+      for (const t of underCovered) console.log(`  - ${t.className}/${t.topicName}: ${t.approvedCount}/${t.targetCount} (deficit ${t.deficit})`);
 
       for (const topic of underCovered) {
-        if (!classes.includes(topic.className)) continue;
+        if (!classes.includes(topic.className)) {
+          console.log(`[AUTO-POPULATE] Skipping ${topic.className}/${topic.topicName} - class not in selected list ${JSON.stringify(classes)}`);
+          continue;
+        }
 
         const entry = {
           board,
@@ -61,6 +68,7 @@ export async function POST(request: NextRequest) {
         });
         if (!topicTag) {
           entry.errors.push(`No TagTaxonomy found for ${topic.className} / ${topic.topicName}`);
+          console.log(`[AUTO-POPULATE] TagTaxonomy not found for ${topic.className}/${topic.topicName}`);
           results.push(entry);
           continue;
         }
