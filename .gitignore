@@ -9,3 +9,12 @@ chapters/
 .env.local
 .env*.local
 .github/
+
+# Browser-test output
+frontend/test-results/
+frontend/playwright-report/
+
+# Local package store / tooling scratch
+.pnpm-store/
+.codex-temp/
+.codex_tmp/

@@ -41,3 +41,24 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+.private/
+
+# Local dev / background-job process artifacts (not for version control)
+*.log
+*.err.log
+*.pid
+dev-server.*
+phase2-*
+qa-apply*
+qa-final-audit*
+qa-repair-plan*
+typecheck*.log
+typecheck*.err.log
+typecheck*.pid
+verification.*
+/qa-backups/
+/tmp/pdfs/
+
+# Python bytecode from helper scripts
+__pycache__/
+*.pyc
