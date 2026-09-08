@@ -85,22 +85,50 @@ model User {
   knowledgeFolders KnowledgeFolder[]
 
   // Gamification & Portals Relations
-  challengerOf       PeerChallenge[]     @relation("Challenger")
-  opponentOf         PeerChallenge[]     @relation("Opponent")
-  studentQueries     TeacherQuery[]      @relation("StudentQueries")
-  teacherQueries     TeacherQuery[]      @relation("TeacherReceivedQueries")
-  queryReplies       QueryReply[]
-  parentLinks        ParentLink[]        @relation("ParentLinks")
-  studentLinks       ParentLink[]        @relation("StudentLinks")
-  attendanceRecords  AttendanceRecord[]
-  ingestionJobs      IngestionJob[]
-  userBadges         UserBadge[]
-  pointsTransactions PointsTransaction[]
-  sentMessages       Message[]           @relation("MessageSender")
-  notifications      Notification[]
-  ingestedDocuments  SourceDocument[]    @relation("AdminIngestedDocs")
-  ingestedPapers     SamplePaper[]       @relation("AdminIngestedPapers")
-  extractionSessions ExtractionSession[]
+  challengerOf              PeerChallenge[]     @relation("Challenger")
+  opponentOf                PeerChallenge[]     @relation("Opponent")
+  studentQueries            TeacherQuery[]      @relation("StudentQueries")
+  teacherQueries            TeacherQuery[]      @relation("TeacherReceivedQueries")
+  queryReplies              QueryReply[]
+  parentLinks               ParentLink[]        @relation("ParentLinks")
+  studentLinks              ParentLink[]        @relation("StudentLinks")
+  attendanceRecords         AttendanceRecord[]
+  ingestionJobs             IngestionJob[]
+  userBadges                UserBadge[]
+  pointsTransactions        PointsTransaction[]
+  sentMessages              Message[]           @relation("MessageSender")
+  notifications             Notification[]
+  ingestedDocuments         SourceDocument[]    @relation("AdminIngestedDocs")
+  ingestedPapers            SamplePaper[]       @relation("AdminIngestedPapers")
+  extractionSessions        ExtractionSession[]
+  auditLogs                 AuditLog[]
+  reviewedHomeworkResponses TestResponse[]      @relation("HomeworkResponseReviewer")
+  teacherCourses            Course[]            @relation("TeacherCourses")
+  courseEnrollments         CourseEnrollment[]
+  masteryEvents             MasteryEvent[]
+  assignedInterventions     Intervention[]      @relation("InterventionTeacher")
+  studentInterventions      Intervention[]      @relation("InterventionStudent")
+  createdBooks              Book[]              @relation("BookCreator")
+  bookIngestionRuns         BookIngestionRun[]
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([action, createdAt])
 }
 
 model Batch {
@@ -117,13 +145,14 @@ model Batch {
   lastMeetingId   String? // MS Graph meeting identity
   createdAt       DateTime  @default(now())
 
-  teacher     User              @relation("TeacherBatches", fields: [teacherId], references: [id])
-  enrollments BatchEnrollment[]
-  assignments TestAssignment[]
-  coupons     DiscountCoupon[]
-  liveClasses LiveClass[]
-  notices     Notice[]
-  messages    Message[]
+  teacher       User              @relation("TeacherBatches", fields: [teacherId], references: [id])
+  enrollments   BatchEnrollment[]
+  assignments   TestAssignment[]
+  coupons       DiscountCoupon[]
+  liveClasses   LiveClass[]
+  notices       Notice[]
+  messages      Message[]
+  interventions Intervention[]
 }
 
 model LiveClass {
@@ -322,6 +351,29 @@ enum ExtractionStatus {
   PARTIAL
 }
 
+enum BookIngestionStage {
+  REGISTERED
+  STORED
+  LAYOUT_ANALYSIS
+  BOOK_MAPPING
+  QUESTION_INVENTORY
+  QUESTION_EXTRACTION
+  SOLUTION_MATCHING
+  VERIFICATION
+  REVIEW_READY
+  COMPLETED
+}
+
+enum QuestionVerificationStatus {
+  UNVERIFIED
+  STRUCTURALLY_VALID
+  ANSWER_MATCHED
+  SOLUTION_MATCHED
+  MATHEMATICALLY_VERIFIED
+  NEEDS_REVIEW
+  VERIFIED
+}
+
 enum SolutionStepType {
   EXPLANATION
   CALCULATION
@@ -416,8 +468,19 @@ model Question {
   reviewNotes String? // Admin/teacher review comments
 
   // Source tracking
-  sourceDocumentId String? // Link to book chapter ingestion
-  samplePaperId    String? // Link to sample paper ingestion
+  sourceDocumentId     String? // Link to book chapter ingestion
+  samplePaperId        String? // Link to sample paper ingestion
+  bookId               String?
+  bookChapterId        String?
+  bookExerciseId       String?
+  printedNumber        String?
+  printedSubpart       String?
+  sourcePageStart      Int?
+  sourcePageEnd        Int?
+  sourceLocator        Json?
+  extractionConfidence Float?
+  verificationStatus   QuestionVerificationStatus @default(UNVERIFIED)
+  verifiedAt           DateTime?
 
   // Versioning
   currentVersion Int @default(1)
@@ -426,16 +489,20 @@ model Question {
   createdById       String // ID of Teacher or Admin who created it
   knowledgeFolderId String? // Optional link to a KnowledgeFolder
   createdAt         DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  updatedAt         DateTime @default(now()) @updatedAt
 
   createdBy       User             @relation(fields: [createdById], references: [id])
   knowledgeFolder KnowledgeFolder? @relation(fields: [knowledgeFolderId], references: [id], onDelete: SetNull)
   testQuestions   TestQuestion[]
   testResponses   TestResponse[]
+  masteryEvents   MasteryEvent[]
 
   // New relations
-  sourceDocument SourceDocument?   @relation(fields: [sourceDocumentId], references: [id])
-  samplePaper    SamplePaper?      @relation(fields: [samplePaperId], references: [id])
+  sourceDocument SourceDocument?     @relation(fields: [sourceDocumentId], references: [id])
+  samplePaper    SamplePaper?        @relation(fields: [samplePaperId], references: [id])
+  book           Book?               @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  bookChapter    BookChapter?        @relation(fields: [bookChapterId], references: [id], onDelete: SetNull)
+  bookExercise   BookExercise?       @relation(fields: [bookExerciseId], references: [id], onDelete: SetNull)
   solution       Solution?
   images         QuestionImage[]
   versions       QuestionVersion[]
@@ -443,6 +510,9 @@ model Question {
   embeddings     QuestionEmbedding[]
 
   @@index([contentHash])
+  @@index([bookId, bookChapterId, bookExerciseId])
+  @@index([bookExerciseId, printedNumber, printedSubpart])
+  @@index([verificationStatus, status])
 }
 
 enum TestMode {
@@ -486,7 +556,8 @@ model TestAttempt {
   totalIncorrect Int   @default(0)
   totalSkipped   Int   @default(0)
 
-  responses TestResponse[]
+  responses     TestResponse[]
+  masteryEvents MasteryEvent[]
 
   test Test? @relation(fields: [testId], references: [id], onDelete: Cascade)
   user User  @relation(fields: [userId], references: [id])
@@ -531,23 +602,133 @@ model TestResponse {
   timeSpent Int    @default(0) // Seconds spent on this question
   status    String @default("ANSWERED") // ANSWERED, MARKED_FOR_REVIEW, SKIPPED
 
-  attempt  TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question Question    @relation(fields: [questionId], references: [id])
+  reviewStatus    HomeworkReviewStatus @default(NOT_REQUIRED)
+  teacherFeedback String?
+  reviewedAt      DateTime?
+  reviewedById    String?
+
+  attempt    TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question   Question    @relation(fields: [questionId], references: [id])
+  reviewedBy User?       @relation("HomeworkResponseReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([reviewStatus, reviewedAt])
+}
+
+enum HomeworkReviewStatus {
+  NOT_REQUIRED
+  PENDING
+  REVIEWED
 }
 
 model TestAssignment {
-  id           String    @id @default(cuid())
+  id           String         @id @default(cuid())
   testId       String
   batchId      String? // If assigned to a whole batch
   studentId    String? // If assigned to a specific student
   scheduledFor DateTime? // When the test unlocks
   deadline     DateTime? // When the test closes
-  maxAttempts  Int       @default(1) // Controls attempt limit
-  createdAt    DateTime  @default(now())
+  maxAttempts  Int            @default(1) // Controls attempt limit
+  kind         AssignmentKind @default(TEST)
+  instructions String?
+  createdAt    DateTime       @default(now())
 
   test    Test   @relation(fields: [testId], references: [id], onDelete: Cascade)
   batch   Batch? @relation(fields: [batchId], references: [id], onDelete: Cascade)
   student User?  @relation("StudentAssignments", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([kind, deadline])
+}
+
+enum AssignmentKind {
+  TEST
+  HOMEWORK
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  class       String?
+  subject     String?
+  isPublished Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy   User               @relation("TeacherCourses", fields: [createdById], references: [id])
+  modules     CourseModule[]
+  enrollments CourseEnrollment[]
+
+  @@index([createdById, createdAt])
+  @@index([isPublished, class])
+}
+
+model CourseModule {
+  id          String  @id @default(cuid())
+  courseId    String
+  title       String
+  description String?
+  orderIndex  Int     @default(0)
+
+  course  Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons CourseLesson[]
+
+  @@unique([courseId, orderIndex])
+}
+
+model CourseLesson {
+  id               String   @id @default(cuid())
+  moduleId         String
+  title            String
+  content          String?  @db.Text
+  contentUrl       String?
+  orderIndex       Int      @default(0)
+  estimatedMinutes Int?
+  isPublished      Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  module   CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+
+  @@unique([moduleId, orderIndex])
+}
+
+model CourseEnrollment {
+  id          String                 @id @default(cuid())
+  courseId    String
+  studentId   String
+  status      CourseEnrollmentStatus @default(ACTIVE)
+  enrolledAt  DateTime               @default(now())
+  completedAt DateTime?
+
+  course   Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student  User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+
+  @@unique([courseId, studentId])
+  @@index([studentId, status])
+}
+
+model LessonProgress {
+  id             String    @id @default(cuid())
+  enrollmentId   String
+  lessonId       String
+  completed      Boolean   @default(false)
+  completedAt    DateTime?
+  lastAccessedAt DateTime  @default(now())
+
+  enrollment CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     CourseLesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@index([lessonId, completed])
+}
+
+enum CourseEnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
 }
 
 enum MaterialType {
@@ -600,6 +781,72 @@ model StudentProgress {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, topic])
+}
+
+model MasteryEvent {
+  id            String        @id @default(cuid())
+  userId        String
+  topic         String
+  source        MasterySource
+  previousScore Int
+  newScore      Int
+  delta         Int
+  isCorrect     Boolean
+  attemptId     String?
+  questionId    String?
+  createdAt     DateTime      @default(now())
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt  TestAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  question Question?    @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, topic, createdAt])
+  @@index([attemptId])
+}
+
+enum MasterySource {
+  PRACTICE
+  TEST
+  HOMEWORK
+}
+
+model Intervention {
+  id           String             @id @default(cuid())
+  teacherId    String
+  studentId    String
+  batchId      String?
+  topic        String
+  type         InterventionType
+  status       InterventionStatus @default(ASSIGNED)
+  title        String
+  description  String             @db.Text
+  dueDate      DateTime?
+  outcomeNotes String?            @db.Text
+  completedAt  DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  teacher User   @relation("InterventionTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  student User   @relation("InterventionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  batch   Batch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([teacherId, status, dueDate])
+  @@index([studentId, status, dueDate])
+}
+
+enum InterventionType {
+  PRACTICE
+  HOMEWORK
+  LIVE_SUPPORT
+  MATERIAL
+  OTHER
+}
+
+enum InterventionStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 // NEW MODEL: Knowledge Folders (Topic-based grouping for Admins & Teachers)
@@ -821,15 +1068,128 @@ model Message {
 // QUESTION BANK REVAMP: Source Documents, Sample Papers, Solutions, etc.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Book chapter ingestion source
+model Book {
+  id              String  @id @default(cuid())
+  title           String
+  author          String?
+  publisher       String?
+  edition         String?
+  publicationYear Int?
+  isbn            String?
+  board           String?
+  className       String
+  subject         String  @default("Mathematics")
+  language        String  @default("English")
+  description     String? @db.Text
+  coverImageUrl   String?
+  isActive        Boolean @default(true)
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy       User               @relation("BookCreator", fields: [createdById], references: [id])
+  chapters        BookChapter[]
+  sourceDocuments SourceDocument[]
+  questions       Question[]
+  ingestionRuns   BookIngestionRun[]
+
+  @@index([className, subject, isActive])
+  @@index([title, edition])
+  @@index([publisher])
+}
+
+model BookChapter {
+  id            String   @id @default(cuid())
+  bookId        String
+  chapterNumber String?
+  name          String
+  orderIndex    Int
+  startPage     Int?
+  endPage       Int?
+  topic         String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  book      Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  exercises BookExercise[]
+  questions Question[]
+
+  @@unique([bookId, orderIndex])
+  @@index([bookId, chapterNumber])
+  @@index([topic])
+}
+
+model BookExercise {
+  id                      String   @id @default(cuid())
+  chapterId               String
+  code                    String?
+  title                   String?
+  sectionType             String?
+  orderIndex              Int
+  startPage               Int?
+  endPage                 Int?
+  expectedQuestionCount   Int?
+  extractedQuestionCount  Int      @default(0)
+  unresolvedQuestionCount Int      @default(0)
+  metadata                Json?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  chapter   BookChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@unique([chapterId, orderIndex])
+  @@index([chapterId, code])
+}
+
+model BookIngestionRun {
+  id                 String             @id @default(cuid())
+  bookId             String
+  userId             String
+  sourceDocumentId   String?
+  fileName           String
+  fileHash           String
+  storagePath        String?
+  status             ExtractionStatus   @default(PENDING)
+  stage              BookIngestionStage @default(REGISTERED)
+  providerConfig     Json?
+  totalPages         Int?
+  processedPages     Int                @default(0)
+  expectedQuestions  Int?
+  extractedQuestions Int                @default(0)
+  matchedSolutions   Int                @default(0)
+  verifiedQuestions  Int                @default(0)
+  reviewRequired     Int                @default(0)
+  progress           Float              @default(0)
+  errorMessage       String?            @db.Text
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  book           Book                      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceDocument SourceDocument?           @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  benchmarks     PageExtractionBenchmark[]
+
+  @@unique([bookId, fileHash])
+  @@index([status, stage, updatedAt])
+  @@index([userId, createdAt])
+}
+
+// Whole-book or chapter ingestion source
 model SourceDocument {
-  id           String            @id @default(cuid())
-  title        String // e.g., "RD Sharma Chapter 5 - Trigonometry.pdf"
-  sourceType   SourceType
+  id               String           @id @default(cuid())
+  title            String // e.g., "RD Sharma Chapter 5 - Trigonometry.pdf"
+  sourceType       SourceType
   documentCategory DocumentCategory @default(QUESTION_PAPER)
-  sourceUrl    String? // URL for web/YouTube sources
-  filePath     String? // Local path for uploaded files
-  thumbnailUrl String? // Preview image
+  sourceUrl        String? // URL for web/YouTube sources
+  filePath         String? // Local path for uploaded files
+  thumbnailUrl     String? // Preview image
+  bookId           String?
+  fileHash         String?
 
   // Chapter-level metadata
   className   String? // e.g., "Class 12"
@@ -850,15 +1210,19 @@ model SourceDocument {
   errorMessage String?
 
   // Relations
-  pages             DocumentPage[]
-  questions         Question[]
-  ingestedByUser    User           @relation("AdminIngestedDocs", fields: [ingestedBy], references: [id])
-  extractionSessions ExtractionSession[]
+  pages                           DocumentPage[]
+  questions                       Question[]
+  ingestedByUser                  User                @relation("AdminIngestedDocs", fields: [ingestedBy], references: [id])
+  extractionSessions              ExtractionSession[]
   extractionSessionsWithSolutions ExtractionSession[] @relation("SessionSolutionDoc")
+  book                            Book?               @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  bookIngestionRuns               BookIngestionRun[]
 
   @@index([status])
   @@index([ingestedBy])
   @@index([className, subject])
+  @@index([bookId])
+  @@index([fileHash])
 }
 
 // Individual pages of a book chapter
@@ -872,19 +1236,53 @@ model DocumentPage {
   rawText     String @db.Text // Plain text version
 
   // Extraction results
-  detectedQuestions Int      @default(0)
-  detectedSolutions Int      @default(0)
-  hasImages         Boolean  @default(false)
-  imageUrls         String[] // Extracted diagram/image URLs
+  detectedQuestions  Int      @default(0)
+  detectedSolutions  Int      @default(0)
+  hasImages          Boolean  @default(false)
+  imageUrls          String[] // Extracted diagram/image URLs
+  pageImageUrl       String?
+  pageImagePath      String? // Private archival image; never expose directly
+  processedImagePath String? // Private enhanced derivative; archival image remains unchanged
+  width              Int?
+  height             Int?
+  nativeText         String?  @db.Text
+  layoutData         Json?
+  ocrProvider        String?
+  ocrConfidence      Float?
+  imageQualityScore  Float?
 
   // Processing
   status       ExtractionStatus @default(PENDING)
   errorMessage String?
 
-  document SourceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   SourceDocument            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  benchmarks PageExtractionBenchmark[]
 
   @@unique([documentId, pageNumber])
   @@index([documentId])
+}
+
+model PageExtractionBenchmark {
+  id             String   @id @default(cuid())
+  ingestionRunId String
+  documentPageId String
+  provider       String
+  model          String?
+  promptVersion  String
+  status         String   @default("PENDING")
+  latencyMs      Int?
+  rawOutput      Json?
+  structuredData Json?
+  metrics        Json?
+  errorMessage   String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  ingestionRun BookIngestionRun @relation(fields: [ingestionRunId], references: [id], onDelete: Cascade)
+  documentPage DocumentPage     @relation(fields: [documentPageId], references: [id], onDelete: Cascade)
+
+  @@unique([documentPageId, provider, promptVersion])
+  @@index([ingestionRunId, provider, status])
 }
 
 // Sample/mock paper ingestion source
@@ -1035,17 +1433,17 @@ model TagTaxonomy {
   questionCount Int @default(0)
 
   // Taxonomy metadata
-  order      Int @default(0) // Sort order within parent
+  order      Int              @default(0) // Sort order within parent
   source     CurriculumSource @default(MANUAL) // How this entry was added
   sourceUrl  String? // Reference URL for official curriculum
-  isApproved Boolean @default(true) // Requires admin approval if false
-  isLocked   Boolean @default(false) // Official entries cannot be edited/deleted by teachers
+  isApproved Boolean          @default(true) // Requires admin approval if false
+  isLocked   Boolean          @default(false) // Official entries cannot be edited/deleted by teachers
   approvedBy String? // Admin user ID who approved
   approvedAt DateTime?
 
   // Board/exam association (for competitive exams)
-  boardType   BoardType?
-  
+  boardType BoardType?
+
   // Metadata
   createdById String?
   createdAt   DateTime @default(now())
@@ -1063,8 +1461,8 @@ model TagTaxonomy {
 
 // Source type for taxonomy entries
 enum CurriculumSource {
-  OFFICIAL    // From official board/exam syllabus
-  MANUAL      // Manually added by admin
+  OFFICIAL // From official board/exam syllabus
+  MANUAL // Manually added by admin
 }
 
 // Board/exam type for classification
@@ -1094,11 +1492,11 @@ model QuestionTag {
 
 // User's extraction sessions for the manual PDF question composer
 model ExtractionSession {
-  id                String    @id @default(cuid())
-  userId            String
-  sourceDocumentId  String?
+  id                 String  @id @default(cuid())
+  userId             String
+  sourceDocumentId   String?
   solutionDocumentId String?
-  status            String    @default("DRAFT") // DRAFT / COMPLETED / DISCARDED
+  status             String  @default("DRAFT") // DRAFT / COMPLETED / DISCARDED
 
   // User-authored questions (template data, not yet Question records)
   authoredQuestions Json? // [{ id, type, question, options, correctOption, solution, assertion?, reasoning?, passage?, subQuestions? }]
@@ -1113,21 +1511,21 @@ model ExtractionSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user                    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceDocument          SourceDocument?  @relation(fields: [sourceDocumentId], references: [id])
-  solutionDocument        SourceDocument?  @relation("SessionSolutionDoc", fields: [solutionDocumentId], references: [id])
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceDocument   SourceDocument? @relation(fields: [sourceDocumentId], references: [id])
+  solutionDocument SourceDocument? @relation("SessionSolutionDoc", fields: [solutionDocumentId], references: [id])
 
   @@index([userId, status])
 }
 
 // Embedding store for approved questions (RAG-powered question generation)
 model QuestionEmbedding {
-  id         String   @id @default(cuid())
+  id         String                       @id @default(cuid())
   questionId String
-  content    String   @db.Text
+  content    String                       @db.Text
   embedding  Unsupported("vector(1536)")?
   tags       String[]
-  createdAt  DateTime @default(now())
+  createdAt  DateTime                     @default(now())
 
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
