@@ -1,0 +1,28 @@
+# Normalize all text files to LF in the repository and on checkout.
+# Fixes a working-tree that had drifted to mixed CRLF/LF endings.
+* text=auto eol=lf
+
+# Explicitly binary — never touch these.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.webp   binary
+*.ico    binary
+*.pdf    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.eot    binary
+*.otf    binary
+*.zip    binary
+*.gz     binary
+*.pptx   binary
+*.docx   binary
+*.xlsx   binary
+*.mp4    binary
+*.mov    binary
+
+# Lockfiles: keep LF, mark as generated so diffs collapse in review.
+package-lock.json  -diff
+pnpm-lock.yaml     -diff
