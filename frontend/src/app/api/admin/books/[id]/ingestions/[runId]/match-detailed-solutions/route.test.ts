@@ -8,10 +8,16 @@ const bookIngestionRun = { findFirst: vi.fn() };
 const documentPage = { findMany: vi.fn() };
 const question = { findMany: vi.fn(), update: vi.fn() };
 
+const loadConfirmedChapters = vi.fn();
+
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
 vi.mock('@/lib/prisma', () => ({ default: { bookIngestionRun, documentPage, question } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 vi.mock('../extract-questions/route', () => ({ findOrCreateBookChapter }));
+vi.mock('@/lib/book-manifest', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/book-manifest')>()),
+  loadConfirmedChapters,
+}));
 
 function post(body: unknown) {
   return new Request('http://localhost/api/admin/books/book-1/ingestions/run-1/match-detailed-solutions', {
@@ -39,6 +45,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
     getAuthenticatedUser.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     bookIngestionRun.findFirst.mockResolvedValue({ id: 'run-1', sourceDocumentId: 'doc-1' });
     findOrCreateBookChapter.mockResolvedValue('chapter-1');
+    loadConfirmedChapters.mockResolvedValue([]);
   });
 
   it('rejects non-admin callers', async () => {
@@ -291,5 +298,53 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
     const data = await response.json();
 
     expect(data.topicsBackfilled).toBe(0);
+  });
+
+  describe('with a confirmed chapter manifest', () => {
+    const manifestChapter = {
+      id: 'ch-vec', name: 'Vector Algebra', topic: 'Vector Algebra',
+      startPage: 200, endPage: 240, manifestConfirmedAt: new Date(),
+      exercises: [{
+        id: 'sec-la', sectionType: 'LONG_ANSWER', startPage: 205, endPage: 214,
+        inlineAnswers: false, noAnswers: false,
+        answerKeyStartPage: null, answerKeyEndPage: null, solutionsStartPage: 230, solutionsEndPage: 232,
+      }],
+    };
+
+    it('scopes candidates to the section question range and skips the coverage heuristic', async () => {
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([
+        { pageNumber: 230, rawText: `Detailed Solutions\n\n${SOLUTION_TEXT(1)}\n${SOLUTION_TEXT(2)}` },
+      ]);
+      const seenRanges: unknown[] = [];
+      question.findMany.mockImplementation(async ({ where }: any) => {
+        seenRanges.push(where.sourcePageStart);
+        if (where.printedNumber === '1') return [{ id: 'q-1', explanation: null, tags: [], topic: 'Vector Algebra', reviewNotes: null }];
+        return []; // 2 has no candidate -> coverage 1/2, but heuristic is skipped anyway
+      });
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({ apply: true }), { params }) as Response).json();
+
+      expect(data.manifestConfirmed).toBe(true);
+      expect(data.manifestScopedPages).toBe(1);
+      expect(data.lowCoveragePagesSkipped).toBe(0);
+      expect(data.matched).toBe(1);
+      expect(seenRanges[0]).toEqual({ gte: 205, lte: 214 });
+    });
+
+    it('skips a solutions page inside a confirmed chapter but outside every confirmed solutions range', async () => {
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([
+        { pageNumber: 220, rawText: `Detailed Solutions\n\n${SOLUTION_TEXT(1)}\n${SOLUTION_TEXT(2)}` },
+      ]);
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({}), { params }) as Response).json();
+
+      expect(data.manifestSkippedPages).toBe(1);
+      expect(question.findMany).not.toHaveBeenCalled();
+      expect(data.details).toContainEqual(expect.objectContaining({ outcome: 'not_in_confirmed_solutions_range' }));
+    });
   });
 });

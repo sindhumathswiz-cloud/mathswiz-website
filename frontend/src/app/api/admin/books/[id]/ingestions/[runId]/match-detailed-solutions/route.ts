@@ -3,6 +3,13 @@ import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { findOrCreateBookChapter } from '../extract-questions/route';
+import {
+  parseSolutionBlocks,
+  isLikelyDetailedSolutionsPage,
+  solutionsSectionForPage,
+  chapterForPage,
+  loadConfirmedChapters,
+} from '@/lib/book-manifest';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -56,27 +63,13 @@ export const maxDuration = 240;
  * printedNumber itself is left untouched here (see clear-printed-numbers).
  */
 
-// Requires the page's FIRST LINE to itself be a heading like "Solutions" or
-// "Solutions of Selected Multiple Choice Questions" -- confirmed against
-// real pages from Sindhu's book (e.g. pages 79, 107, 488, 499, 511, 526 of
-// the Xam Idea run), which print the heading alone on its own line
-// immediately before the first numbered solution. Anchoring to the START of
-// the page (not just "appears somewhere near the top") is what keeps an
-// ordinary question page -- which can easily contain the word "solution"
-// inside a question stem a few lines down, e.g. "10. Show that the general
-// solution of the differential equation..." -- from being mistaken for a
-// solutions page.
-const SOLUTIONS_HEADING_RE = /^(?:detailed\s+)?(?:solutions?|hints?)\b.{0,80}$/i;
+// The detailed-solutions page signal (SOLUTIONS_HEADING_RE, parseSolutionBlocks,
+// isLikelyDetailedSolutionsPage) lives in lib/book-manifest.ts so the manifest
+// detector and this route agree on what a solutions page looks like.
 
-// A solutions page needs at least this many numbered blocks, each averaging
-// at least this many characters, to be trusted as real worked solutions
-// rather than a false-positive heading match.
-const MIN_BLOCKS = 2;
-const MIN_AVG_BLOCK_CHARS = 40;
-
-// Same lookback distance as match-answer-keys -- comfortably covers the
-// "4 to 8 pages apart" Sindhu described, with headroom for a solutions
-// section printed at the very end of a longer chapter.
+// Heuristic-fallback lookback -- comfortably covers the "4 to 8 pages apart"
+// Sindhu described. A confirmed manifest replaces this with a direct
+// section-range lookup.
 const DETAILED_SOLUTION_LOOKBACK_PAGES = 40;
 
 // Same double-check philosophy as match-answer-keys: MIN_PAGE_COVERAGE doc
@@ -92,46 +85,6 @@ const MAX_DETAILS = 200;
 
 const TAG_NO_SOLUTION = 'Questions without Solutions';
 const TAG_HINT_AVAILABLE = 'Hint Available';
-
-interface SolutionBlock {
-  number: string;
-  text: string;
-}
-
-// A block boundary is a printed number immediately followed by "." or ")"
-// then whitespace, where that number is preceded by the start of the page,
-// a real line break, OR a closing "$" (end of the previous solution's
-// LaTeX). That last case is the common one in practice: Mathpix frequently
-// runs "...$2. We have,$..." together with NO newline between one compact
-// solution's closing "$" and the next solution's leading number -- confirmed
-// against real pages (79, 107, 488, 511) where a plain "preceded by \n"
-// check misses most block boundaries entirely and silently merges several
-// solutions into one. The lookbehind doesn't consume the "$", so it stays
-// attached to the PREVIOUS block's text -- otherwise that block would lose
-// its closing math delimiter and render broken.
-function parseSolutionBlocks(rawText: string): SolutionBlock[] {
-  const startRe = /(?<=^|\n|\$)[ \t]*(\d{1,3})[.)][ \t]+/g;
-  const starts: Array<{ index: number; number: string; contentStart: number }> = [];
-  let m: RegExpExecArray | null;
-  while ((m = startRe.exec(rawText))) {
-    starts.push({ index: m.index, number: m[1], contentStart: m.index + m[0].length });
-  }
-  const blocks: SolutionBlock[] = [];
-  for (let i = 0; i < starts.length; i++) {
-    const end = i + 1 < starts.length ? starts[i + 1].index : rawText.length;
-    const text = rawText.slice(starts[i].contentStart, end).trim();
-    if (text) blocks.push({ number: starts[i].number, text });
-  }
-  return blocks;
-}
-
-function isLikelyDetailedSolutionsPage(rawText: string, blocks: SolutionBlock[]): boolean {
-  if (blocks.length < MIN_BLOCKS) return false;
-  const firstLine = rawText.trimStart().split('\n', 1)[0].trim();
-  if (!SOLUTIONS_HEADING_RE.test(firstLine)) return false;
-  const avgLen = blocks.reduce((sum, b) => sum + b.text.length, 0) / blocks.length;
-  return avgLen >= MIN_AVG_BLOCK_CHARS;
-}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; runId: string }> }) {
   const auth = await getAuthenticatedUser(['ADMIN']);
@@ -152,6 +105,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     select: { pageNumber: true, rawText: true },
   });
 
+  // Prefer a confirmed chapter manifest (see match-answer-keys for the full
+  // rationale): a solutions page inside a section's confirmed
+  // solutionsStart..End range matches ONLY that section's questions.
+  const confirmedChapters = await loadConfirmedChapters(id);
+
   let solutionsPagesFound = 0;
   let blocksFound = 0;
   let matched = 0;
@@ -161,6 +119,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let alreadyHasSolution = 0;
   let lowCoveragePagesSkipped = 0;
   let topicsBackfilled = 0;
+  let manifestScopedPages = 0;
+  let manifestSkippedPages = 0;
   const details: Array<{ page: number; printedNumber: string; questionId?: string; outcome: string }> = [];
   const chapterCache = new Map<string, string>();
 
@@ -185,6 +145,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     solutionsPagesFound++;
     blocksFound += blocks.length;
 
+    const manifestSection = solutionsSectionForPage(confirmedChapters, page.pageNumber);
+    const insideConfirmedChapter = !manifestSection && chapterForPage(confirmedChapters, page.pageNumber);
+    if (insideConfirmedChapter) {
+      manifestSkippedPages++;
+      if (details.length < MAX_DETAILS) {
+        details.push({ page: page.pageNumber, printedNumber: '', outcome: 'not_in_confirmed_solutions_range' });
+      }
+      continue;
+    }
+    const sectionRange = manifestSection?.section.startPage != null && manifestSection.section.endPage != null
+      ? { gte: manifestSection.section.startPage, lte: manifestSection.section.endPage }
+      : null;
+    if (sectionRange) manifestScopedPages++;
+
     const lookups: BlockLookup[] = [];
     for (const { number, text } of blocks) {
       const candidates = await prisma.question.findMany({
@@ -192,7 +166,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           bookId: id,
           status: 'DRAFT',
           printedNumber: number,
-          sourcePageStart: { gte: page.pageNumber - DETAILED_SOLUTION_LOOKBACK_PAGES, lt: page.pageNumber },
+          sourcePageStart: sectionRange ?? { gte: page.pageNumber - DETAILED_SOLUTION_LOOKBACK_PAGES, lt: page.pageNumber },
         },
         select: { id: true, explanation: true, tags: true, topic: true, reviewNotes: true },
       });
@@ -207,7 +181,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const withAnyCandidate = lookups.filter((l) => l.hasAnyCandidate).length;
     const coverage = blocks.length > 0 ? withAnyCandidate / blocks.length : 0;
 
-    if (coverage < MIN_PAGE_COVERAGE) {
+    if (!sectionRange && coverage < MIN_PAGE_COVERAGE) {
       lowCoveragePagesSkipped++;
       if (details.length < MAX_DETAILS) {
         details.push({ page: page.pageNumber, printedNumber: '', outcome: `low_coverage_page_${withAnyCandidate}_of_${blocks.length}` });
@@ -267,7 +241,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       if (!apply) continue;
 
-      const note = `Detailed solution backfilled from a solutions section (page ${page.pageNumber}) printed away from the question -- NOT independently verified yet; confirm before approving.`;
+      const note = `Detailed solution backfilled from a solutions section (page ${page.pageNumber})${sectionRange ? ' within the confirmed chapter manifest range' : ' printed away from the question'} -- NOT independently verified yet; confirm before approving.`;
       const nextTags = candidate.tags.filter((t) => t !== TAG_NO_SOLUTION && t !== TAG_HINT_AVAILABLE);
       const bookChapterId = needsTopic ? await findOrCreateBookChapter(id, majorityTopic as string, chapterCache) : undefined;
 
@@ -291,13 +265,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       action: 'BOOK_DETAILED_SOLUTIONS_MATCHED',
       entityType: 'BookIngestionRun',
       entityId: run.id,
-      metadata: { bookId: id, solutionsPagesFound, blocksFound, matched, updated, ambiguous, noCandidate, alreadyHasSolution, lowCoveragePagesSkipped, topicsBackfilled },
+      metadata: { bookId: id, solutionsPagesFound, blocksFound, matched, updated, ambiguous, noCandidate, alreadyHasSolution, lowCoveragePagesSkipped, topicsBackfilled, manifestScopedPages, manifestSkippedPages },
       ...requestAuditContext(request),
     });
   }
 
   return NextResponse.json({
     apply,
+    manifestConfirmed: confirmedChapters.length > 0,
+    manifestScopedPages,
+    manifestSkippedPages,
     pagesScanned: pages.length,
     solutionsPagesFound,
     blocksFound,

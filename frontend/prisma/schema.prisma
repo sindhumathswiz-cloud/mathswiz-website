@@ -1100,17 +1100,23 @@ model Book {
 }
 
 model BookChapter {
-  id            String   @id @default(cuid())
-  bookId        String
-  chapterNumber String?
-  name          String
-  orderIndex    Int
-  startPage     Int?
-  endPage       Int?
-  topic         String?
-  metadata      Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                    String    @id @default(cuid())
+  bookId                String
+  chapterNumber         String?
+  name                  String
+  orderIndex            Int
+  startPage             Int?
+  endPage               Int?
+  topic                 String?
+  metadata              Json?
+  // Set once an admin confirms this chapter's manifest (page ranges + the
+  // per-section answer layout below). extract-questions / match-answer-keys /
+  // match-detailed-solutions prefer a confirmed manifest over their heuristics;
+  // null means "fall back to heuristics for this chapter's pages".
+  manifestConfirmedAt   DateTime?
+  manifestConfirmedById String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   book      Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
   exercises BookExercise[]
@@ -1133,6 +1139,18 @@ model BookExercise {
   expectedQuestionCount   Int?
   extractedQuestionCount  Int      @default(0)
   unresolvedQuestionCount Int      @default(0)
+  // Per-section answer layout, part of the confirmed chapter manifest. The
+  // four *Page fields locate separate blocks printed elsewhere in the chapter;
+  // all independent (a section can have both a letter key and a solutions
+  // block). inlineAnswers = printed with the questions (worked examples).
+  // noAnswers = a practice exercise with nothing anywhere (an assertion that
+  // stops match-* from guessing).
+  answerKeyStartPage      Int?
+  answerKeyEndPage        Int?
+  solutionsStartPage      Int?
+  solutionsEndPage        Int?
+  inlineAnswers           Boolean  @default(false)
+  noAnswers               Boolean  @default(false)
   metadata                Json?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt

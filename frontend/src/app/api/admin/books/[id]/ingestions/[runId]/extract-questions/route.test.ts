@@ -12,12 +12,17 @@ const documentPage = { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), c
 const question = { findMany: vi.fn(), create: vi.fn() };
 const questionImage = { create: vi.fn() };
 const bookChapter = { findFirst: vi.fn(), aggregate: vi.fn(), create: vi.fn() };
+const loadConfirmedChapters = vi.fn();
 
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
 vi.mock('@/lib/prisma', () => ({ default: { bookIngestionRun, book, documentPage, question, questionImage, bookChapter } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 vi.mock('@/lib/extract-book-page', () => ({ getPageRawText, structurePageQuestions }));
 vi.mock('@/lib/page-image-crop', () => ({ cropPageRegion }));
+vi.mock('@/lib/book-manifest', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/book-manifest')>()),
+  loadConfirmedChapters,
+}));
 // isLikelyCaseStudyFragment is left un-mocked (real implementation) — it's a
 // pure regex/shape check, and using the real thing here is what actually
 // exercises the stitching decisions below rather than just asserting on a stub.
@@ -51,6 +56,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
     bookChapter.create.mockResolvedValue({ id: 'chapter-1' });
     cropPageRegion.mockResolvedValue({ imagePath: '/private/crop.jpg', width: 200, height: 200 });
     questionImage.create.mockResolvedValue({ id: 'qi-1' });
+    loadConfirmedChapters.mockResolvedValue([]);
   });
 
   it('rejects non-admin callers', async () => {
@@ -209,7 +215,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
 
       expect(response.status).toBe(200);
       // structurePageQuestions' second call must have seen page 24's passage prepended.
-      expect(structurePageQuestions).toHaveBeenNthCalledWith(2, `${CASE_STUDY_PASSAGE}\n\n${CASE_STUDY_SUBQUESTIONS}`);
+      expect(structurePageQuestions).toHaveBeenNthCalledWith(2, `${CASE_STUDY_PASSAGE}\n\n${CASE_STUDY_SUBQUESTIONS}`, { distrustEmpty: false });
       expect(question.create).toHaveBeenCalledTimes(1);
       expect(question.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ contentHash: 'hash-cs', sourcePageStart: 24, sourcePageEnd: 25 }),
@@ -257,7 +263,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       const { POST } = await import('./route');
       await POST(post({ startPage: 25, batchSize: 5 }), { params });
 
-      expect(structurePageQuestions).toHaveBeenCalledWith(`${CASE_STUDY_PASSAGE}\n\n${CASE_STUDY_SUBQUESTIONS}`);
+      expect(structurePageQuestions).toHaveBeenCalledWith(`${CASE_STUDY_PASSAGE}\n\n${CASE_STUDY_SUBQUESTIONS}`, { distrustEmpty: false });
       expect(question.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ sourcePageStart: 24, sourcePageEnd: 25 }),
       }));
@@ -279,7 +285,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       await POST(post({ startPage: 30, batchSize: 5 }), { params });
 
       // The stale fragment's text must NOT have been prepended.
-      expect(structurePageQuestions).toHaveBeenCalledWith('An unrelated question on page 30.');
+      expect(structurePageQuestions).toHaveBeenCalledWith('An unrelated question on page 30.', { distrustEmpty: false });
       expect(question.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ sourcePageStart: 30, sourcePageEnd: 30 }),
       }));
@@ -390,6 +396,58 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       expect(questionImage.create).not.toHaveBeenCalled();
       expect(data.batch.saved).toBe(1);
       expect(data.batch.failures).toEqual([]);
+    });
+  });
+
+  describe('with a confirmed chapter manifest', () => {
+    const manifestChapter = {
+      id: 'ch-vec', name: 'Vector Algebra', topic: 'Vector Algebra',
+      startPage: 1, endPage: 20, manifestConfirmedAt: new Date(),
+      exercises: [{
+        id: 'sec-mcq', sectionType: 'MCQ', startPage: 1, endPage: 5,
+        inlineAnswers: false, noAnswers: false,
+        answerKeyStartPage: null, answerKeyEndPage: null, solutionsStartPage: null, solutionsEndPage: null,
+      }],
+    };
+
+    it('files questions under the manifest chapter by page range and sets distrustEmpty inside a section', async () => {
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-3', pageNumber: 3, nativeText: 'text', pageImagePath: '/p3.png', processedImagePath: null, layoutData: null },
+      ]);
+      getPageRawText.mockResolvedValueOnce({ provider: 'NATIVE_TEXT', rawText: 'page three text', ocrConfidence: null });
+      structurePageQuestions.mockResolvedValueOnce([
+        { question: { questionContent: 'Q1', type: 'SUBJECTIVE', difficulty: 'EASY', options: [], correctAnswer: '', explanation: '', explanationType: 'NONE', tags: [], topic: 'a wrong guess the LLM made', method: '', printedNumber: '' }, contentHash: 'hash-m1', qaIssues: [] },
+      ]);
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({ startPage: 3, batchSize: 5 }), { params }) as Response).json();
+
+      // structurePageQuestions was told to distrust an empty result.
+      expect(structurePageQuestions).toHaveBeenCalledWith('page three text', { distrustEmpty: true });
+      // The question is filed under the manifest chapter, not the LLM's topic guess.
+      expect(question.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ topic: 'Vector Algebra', bookChapterId: 'ch-vec' }),
+      }));
+      // No lightweight chapter was created from the discarded topic guess.
+      expect(bookChapter.create).not.toHaveBeenCalled();
+      expect(data.batch.manifestFiled).toBe(1);
+      expect(data.batch.distrustEmptyPages).toBe(1);
+    });
+
+    it('does not set distrustEmpty for a page outside every confirmed section', async () => {
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-9', pageNumber: 9, nativeText: 'text', pageImagePath: '/p9.png', processedImagePath: null, layoutData: null },
+      ]);
+      getPageRawText.mockResolvedValueOnce({ provider: 'NATIVE_TEXT', rawText: 'page nine text', ocrConfidence: null });
+      structurePageQuestions.mockResolvedValueOnce([]);
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({ startPage: 9, batchSize: 5 }), { params }) as Response).json();
+
+      expect(structurePageQuestions).toHaveBeenCalledWith('page nine text', { distrustEmpty: false });
+      expect(data.batch.distrustEmptyPages).toBe(0);
     });
   });
 });

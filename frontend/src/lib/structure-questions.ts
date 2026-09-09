@@ -181,7 +181,20 @@ const PROVIDERS: Array<{ name: string; call: (prompt: string) => Promise<string>
   { name: 'mistral', call: callMistral },
 ];
 
-export async function structureQuestions(rawText: string): Promise<CanonicalQuestion[]> {
+export interface StructureQuestionsOptions {
+  /**
+   * When the caller KNOWS this page is inside a confirmed questions region (a
+   * confirmed chapter-manifest section — not front matter, not an answer-key
+   * page), a *parseable-but-empty* result is almost certainly a model error,
+   * not a real "no questions here". With this set, an empty parse no longer
+   * stops the provider chain — only a non-empty parse or provider exhaustion
+   * does. Default (unset) keeps the fast path: a parseable empty result from
+   * Gemini is trusted immediately.
+   */
+  distrustEmpty?: boolean;
+}
+
+export async function structureQuestions(rawText: string, opts: StructureQuestionsOptions = {}): Promise<CanonicalQuestion[]> {
   if (!rawText || !rawText.trim()) return [];
 
   const prompt = buildPrompt(rawText);
@@ -217,6 +230,16 @@ export async function structureQuestions(rawText: string): Promise<CanonicalQues
     // and this is what it found" signal. Stop here rather than burning two
     // more API calls confirming a real "no questions on this page" result.
     const normalized = normalizeExtractedQuestions(parsed);
+
+    // ...unless the caller KNOWS the page has questions (distrustEmpty): a
+    // parseable-but-empty result then behaves like unparseable JSON -- fall
+    // through to the next provider. Found live on Xam Idea Class 12 p.479
+    // (12 questions + a printed key), where Gemini confidently returns
+    // {"questions":[]} every time.
+    if (opts.distrustEmpty && normalized.length === 0) {
+      attempts.push(`${provider.name} returned a parseable but EMPTY result on a page confirmed to contain questions`);
+      continue;
+    }
 
     if (provider.name === 'gemini') return normalized;
 

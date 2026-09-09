@@ -165,11 +165,15 @@ export async function getPageRawText(page: PageForExtraction): Promise<PageRawTe
  * Step 2: structure already-resolved raw text into canonical, QA-checked
  * questions. `rawText` may be a single page's text, or a caller-assembled
  * combination of several pages' text (case-study stitching).
+ *
+ * `distrustEmpty` (from a confirmed chapter manifest) forces the provider
+ * fallback chain to keep going when a model returns a parseable-but-empty
+ * result for a page known to contain questions — see structureQuestions.
  */
-export async function structurePageQuestions(rawText: string): Promise<ExtractedPageQuestion[]> {
+export async function structurePageQuestions(rawText: string, opts: { distrustEmpty?: boolean } = {}): Promise<ExtractedPageQuestion[]> {
   if (!rawText.trim()) return [];
 
-  const canonicalQuestions = await structureQuestions(rawText);
+  const canonicalQuestions = await structureQuestions(rawText, opts);
   return canonicalQuestions.map((question) => ({
     question,
     contentHash: computeContentHash(question.questionContent),
