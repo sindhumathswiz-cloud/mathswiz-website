@@ -6,7 +6,7 @@ import type { UserRole } from "@/types/next-auth";
 export async function getAuthenticatedUser(requiredRoles?: UserRole[]) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user) {
+  if (!session?.user || !session.user.role) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
 

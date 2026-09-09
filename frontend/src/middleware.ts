@@ -1,36 +1,76 @@
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
+import { authorizeApiPath } from "@/lib/api-authorization";
+import { checkRateLimit, type RateLimitTier } from "@/lib/rate-limit";
 
-const AI_PATHS = ["/api/doubts/", "/api/extract-", "/api/student/practice/", "/api/admin/ingest/"];
-const AUTH_PATHS = ["/api/auth/", "/api/register"];
+const AI_PATHS = [
+  "/api/doubts/",
+  "/api/extract",
+  "/api/rag/",
+  "/api/student/doubt-buddy/",
+  "/api/student/practice/",
+  "/api/admin/ingest/",
+  "/api/admin/auto-populate",
+  "/api/admin/solutions/",
+  "/api/teacher/questions/generate-from-rag",
+  "/api/teacher/knowledge/flashcards/generate",
+];
+const AUTH_PATHS = [
+  "/api/auth/callback/credentials",
+  "/api/auth/signin",
+  "/api/auth/register",
+  "/api/register",
+];
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  const ip = req.headers.get("x-forwarded-for") || "unknown";
-  const rateLimitKey = `ratelimit:${ip}`;
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || process.env.NEXT_AUTH_SECRET });
 
-  let rateTier: "ai" | "auth" | "general" = "general";
-  if (AI_PATHS.some((p) => path.startsWith(p))) rateTier = "ai";
-  else if (AUTH_PATHS.some((p) => path.startsWith(p))) rateTier = "auth";
-
-  const rateStore = new Map<string, { count: number; resetTime: number }>();
-  const config = { windowMs: 60_000, maxRequests: rateTier === "ai" ? 10 : rateTier === "auth" ? 5 : 100 };
-  const now = Date.now();
-  const entry = rateStore.get(rateLimitKey);
-
-  if (!entry || now > entry.resetTime) {
-    rateStore.set(rateLimitKey, { count: 1, resetTime: now + config.windowMs });
-  } else if (entry.count >= config.maxRequests) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((entry.resetTime - now) / 1000)) } }
-    );
-  } else {
-    entry.count++;
+  if (path.startsWith("/api/")) {
+    const decision = authorizeApiPath(path, token?.role as string | undefined, req.method);
+    if (!decision.allowed) {
+      return NextResponse.json(
+        { error: decision.message },
+        { status: decision.status },
+      );
+    }
+    if (path === "/api/health" || path.startsWith("/api/health/")) {
+      return NextResponse.next();
+    }
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (path.startsWith("/api/")) {
+    let rateTier: RateLimitTier = "general";
+    if (AI_PATHS.some((prefix) => path.startsWith(prefix))) rateTier = "ai";
+    else if (AUTH_PATHS.some((prefix) => path.startsWith(prefix))) rateTier = "auth";
+
+    const forwardedIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    const ip = forwardedIp || req.headers.get("x-real-ip") || "unknown";
+    const identity = token?.id ? `user:${String(token.id)}` : `ip:${ip}`;
+    const limit = await checkRateLimit(identity, rateTier);
+
+    const failClosed = process.env.NODE_ENV === "production" && (rateTier === "auth" || rateTier === "ai");
+    if (!limit.available && failClosed) {
+      return NextResponse.json(
+        { error: "Request protection service is temporarily unavailable." },
+        { status: 503, headers: { "Retry-After": "30" } },
+      );
+    }
+
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.max(1, Math.ceil((limit.resetAt - Date.now()) / 1000))),
+            "X-RateLimit-Remaining": String(limit.remaining),
+          },
+        },
+      );
+    }
+  }
 
   if (path.startsWith("/admin") || path.startsWith("/teacher") || path.startsWith("/student") || path.startsWith("/parent")) {
     if (!token || !token.role) {
@@ -73,5 +113,6 @@ export const config = {
     "/api/admin/ingest/:path*",
     "/api/auth/:path*",
     "/api/register",
+    "/api/:path*",
   ],
 };

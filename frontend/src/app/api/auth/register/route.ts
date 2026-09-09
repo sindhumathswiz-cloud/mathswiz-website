@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { hash } from "bcryptjs";
+import { z } from "zod";
 
 export const dynamic = 'force-dynamic';
 
+const registrationSchema = z.object({
+    firstName: z.string().trim().min(1).max(80),
+    lastName: z.string().trim().min(1).max(80),
+    mobileNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/),
+    phone: z.string().trim().regex(/^\+?[0-9]{10,15}$/).optional(),
+    password: z.string().min(8).max(128),
+    role: z.enum(["STUDENT", "TEACHER", "PARENT"]),
+    class: z.string().trim().max(50).optional(),
+    subjectExpertise: z.string().trim().max(200).optional(),
+    childName: z.string().trim().max(160).optional(),
+    childMobile: z.string().trim().regex(/^\+?[0-9]{10,15}$/).optional(),
+});
+
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
-        const { firstName, lastName, mobileNumber, phone, password, role, class: studentClass, subjectExpertise, childName, childMobile } = body;
-
-        if (!mobileNumber || !password || !firstName || !lastName) {
-            return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
+        const parsed = registrationSchema.safeParse(await req.json());
+        if (!parsed.success) {
+            return NextResponse.json({ message: "Please provide valid registration details." }, { status: 400 });
         }
+        const { firstName, lastName, mobileNumber, phone, password, role, class: studentClass, subjectExpertise, childName, childMobile } = parsed.data;
 
         const existingUser = await prisma.user.findUnique({ where: { mobileNumber } });
         if (existingUser) {
@@ -19,14 +33,15 @@ export async function POST(req: Request) {
 
         const accountStatus = role === "STUDENT" ? "APPROVED" : "PENDING";
 
-        const user = await (prisma as any).user.create({
+        const passwordHash = await hash(password, 12);
+        const user = await prisma.user.create({
             data: {
                 firstName, 
                 lastName, 
                 mobileNumber, 
                 phone: phone || mobileNumber,
-                password,
-                role: role || "STUDENT", 
+                password: passwordHash,
+                role,
                 accountStatus,
                 class: studentClass, 
                 subjectExpertise, 
@@ -35,8 +50,12 @@ export async function POST(req: Request) {
             }
         });
 
-        return NextResponse.json({ message: "User created successfully", user }, { status: 201 });
+        return NextResponse.json({
+            message: "User created successfully",
+            user: { id: user.id, mobileNumber: user.mobileNumber, role: user.role, accountStatus: user.accountStatus },
+        }, { status: 201 });
     } catch (error) {
+        console.error("Registration error:", error);
         return NextResponse.json({ message: "Error creating user" }, { status: 500 });
     }
 }

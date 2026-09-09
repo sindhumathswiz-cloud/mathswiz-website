@@ -1,49 +1,82 @@
-interface RateLimitEntry {
-  count: number;
-  resetTime: number;
-}
-
-const store = new Map<string, RateLimitEntry>();
+export type RateLimitTier = "ai" | "auth" | "general";
 
 export interface RateLimitConfig {
   windowMs: number;
   maxRequests: number;
 }
 
-const defaultLimits: Record<string, RateLimitConfig> = {
+export interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetAt: number;
+  available: boolean;
+}
+
+export const rateLimitConfigs: Record<RateLimitTier, RateLimitConfig> = {
   ai: { windowMs: 60_000, maxRequests: 10 },
-  general: { windowMs: 60_000, maxRequests: 100 },
   auth: { windowMs: 60_000, maxRequests: 5 },
+  general: { windowMs: 60_000, maxRequests: 100 },
 };
 
-export function checkRateLimit(
+const ATOMIC_COUNTER_SCRIPT = `
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+local ttl = redis.call("PTTL", KEYS[1])
+return {count, ttl}
+`.trim();
+
+type RedisResponse = { result?: [number, number]; error?: string };
+
+export async function checkRateLimit(
   identifier: string,
-  tier: keyof typeof defaultLimits = "general"
-): { allowed: boolean; remaining: number; resetAt: number } {
-  const config = defaultLimits[tier];
-  const now = Date.now();
-  const entry = store.get(identifier);
+  tier: RateLimitTier = "general",
+  now = Date.now(),
+): Promise<RateLimitResult> {
+  const config = rateLimitConfigs[tier];
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (!entry || now > entry.resetTime) {
-    store.set(identifier, { count: 1, resetTime: now + config.windowMs });
-    return { allowed: true, remaining: config.maxRequests - 1, resetAt: now + config.windowMs };
+  if (!redisUrl || !redisToken) {
+    return { allowed: true, remaining: config.maxRequests, resetAt: now, available: false };
   }
 
-  if (entry.count >= config.maxRequests) {
-    return { allowed: false, remaining: 0, resetAt: entry.resetTime };
-  }
+  const key = `mathswiz:ratelimit:${tier}:${identifier}`;
 
-  entry.count++;
-  return { allowed: true, remaining: config.maxRequests - entry.count, resetAt: entry.resetTime };
-}
+  try {
+    const response = await fetch(redisUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${redisToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(["EVAL", ATOMIC_COUNTER_SCRIPT, 1, key, config.windowMs]),
+      cache: "no-store",
+    });
 
-export function cleanupStore() {
-  const now = Date.now();
-  for (const [key, entry] of store.entries()) {
-    if (now > entry.resetTime) {
-      store.delete(key);
+    if (!response.ok) {
+      return { allowed: true, remaining: config.maxRequests, resetAt: now, available: false };
     }
+
+    const data = await response.json() as RedisResponse;
+    if (data.error || !Array.isArray(data.result)) {
+      return { allowed: true, remaining: config.maxRequests, resetAt: now, available: false };
+    }
+
+    const [count, ttl] = data.result.map(Number);
+    if (!Number.isFinite(count) || !Number.isFinite(ttl)) {
+      return { allowed: true, remaining: config.maxRequests, resetAt: now, available: false };
+    }
+
+    const remaining = Math.max(0, config.maxRequests - count);
+    return {
+      allowed: count <= config.maxRequests,
+      remaining,
+      resetAt: now + Math.max(0, ttl),
+      available: true,
+    };
+  } catch {
+    return { allowed: true, remaining: config.maxRequests, resetAt: now, available: false };
   }
 }
-
-setInterval(cleanupStore, 60_000);

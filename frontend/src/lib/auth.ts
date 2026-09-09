@@ -3,91 +3,98 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import prisma from "@/lib/prisma";
-import type { Role, AccountStatus } from "@prisma/client";
+import type { UserRole } from "@/types/next-auth";
 import { awardPoints, POINTS_RULES } from "@/lib/gamification";
+import { compare, hash } from "bcryptjs";
+
+const authSecret = process.env.NEXTAUTH_SECRET || process.env.NEXT_AUTH_SECRET;
+
+if (!authSecret) {
+    throw new Error("NEXTAUTH_SECRET is required. Authentication cannot start without it.");
+}
+
+const providers: NextAuthOptions["providers"] = [];
+
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    providers.push(GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }));
+}
+
+if (process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET) {
+    providers.push(AzureADProvider({
+        clientId: process.env.AZURE_AD_CLIENT_ID,
+        clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
+        tenantId: process.env.AZURE_AD_TENANT_ID,
+        authorization: {
+            params: {
+                scope: "openid profile email offline_access User.Read Team.ReadBasic.All Group.Read.All Calendars.ReadWrite OnlineMeetings.ReadWrite Notes.Read Notes.Read.All Notes.ReadWrite Notes.ReadWrite.All TeamMember.ReadWrite.All TeamSettings.ReadWrite.All"
+            }
+        }
+    }));
+}
+
+providers.push(
+    CredentialsProvider({
+        name: "Mobile / Password",
+        credentials: {
+            mobile: { label: "Mobile Number", type: "text", placeholder: "10-digit number" },
+            password: { label: "Password", type: "password" },
+        },
+        async authorize(credentials, req) {
+            const mobile = credentials?.mobile?.trim();
+            if (!mobile || !credentials?.password) return null;
+
+            const user = await prisma.user.findUnique({ where: { mobileNumber: mobile } });
+            if (!user?.password) return null;
+
+            if (user.accountStatus !== "APPROVED") {
+                throw new Error(
+                    user.accountStatus === "BLOCKED"
+                        ? "Your account has been blocked by the administrator."
+                        : "Your account is awaiting administrator approval."
+                );
+            }
+
+            const hasBcryptPassword = /^\$2[aby]\$\d{2}\$/.test(user.password);
+            const isPasswordValid = hasBcryptPassword
+                ? await compare(credentials.password, user.password)
+                : credentials.password === user.password;
+            if (!isPasswordValid) return null;
+
+            // Transparently secure legacy accounts that still contain a plain-text password.
+            // The original password works once and is never stored in plain text again.
+            const upgradedPassword = hasBcryptPassword
+                ? undefined
+                : await hash(credentials.password, 12);
+
+            const deviceInfo = req?.headers?.["user-agent"] || "Unknown Device";
+            const updatedUser = await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    ...(upgradedPassword ? { password: upgradedPassword } : {}),
+                    lastActiveAt: new Date(),
+                    lastLoginAt: new Date(),
+                    loginDevice: deviceInfo,
+                },
+            });
+
+            return {
+                id: updatedUser.id,
+                email: updatedUser.email ?? undefined,
+                name: updatedUser.firstName ?? undefined,
+                image: updatedUser.image ?? undefined,
+                role: updatedUser.role,
+                microsoftId: updatedUser.microsoftId ?? undefined,
+                accountStatus: updatedUser.accountStatus,
+            };
+        },
+    })
+);
 
 export const authOptions: NextAuthOptions = {
-    providers: [
-        GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID || "mock_client_id",
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET || "mock_client_secret",
-        }),
-        AzureADProvider({
-            clientId: process.env.AZURE_AD_CLIENT_ID!,
-            clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-            tenantId: process.env.AZURE_AD_TENANT_ID,
-            authorization: {
-                params: {
-                    scope: "openid profile email offline_access User.Read Team.ReadBasic.All Group.Read.All Calendars.ReadWrite OnlineMeetings.ReadWrite Notes.Read Notes.Read.All Notes.ReadWrite Notes.ReadWrite.All TeamMember.ReadWrite.All TeamSettings.ReadWrite.All"
-                }
-            }
-        }),
-        CredentialsProvider({
-            name: "Mobile / Password",
-            credentials: {
-                mobile: { label: "Mobile Number", type: "text", placeholder: "10-digit number" },
-                password: { label: "Password (leave blank if using OTP)", type: "password" },
-                otp: { label: "OTP", type: "text", placeholder: "1234" }
-            },
-            async authorize(credentials, req) {
-                if (!credentials?.mobile) return null;
-
-                const user = await prisma.user.findUnique({ where: { mobileNumber: credentials.mobile } });
-
-                if (user?.accountStatus === 'BLOCKED') {
-                    throw new Error("Your account has been blocked by the administrator.");
-                }
-
-                const isOtpValid = credentials.otp === "1234";
-                const isPasswordValid = !!user?.password && credentials.password === user.password;
-
-                if (isOtpValid || isPasswordValid) {
-                    const deviceInfo = req?.headers?.['user-agent'] || "Unknown Device";
-
-                    if (!user) {
-                        const newUser = await prisma.user.create({
-                            data: {
-                                mobileNumber: credentials.mobile,
-                                role: "STUDENT" as Role,
-                                accountStatus: "APPROVED" as AccountStatus,
-                                lastActiveAt: new Date(),
-                                lastLoginAt: new Date(),
-                                loginDevice: deviceInfo
-                            }
-                        });
-                        return {
-                            id: newUser.id,
-                            email: newUser.email ?? undefined,
-                            name: newUser.firstName ?? undefined,
-                            image: newUser.image ?? undefined,
-                            role: newUser.role,
-                            microsoftId: newUser.microsoftId ?? undefined,
-                            accountStatus: newUser.accountStatus,
-                        };
-                    } else {
-                        const updatedUser = await prisma.user.update({
-                            where: { id: user.id },
-                            data: {
-                                lastActiveAt: new Date(),
-                                lastLoginAt: new Date(),
-                                loginDevice: deviceInfo
-                            }
-                        });
-                        return {
-                            id: updatedUser.id,
-                            email: updatedUser.email ?? undefined,
-                            name: updatedUser.firstName ?? undefined,
-                            image: updatedUser.image ?? undefined,
-                            role: updatedUser.role,
-                            microsoftId: updatedUser.microsoftId ?? undefined,
-                            accountStatus: updatedUser.accountStatus,
-                        };
-                    }
-                }
-                return null;
-            }
-        })
-    ],
+    providers,
     callbacks: {
         async signIn({ user, account, profile }) {
             try {
@@ -99,17 +106,18 @@ export const authOptions: NextAuthOptions = {
 
                 if (!email) return false;
 
-                const superAdmin = process.env.SUPER_ADMIN_EMAIL?.toLowerCase() || "maverick@sindhusmathswizclasses.com";
-                const teacherAdmin = process.env.MASTER_ADMIN_EMAIL?.toLowerCase() || "sindhu@sindhusmathswizclasses.com";
+                const superAdmin = process.env.SUPER_ADMIN_EMAIL?.toLowerCase();
+                const teacherAdmin = process.env.MASTER_ADMIN_EMAIL?.toLowerCase();
 
                 const isSuperAdmin = email === superAdmin;
                 const isTeacherAdmin = email === teacherAdmin;
 
-                let assignedRole: Role = "STUDENT";
+                let assignedRole: UserRole = "STUDENT";
                 if (isSuperAdmin) assignedRole = "ADMIN";
                 else if (isTeacherAdmin) assignedRole = "TEACHER";
 
                 const dbUser = await prisma.user.findUnique({ where: { email: email } });
+                if (dbUser && dbUser.accountStatus !== "APPROVED") return false;
                 
                 await prisma.user.upsert({
                     where: { email: email },
@@ -117,7 +125,7 @@ export const authOptions: NextAuthOptions = {
                         microsoftId: account?.providerAccountId || "",
                         lastLoginAt: new Date(),
                         loginDevice: "SSO",
-                        role: assignedRole
+                        ...(isSuperAdmin || isTeacherAdmin ? { role: assignedRole } : {})
                     },
                     create: {
                         email: email,
@@ -125,7 +133,7 @@ export const authOptions: NextAuthOptions = {
                         lastName: user?.name?.split(' ').slice(1).join(' ') || (profile as Record<string, unknown>)?.name?.toString().split(' ').slice(1).join(' ') || "User",
                         microsoftId: account?.providerAccountId || "",
                         role: assignedRole,
-                        accountStatus: "APPROVED" as AccountStatus,
+                        accountStatus: "APPROVED",
                         lastActiveAt: new Date(),
                         lastLoginAt: new Date(),
                         loginDevice: "SSO"
@@ -155,7 +163,7 @@ export const authOptions: NextAuthOptions = {
                 return true;
             } catch (error) {
                 console.error("[AUTH] SignIn Error:", error);
-                return true;
+                return false;
             }
         },
         async jwt({ token, user, account }) {
@@ -164,29 +172,29 @@ export const authOptions: NextAuthOptions = {
             if (user) {
                 token.id = user.id;
                 token.role = user.role;
+                token.accountStatus = user.accountStatus;
             }
 
             const email = token.email?.toLowerCase();
-            const isSuperAdmin = email === "maverick@sindhusmathswizclasses.com" ||
-                email === (process.env.SUPER_ADMIN_EMAIL || "").toLowerCase();
-            const isTeacherAdmin = email === "sindhu@sindhusmathswizclasses.com" ||
-                email === (process.env.MASTER_ADMIN_EMAIL || "").toLowerCase();
+            const isSuperAdmin = !!email && email === process.env.SUPER_ADMIN_EMAIL?.toLowerCase();
+            const isTeacherAdmin = !!email && email === process.env.MASTER_ADMIN_EMAIL?.toLowerCase();
 
-            if (isSuperAdmin) {
-                token.role = "ADMIN";
-            } else if (isTeacherAdmin) {
-                token.role = "TEACHER";
-            } else if (token.email) {
-                const dbUser = await prisma.user.findUnique({ where: { email: token.email } });
-                if (dbUser) {
-                    token.role = dbUser.role || "STUDENT";
-                    token.id = dbUser.id;
-                }
-            } else if (token.id && !token.role) {
-                const dbUser = await prisma.user.findUnique({ where: { id: token.id as string } });
-                if (dbUser) {
-                    token.role = dbUser.role || "STUDENT";
-                }
+            const dbUser = token.email
+                ? await prisma.user.findUnique({ where: { email: token.email } })
+                : token.id
+                    ? await prisma.user.findUnique({ where: { id: token.id } })
+                    : null;
+
+            if (dbUser) {
+                token.id = dbUser.id;
+                token.accountStatus = dbUser.accountStatus;
+                token.role = dbUser.accountStatus !== "APPROVED"
+                    ? undefined
+                    : isSuperAdmin
+                        ? "ADMIN"
+                        : isTeacherAdmin
+                            ? "TEACHER"
+                            : dbUser.role;
             }
 
             return token;
@@ -194,13 +202,14 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             if (session.user) {
                 session.user.role = token.role;
-                session.user.id = token.id;
+                session.user.id = token.id || "";
+                session.user.accountStatus = token.accountStatus;
             }
             session.accessToken = token.accessToken;
             return session;
         }
     },
-    secret: process.env.NEXT_AUTH_SECRET || process.env.NEXTAUTH_SECRET || "fallback_development_secret_12345",
+    secret: authSecret,
     session: { strategy: "jwt" },
     pages: {
         signIn: '/login',

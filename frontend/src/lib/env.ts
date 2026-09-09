@@ -12,6 +12,8 @@ const envSchema = z.object({
   MASTER_ADMIN_EMAIL: z.string().email().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),

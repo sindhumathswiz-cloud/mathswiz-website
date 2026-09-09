@@ -1,23 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { hash } from "bcryptjs";
+import { z } from "zod";
 
 export const dynamic = 'force-dynamic';
 
+const registrationSchema = z.object({
+    firstName: z.string().trim().min(1).max(80),
+    lastName: z.string().trim().min(1).max(80),
+    mobile: z.string().trim().regex(/^\+?[0-9]{10,15}$/),
+    password: z.string().min(8).max(128),
+    role: z.enum(["STUDENT", "TEACHER", "PARENT"]),
+    studentClass: z.string().trim().max(50).optional(),
+    childName: z.string().trim().max(160).optional(),
+    childMobile: z.string().trim().regex(/^\+?[0-9]{10,15}$/).optional(),
+    subjectExpertise: z.string().trim().max(200).optional(),
+});
+
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
-        const { firstName, lastName, mobile, password, role, studentClass, childName, childMobile, subjectExpertise } = body;
-
-        // 1. Validate mandatory fields
-        if (!firstName || !lastName || !mobile || !password || !role) {
-            return NextResponse.json({ message: "Missing essential required fields." }, { status: 400 });
+        const parsed = registrationSchema.safeParse(await req.json());
+        if (!parsed.success) {
+            return NextResponse.json({ message: "Please provide valid registration details." }, { status: 400 });
         }
-
-        // 2. Prevent Admin registration
-        if (role === "ADMIN") {
-            return NextResponse.json({ message: "Admin role cannot be self-registered." }, { status: 403 });
-        }
+        const { firstName, lastName, mobile, password, role, studentClass, childName, childMobile, subjectExpertise } = parsed.data;
 
         // 3. Verify uniqueness 
         const existingUser = await prisma.user.findUnique({
@@ -54,12 +60,9 @@ export async function POST(req: NextRequest) {
             user: { id: user.id, mobile: user.mobileNumber, role: user.role }
         }, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("Registration Error:", error);
-        return NextResponse.json(
-            { message: "Server Error during registration.", error: error?.message || "Unknown error" },
-            { status: 500 }
-        );
+        return NextResponse.json({ message: "Server Error during registration." }, { status: 500 });
     }
 }
 
