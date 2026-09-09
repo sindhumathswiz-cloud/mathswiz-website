@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const status = searchParams.get('status') || 'DRAFT';
         const folderId = searchParams.get('folderId');
+        const bookId = searchParams.get('bookId');
         const taxonomyIdsRaw = searchParams.get('taxonomyIds');
         const taxonomyIds: string[] = taxonomyIdsRaw ? JSON.parse(taxonomyIdsRaw) : [];
 
@@ -28,6 +29,15 @@ export async function GET(req: NextRequest) {
 
         if (folderId) {
             where.knowledgeFolderId = folderId;
+        }
+
+        // Book-scoped queries (book ingestion review/cleanup tooling) need to
+        // see every one of that book's questions regardless of the take:200
+        // safety cap below — without this, a book's older questions can fall
+        // off the page once enough newer questions (from any source) exist
+        // system-wide.
+        if (bookId) {
+            where.bookId = bookId;
         }
 
         if (taxonomyIds.length > 0) {
@@ -50,7 +60,7 @@ export async function GET(req: NextRequest) {
         const questions = await prisma.question.findMany({
             where,
             orderBy: { createdAt: 'desc' },
-            take: 200, // Safety cap
+            take: bookId ? 1000 : 200, // Safety cap; a book-scoped query needs headroom above the general-purpose feed's cap
             include: {
                 createdBy: { select: { firstName: true, lastName: true, role: true } },
                 solution: { select: { content: true, confidence: true, isVerified: true } },

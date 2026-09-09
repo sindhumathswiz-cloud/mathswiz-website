@@ -34,6 +34,17 @@ const VALID_TYPES = new Set<CanonicalType>([
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 const VALID_DIFFICULTY = new Set<Difficulty>(['EASY', 'MEDIUM', 'HARD']);
 
+/**
+ * What kind of solution guidance `explanation` actually holds:
+ *  - FULL: a genuine worked solution / detailed answer.
+ *  - HINT: the source gave only a hint (no full working) -- `explanation`
+ *    holds that hint text instead, so it isn't lost, but downstream code
+ *    must not present it as a complete solution.
+ *  - NONE: no solution or hint text at all; `explanation` is "".
+ */
+export type ExplanationType = 'FULL' | 'HINT' | 'NONE';
+const VALID_EXPLANATION_TYPE = new Set<ExplanationType>(['FULL', 'HINT', 'NONE']);
+
 export interface CanonicalQuestion {
   questionContent: string;
   type: CanonicalType;
@@ -41,7 +52,29 @@ export interface CanonicalQuestion {
   options: string[];
   correctAnswer: string;
   explanation: string;
+  /**
+   * Classifies what `explanation` actually contains -- see ExplanationType.
+   * Lets downstream code (tagging DRAFT questions as "Questions without
+   * Solutions", "Hint Available") distinguish a real worked solution from a
+   * mere hint or nothing at all, instead of only checking for a non-empty
+   * string.
+   */
+  explanationType: ExplanationType;
   tags: string[];
+  /** Chapter/topic this question belongs to, e.g. "Integrals" — raw LLM guess, not yet snapped to a canonical name. */
+  topic: string;
+  /** Named solution technique, if the question calls for one, e.g. "Integration by substitution". */
+  method: string;
+  /**
+   * The book's own printed serial number for this question (e.g. "19",
+   * "Q.3", "2(a)") — the SAME number stripped from the front of
+   * questionContent by stripLeadingQuestionNumber. Captured separately
+   * (rather than only discarded) so a later pass can match a
+   * question to an answer-key page that lists answers by number, printed
+   * pages away from the question itself. "" when the source has no visible
+   * numbering (e.g. an individual case-study sub-part).
+   */
+  printedNumber: string;
 }
 
 /** Normalize a difficulty value to the enum, defaulting to MEDIUM. */
@@ -73,6 +106,15 @@ const ANSWER_KEYS = ['correctAnswer', 'correctOption', 'correct', 'answer', 'ans
 const EXPLANATION_KEYS = ['explanation', 'solution', 'sol', 'working', 'steps', 'reasoning'];
 const OPTION_KEYS = ['options', 'choices', 'opts'];
 const TAG_KEYS = ['tags', 'topics', 'labels'];
+const TOPIC_KEYS = ['topic', 'chapter', 'topicName', 'chapterName'];
+const METHOD_KEYS = ['method', 'solutionMethod', 'approach', 'technique'];
+const PRINTED_NUMBER_KEYS = ['printedNumber', 'number', 'serialNumber', 'qNumber', 'questionNumber'];
+const EXPLANATION_TYPE_KEYS = ['explanationType', 'solutionType', 'answerType'];
+
+// Matches explanation text that IS a hint rather than a full worked solution,
+// when the model captured the text but didn't (or couldn't) set
+// explanationType itself -- e.g. "Hint: use the sandwich theorem.".
+const HINT_TEXT_RE = /^\s*hints?\b\s*[:.\-]?/i;
 
 function firstString(obj: Record<string, unknown>, keys: string[]): string {
   for (const k of keys) {
@@ -86,6 +128,23 @@ function firstString(obj: Record<string, unknown>, keys: string[]): string {
 /** Strip a leading option label like "(a)", "A.", "b)" so it isn't duplicated next to the UI's own A/B/C/D badge. */
 function stripOptionLabel(text: string): string {
   return text.replace(/^\s*\(?([A-Da-d])\)?[.):]\s+/, '').trim();
+}
+
+/**
+ * Strip the book's own printed exercise/question serial number — "1. ",
+ * "19. ", "Q1.", "Question 1 " — from the very start of a question's content.
+ * Defense-in-depth alongside the prompt instruction above: catches it even
+ * when the model doesn't comply, and covers every entry point into this
+ * normalizer (both extraction routes share it).
+ *
+ * Anchored to the start only, so a case-study passage's own "(i)"/"(ii)"
+ * sub-part labels further into the text are never touched — only the single
+ * outer serial number the printed book put in front of the whole item.
+ * Requires whitespace after the number/punctuation, so a genuine decimal
+ * like "2.5" (no space before the next character) never matches.
+ */
+function stripLeadingQuestionNumber(text: string): string {
+  return text.replace(/^\s*(?:Q(?:uestion)?[\s.]*)?\(?\d{1,3}\)?[.)]\s+/i, '').trim();
 }
 
 function normalizeOptions(obj: Record<string, unknown>): string[] {
@@ -143,11 +202,43 @@ function normalizeAnswer(rawAnswer: string, options: string[]): string {
   return a;
 }
 
+/**
+ * Determine the ExplanationType for a question, given the model's own
+ * (optional, unreliable) explanationType field and the already-normalized
+ * explanation text.
+ *
+ * Conservative by construction: explanation text is the source of truth, not
+ * the model's classification, so a model that mislabels a real solution as a
+ * "HINT" (or vice versa) can't cause the wrong text to be discarded --
+ * normalizeExtractedQuestion always keeps whatever text firstString(...)
+ * found in `explanation` regardless of this classification.
+ *  - No explanation text at all -> NONE, no matter what the model claimed.
+ *  - Explanation text present and starts with "Hint"/"Hints" -> HINT, even if
+ *    the model didn't say so (or said FULL) -- the text itself is the
+ *    stronger signal.
+ *  - Explanation text present and the model gave a valid, non-NONE type ->
+ *    trust it (lets the model call out a HINT that doesn't start with the
+ *    word "Hint").
+ *  - Otherwise, explanation text present with no usable signal -> FULL (the
+ *    pre-existing behavior: any captured explanation text was treated as a
+ *    real solution).
+ */
+export function normalizeExplanationType(obj: Record<string, unknown>, explanation: string): ExplanationType {
+  if (!explanation.trim()) return 'NONE';
+  if (HINT_TEXT_RE.test(explanation)) return 'HINT';
+
+  const raw = String(obj.explanationType ?? firstString(obj, EXPLANATION_TYPE_KEYS)).toUpperCase();
+  if (VALID_EXPLANATION_TYPE.has(raw as ExplanationType) && raw !== 'NONE') return raw as ExplanationType;
+
+  return 'FULL';
+}
+
 /** Normalize one raw object into the canonical schema. */
 export function normalizeExtractedQuestion(raw: unknown): CanonicalQuestion {
   const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const options = normalizeOptions(obj);
-  const questionContent = firstString(obj, QUESTION_KEYS);
+  const questionContent = stripLeadingQuestionNumber(firstString(obj, QUESTION_KEYS));
+  const explanation = firstString(obj, EXPLANATION_KEYS);
 
   // Prefer a valid explicit type from the model; otherwise derive it.
   const rawType = String(obj.type ?? '').toUpperCase() as CanonicalType;
@@ -159,8 +250,12 @@ export function normalizeExtractedQuestion(raw: unknown): CanonicalQuestion {
     difficulty: normalizeDifficulty(obj.difficulty),
     options,
     correctAnswer: normalizeAnswer(firstString(obj, ANSWER_KEYS), options),
-    explanation: firstString(obj, EXPLANATION_KEYS),
+    explanation,
+    explanationType: normalizeExplanationType(obj, explanation),
     tags: normalizeTags(obj),
+    topic: firstString(obj, TOPIC_KEYS),
+    method: firstString(obj, METHOD_KEYS),
+    printedNumber: firstString(obj, PRINTED_NUMBER_KEYS),
   };
 }
 

@@ -103,6 +103,77 @@ describe('normalizeExtractedQuestion', () => {
     const q = normalizeExtractedQuestion({ question: 'Value of $x$?', answer: '$x=5$' });
     expect(q.correctAnswer).toBe('$x=5$');
   });
+
+  it('strips a leading printed exercise/question number but keeps case-study sub-part labels', () => {
+    // Plain "N. " serial number, as the book prints it in front of every item.
+    expect(normalizeExtractedQuestion({ question: '19. Show that the function is one-one.' }).questionContent)
+      .toBe('Show that the function is one-one.');
+    // "Q1."/"Question 1" style numbering.
+    expect(normalizeExtractedQuestion({ question: 'Q1. Find $x$.' }).questionContent).toBe('Find $x$.');
+    expect(normalizeExtractedQuestion({ question: 'Question 1. Find $x$.' }).questionContent).toBe('Find $x$.');
+    // A case-study passage's own leading number is stripped too, but its
+    // "(i)"/"(ii)" sub-part labels further into the text must survive intact.
+    const caseStudy = normalizeExtractedQuestion({
+      question: '1. Read the following and answer any four questions from (i) to (v).\n\nSome passage.\n\n(i) First question?\n(ii) Second question?',
+    });
+    expect(caseStudy.questionContent.startsWith('Read the following')).toBe(true);
+    expect(caseStudy.questionContent).toContain('(i) First question?');
+    expect(caseStudy.questionContent).toContain('(ii) Second question?');
+    // A genuine decimal at the very start (no space after the period) must
+    // never be mistaken for a serial number.
+    expect(normalizeExtractedQuestion({ question: '2.5 kg of sand is poured into a cone.' }).questionContent)
+      .toBe('2.5 kg of sand is poured into a cone.');
+  });
+
+  it('maps topic and method aliases, defaulting to empty strings', () => {
+    const withTopic = normalizeExtractedQuestion({ question: 'Q', chapter: 'Integrals', solutionMethod: 'Integration by substitution' });
+    expect(withTopic.topic).toBe('Integrals');
+    expect(withTopic.method).toBe('Integration by substitution');
+
+    const withoutTopic = normalizeExtractedQuestion({ question: 'Q' });
+    expect(withoutTopic.topic).toBe('');
+    expect(withoutTopic.method).toBe('');
+  });
+
+  it('classifies explanationType as NONE when there is no explanation text at all', () => {
+    const q = normalizeExtractedQuestion({ question: 'Q' });
+    expect(q.explanation).toBe('');
+    expect(q.explanationType).toBe('NONE');
+  });
+
+  it('classifies explanationType as NONE even if the model claims FULL/HINT with no text', () => {
+    expect(normalizeExtractedQuestion({ question: 'Q', explanationType: 'FULL' }).explanationType).toBe('NONE');
+    expect(normalizeExtractedQuestion({ question: 'Q', explanationType: 'HINT' }).explanationType).toBe('NONE');
+  });
+
+  it('defaults to FULL when explanation text is present and nothing marks it as a hint', () => {
+    const q = normalizeExtractedQuestion({ question: 'Q', explanation: 'Differentiate both sides to get $x=2$.' });
+    expect(q.explanationType).toBe('FULL');
+    expect(q.explanation).toBe('Differentiate both sides to get $x=2$.');
+  });
+
+  it('detects a HINT from the explanation text itself, even without an explicit explanationType', () => {
+    const q = normalizeExtractedQuestion({ question: 'Q', explanation: 'Hint: use the sandwich theorem.' });
+    expect(q.explanationType).toBe('HINT');
+    expect(q.explanation).toBe('Hint: use the sandwich theorem.');
+
+    const q2 = normalizeExtractedQuestion({ question: 'Q', solution: 'Hints: try substitution.' });
+    expect(q2.explanationType).toBe('HINT');
+  });
+
+  it('trusts an explicit model explanationType of HINT even when the text does not start with "Hint"', () => {
+    const q = normalizeExtractedQuestion({
+      question: 'Q',
+      explanation: 'Consider using the quotient rule here.',
+      explanationType: 'hint',
+    });
+    expect(q.explanationType).toBe('HINT');
+  });
+
+  it('ignores an invalid model explanationType and falls back to FULL when text is present', () => {
+    const q = normalizeExtractedQuestion({ question: 'Q', explanation: 'A full worked solution.', explanationType: 'nonsense' });
+    expect(q.explanationType).toBe('FULL');
+  });
 });
 
 describe('normalizeExtractedQuestions', () => {

@@ -14,6 +14,9 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+  SUPABASE_PROJECT_REF: z.string().optional(),
+  SUPABASE_ACCESS_TOKEN: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
@@ -27,6 +30,19 @@ const envSchema = z.object({
   TOGETHER_API_KEY_1: z.string().optional(),
   MATHPIX_APP_ID: z.string().optional(),
   MATHPIX_APP_KEY: z.string().optional(),
+  MISTRAL_API_KEY: z.string().optional(),
+  QB_MISTRAL_OCR_MODEL: z.string().optional(),
+  // Text-completion model used by structure-questions.ts's Mistral fallback
+  // (last resort after Gemini and Groq) -- distinct from QB_MISTRAL_OCR_MODEL
+  // above, which is the image-to-markdown OCR model used only by the
+  // benchmark harness.
+  QB_MISTRAL_TEXT_MODEL: z.string().optional(),
+  QB_PRIVATE_STORAGE_ROOT: z.string().optional(),
+  // Book-ingestion PDF storage backend. Defaults to local disk (used
+  // unchanged in development). Set to SUPABASE before deploying anywhere
+  // with a non-persistent filesystem (e.g. Vercel) — see lib/book-storage.ts.
+  QB_STORAGE_BACKEND: z.enum(['LOCAL_DISK', 'SUPABASE']).optional(),
+  QB_STORAGE_BUCKET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

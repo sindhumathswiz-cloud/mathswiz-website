@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
@@ -239,6 +239,12 @@ export default function AdminQuestionBank() {
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold transition flex items-center gap-2 shadow-sm"
                     >
                         <SplitSquareHorizontal className="w-5 h-5" /> Bulk Extraction Studio
+                    </Link>
+                    <Link
+                        href="/admin/question-bank/books"
+                        className="bg-white hover:bg-gray-50 text-indigo-700 border border-indigo-200 px-5 py-3 rounded-xl font-bold transition flex items-center gap-2 shadow-sm"
+                    >
+                        <Database className="w-5 h-5" /> Book Library
                     </Link>
                 </div>
 
