@@ -10,6 +10,7 @@ import { cropPageRegion } from '@/lib/page-image-crop';
 import type { DiagramRegion } from '@/lib/diagram-regions';
 import { worstSeverity } from '@/lib/question-qa';
 import { snapToChapter } from '@/lib/chapter-classifier';
+import { loadConfirmedChapters, chapterForPage, sectionForPage } from '@/lib/book-manifest';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -286,10 +287,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await prisma.bookIngestionRun.update({ where: { id: run.id }, data: { status: 'IN_PROGRESS', stage: 'QUESTION_EXTRACTION', errorMessage: null } });
 
+  // Confirmed chapter manifest (if any). When a page falls inside a confirmed
+  // chapter, its questions are filed under that chapter directly (not the LLM's
+  // per-question topic guess); when it falls inside a confirmed *section* the
+  // provider fallback chain is told to distrust an empty result (p.479 fix).
+  const confirmedChapters = await loadConfirmedChapters(id);
+
   let savedCount = 0;
   let duplicateCount = 0;
   let reviewCount = 0;
   let detectedCount = 0;
+  let manifestFiledCount = 0;
+  let distrustEmptyPages = 0;
   const failures: string[] = [];
   // Cross-run + intra-batch dedupe: skip content that already exists as an
   // APPROVED question anywhere, or that this book already has on file under
@@ -332,7 +341,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         ? (pageRaw.diagramRegions ?? []).map((region) => ({ ocrImagePath: pageRaw.ocrImagePath as string, region }))
         : [];
 
-      const structured = await structurePageQuestions(textForStructuring);
+      // If this page sits inside a confirmed manifest section (a known
+      // questions region), tell the provider chain not to trust a
+      // parseable-but-empty result -- that's the p.479 failure mode.
+      const distrustEmpty = Boolean(sectionForPage(confirmedChapters, page.pageNumber));
+      if (distrustEmpty) distrustEmptyPages++;
+
+      const structured = await structurePageQuestions(textForStructuring, { distrustEmpty });
       const stillFragment = chainLength < MAX_FRAGMENT_CHAIN_PAGES
         && (isLikelyCaseStudyFragment(textForStructuring, structured.map((s) => s.question))
           || isLikelyIncompletePage(textForStructuring, structured));
@@ -396,13 +411,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           0,
           100 - qaIssues.filter((i) => i.severity === 'error').length * 30 - qaIssues.filter((i) => i.severity === 'warn').length * 10,
         );
-        // Snap the LLM's raw topic guess to a canonical CBSE chapter name when
-        // confident; otherwise keep its raw text rather than mis-filing it
-        // under an unrelated chapter. Either way, link (or create) the
-        // matching BookChapter row so this isn't just a free-text label.
-        const rawTopic = question.topic.trim();
-        const topic = rawTopic ? (snapToChapter(rawTopic, book.className) || rawTopic) : null;
-        const bookChapterId = topic ? await findOrCreateBookChapter(id, topic, chapterCache) : null;
+        // A confirmed manifest chapter covering this question's source page is
+        // ground truth -- file the question under it directly and skip the
+        // LLM topic guess entirely. Otherwise: snap the LLM's raw topic guess
+        // to a canonical CBSE chapter name when confident; else keep its raw
+        // text rather than mis-filing it. Either way, link (or create) the
+        // BookChapter row so this isn't just a free-text label.
+        const manifestChapter = chapterForPage(confirmedChapters, sourcePageStart);
+        let topic: string | null;
+        let bookChapterId: string | null;
+        if (manifestChapter) {
+          topic = manifestChapter.topic || manifestChapter.name;
+          bookChapterId = manifestChapter.id;
+          manifestFiledCount++;
+        } else {
+          const rawTopic = question.topic.trim();
+          topic = rawTopic ? (snapToChapter(rawTopic, book.className) || rawTopic) : null;
+          bookChapterId = topic ? await findOrCreateBookChapter(id, topic, chapterCache) : null;
+        }
         // Merge the model's own tags with the ones derived from
         // explanationType, deduped -- a question the model already tagged
         // "Hint Available" itself (unlikely, but possible) shouldn't end up
@@ -528,13 +554,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     action: 'BOOK_PAGE_BATCH_QUESTIONS_EXTRACTED',
     entityType: 'BookIngestionRun',
     entityId: run.id,
-    metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, failures },
+    metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, manifestFiledCount, distrustEmptyPages, failures },
     ...requestAuditContext(request),
   });
 
   const lastPage = pages[pages.length - 1]?.pageNumber ?? requestedStart;
   return NextResponse.json({
-    batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, failures },
+    batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, manifestFiled: manifestFiledCount, distrustEmptyPages, failures },
     extractedQuestions: updatedRun.extractedQuestions,
     reviewRequired: updatedRun.reviewRequired,
     stage: updatedRun.stage,

@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
+import {
+  findAnswerKeyPairs,
+  isLikelyAnswerKeyPage,
+  answerKeySectionForPage,
+  chapterForPage,
+  loadConfirmedChapters,
+} from '@/lib/book-manifest';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -85,23 +92,16 @@ export const maxDuration = 240;
  * discard it -- see that route's doc comment.
  */
 
-// A printed number immediately followed by a bare option letter, optionally
-// parenthesized/punctuated -- "1. (b)", "12) c", "3.d" -- and NOT followed
-// by more letters (which would mean it's the start of ordinary question
-// text, not an isolated answer-key entry).
-const ANSWER_PAIR_RE = /(?:^|[\s,;])(\d{1,3})\s*[.):]\s*\(?([A-Da-d])\)?(?=[\s,.;]|$)/g;
-const ANSWER_HEADING_RE = /\banswers?\b|\banswer\s*key\b/i;
-
-// A page needs an explicit "Answers"/"Answer Key" heading plus a handful of
-// entries, OR a large enough density of entries on its own (no heading
-// captured by OCR, but clearly a compact key rather than a page of prose).
-const MIN_PAIRS_WITH_HEADING = 3;
-const MIN_PAIRS_WITHOUT_HEADING = 8;
+// The answer-key page signal (ANSWER_PAIR_RE, findAnswerKeyPairs,
+// isLikelyAnswerKeyPage) lives in lib/book-manifest.ts so the manifest
+// detector and this route agree on what an answer-key page looks like.
 
 // How far back (in printed pages) to look for a DRAFT question with a
 // matching printed number. Covers "key printed at the end of the exercise"
 // and "key printed at the end of the chapter" without reaching so far back
 // that a number collision from an unrelated earlier exercise gets matched.
+// Only used for the heuristic fallback; a confirmed manifest replaces this
+// with a direct section-range lookup.
 const ANSWER_KEY_LOOKBACK_PAGES = 40;
 
 // The "double check" for a whole answer-key page: at least this fraction of
@@ -117,36 +117,6 @@ const MIN_PAGE_COVERAGE = 0.5;
 // large book doesn't blow up the JSON payload -- the summary counts are
 // always complete regardless.
 const MAX_DETAILS = 200;
-
-interface AnswerPair {
-  number: string;
-  letter: string;
-}
-
-function findAnswerKeyPairs(rawText: string): AnswerPair[] {
-  const pairs: AnswerPair[] = [];
-  const seen = new Set<string>();
-  const re = new RegExp(ANSWER_PAIR_RE);
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(rawText))) {
-    const number = match[1];
-    // Keep only the first occurrence of a given number on this page -- if
-    // the same page bundles more than one exercise's key back to back and
-    // both restart at "1", picking a side deterministically (rather than
-    // overwriting) is safer than silently taking whichever regex pass
-    // happens to run last.
-    if (seen.has(number)) continue;
-    seen.add(number);
-    pairs.push({ number, letter: match[2].toUpperCase() });
-  }
-  return pairs;
-}
-
-function isLikelyAnswerKeyPage(rawText: string, pairs: AnswerPair[]): boolean {
-  if (pairs.length === 0) return false;
-  if (ANSWER_HEADING_RE.test(rawText) && pairs.length >= MIN_PAIRS_WITH_HEADING) return true;
-  return pairs.length >= MIN_PAIRS_WITHOUT_HEADING;
-}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string; runId: string }> }) {
   const auth = await getAuthenticatedUser(['ADMIN']);
@@ -167,6 +137,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     select: { pageNumber: true, rawText: true },
   });
 
+  // Prefer a confirmed chapter manifest: an answer-key page inside a section's
+  // confirmed answerKeyStart..End range matches ONLY that section's questions
+  // (by printedNumber), a direct range lookup instead of the 40-page lookback
+  // + coverage heuristic. Falls back to the heuristic for any page not covered
+  // by a confirmed chapter.
+  const confirmedChapters = await loadConfirmedChapters(id);
+
   let answerKeyPagesFound = 0;
   let pairsFound = 0;
   let matched = 0;
@@ -174,6 +151,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let ambiguous = 0;
   let noCandidate = 0;
   let lowCoveragePagesSkipped = 0;
+  let manifestScopedPages = 0;
+  let manifestSkippedPages = 0;
   const details: Array<{ page: number; printedNumber: string; letter: string; questionId?: string; outcome: string }> = [];
 
   interface CandidateLookup {
@@ -190,6 +169,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     answerKeyPagesFound++;
     pairsFound += pairs.length;
 
+    // Manifest path: this answer-key page sits inside a confirmed section's
+    // answer-key range → scope candidates to that section's question pages and
+    // skip the coverage heuristic (the range is human-confirmed).
+    const manifestSection = answerKeySectionForPage(confirmedChapters, page.pageNumber);
+    // Manifest present but this key page isn't in any confirmed answer-key
+    // range, though it IS inside a confirmed chapter → the admin didn't expect
+    // a key here; don't guess with the old lookback.
+    const insideConfirmedChapter = !manifestSection && chapterForPage(confirmedChapters, page.pageNumber);
+    if (insideConfirmedChapter) {
+      manifestSkippedPages++;
+      if (details.length < MAX_DETAILS) {
+        details.push({ page: page.pageNumber, printedNumber: '', letter: '', outcome: 'not_in_confirmed_answer_key_range' });
+      }
+      continue;
+    }
+
+    const sectionRange = manifestSection?.section.startPage != null && manifestSection.section.endPage != null
+      ? { gte: manifestSection.section.startPage, lte: manifestSection.section.endPage }
+      : null;
+    if (sectionRange) manifestScopedPages++;
+
     // First pass: look up candidates for every pair on this page WITHOUT
     // writing or counting anything yet, so coverage can be judged before any
     // individual match on this page is trusted (see MIN_PAGE_COVERAGE doc
@@ -202,7 +202,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           status: 'DRAFT',
           printedNumber: number,
           OR: [{ correctAnswer: null }, { correctAnswer: '' }],
-          sourcePageStart: { gte: page.pageNumber - ANSWER_KEY_LOOKBACK_PAGES, lt: page.pageNumber },
+          sourcePageStart: sectionRange ?? { gte: page.pageNumber - ANSWER_KEY_LOOKBACK_PAGES, lt: page.pageNumber },
         },
         select: { id: true, options: true, sourcePageStart: true, reviewNotes: true },
       });
@@ -221,7 +221,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const withAnyCandidate = lookups.filter((l) => l.hasAnyCandidate).length;
     const coverage = pairs.length > 0 ? withAnyCandidate / pairs.length : 0;
 
-    if (coverage < MIN_PAGE_COVERAGE) {
+    // The coverage double-check is a heuristic-fallback safeguard. A confirmed
+    // manifest section already vouches for the number range, so skip it there.
+    if (!sectionRange && coverage < MIN_PAGE_COVERAGE) {
       // Not enough of this page's numbers correspond to anything nearby --
       // treat the whole page as unreliable rather than cherry-picking the
       // one or two numbers that happened to line up.
@@ -249,7 +251,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (details.length < MAX_DETAILS) details.push({ page: page.pageNumber, printedNumber: number, letter, questionId: target.id, outcome: apply ? 'updated' : 'would_update' });
 
       if (apply) {
-        const note = `Answer "${letter}" backfilled from an answer-key page (page ${page.pageNumber}) printed away from the question -- NOT independently verified yet; confirm before approving.`;
+        const note = `Answer "${letter}" backfilled from an answer-key page (page ${page.pageNumber})${sectionRange ? ' within the confirmed chapter manifest range' : ' printed away from the question'} -- NOT independently verified yet; confirm before approving.`;
         await prisma.question.update({
           where: { id: target.id },
           data: {
@@ -269,13 +271,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       action: 'BOOK_ANSWER_KEYS_MATCHED',
       entityType: 'BookIngestionRun',
       entityId: run.id,
-      metadata: { bookId: id, answerKeyPagesFound, pairsFound, matched, updated, ambiguous, noCandidate, lowCoveragePagesSkipped },
+      metadata: { bookId: id, answerKeyPagesFound, pairsFound, matched, updated, ambiguous, noCandidate, lowCoveragePagesSkipped, manifestScopedPages, manifestSkippedPages },
       ...requestAuditContext(request),
     });
   }
 
   return NextResponse.json({
     apply,
+    manifestConfirmed: confirmedChapters.length > 0,
     pagesScanned: pages.length,
     answerKeyPagesFound,
     pairsFound,
@@ -284,6 +287,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ambiguous,
     noCandidate,
     lowCoveragePagesSkipped,
+    manifestScopedPages,
+    manifestSkippedPages,
     detailsTruncated: details.length >= MAX_DETAILS,
     details,
   });

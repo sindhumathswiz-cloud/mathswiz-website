@@ -104,6 +104,25 @@ describe('structureQuestions', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('with { distrustEmpty: true }, keeps going past a parseable-but-empty Gemini result (the p.479 case)', async () => {
+    geminiOk(VALID_EMPTY);            // Gemini: confidently empty
+    fetchOk(VALID_ONE_QUESTION);      // Groq: actually finds the question
+    const { structureQuestions } = await import('./structure-questions');
+    const result = await structureQuestions('a page a confirmed manifest says HAS questions', { distrustEmpty: true });
+    expect(result).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // Still a fallback provider -> its answer is stripped.
+    expect(result[0].correctAnswer).toBe('');
+  });
+
+  it('with { distrustEmpty: true }, throws if EVERY provider returns empty', async () => {
+    geminiOk(VALID_EMPTY);
+    fetchOk(VALID_EMPTY);
+    fetchOk(VALID_EMPTY);
+    const { structureQuestions } = await import('./structure-questions');
+    await expect(structureQuestions('page text', { distrustEmpty: true })).rejects.toThrow(/parseable but EMPTY/);
+  });
+
   it('falls back to Groq when Gemini throws (the original, obvious failure mode), but strips its correctAnswer/explanation as unverified', async () => {
     geminiThrows();
     fetchOk(VALID_ONE_QUESTION); // Groq

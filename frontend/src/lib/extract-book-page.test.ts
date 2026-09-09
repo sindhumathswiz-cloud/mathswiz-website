@@ -68,7 +68,7 @@ describe('extractQuestionsFromPage', () => {
     expect(result.provider).toBe('NATIVE_TEXT');
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(readFile).not.toHaveBeenCalled();
-    expect(structureQuestions).toHaveBeenCalledWith(result.rawText);
+    expect(structureQuestions).toHaveBeenCalledWith(result.rawText, {});
     expect(result.questions).toHaveLength(1);
     expect(result.questions[0].contentHash).toBe('hash:Solve for x');
   });

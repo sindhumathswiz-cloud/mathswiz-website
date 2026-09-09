@@ -7,9 +7,16 @@ const bookIngestionRun = { findFirst: vi.fn() };
 const documentPage = { findMany: vi.fn() };
 const question = { findMany: vi.fn(), update: vi.fn() };
 
+const loadConfirmedChapters = vi.fn();
+
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
 vi.mock('@/lib/prisma', () => ({ default: { bookIngestionRun, documentPage, question } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
+// Keep the real page-text signal helpers; stub only the DB-backed loader.
+vi.mock('@/lib/book-manifest', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/book-manifest')>()),
+  loadConfirmedChapters,
+}));
 
 function post(body: unknown) {
   return new Request('http://localhost/api/admin/books/book-1/ingestions/run-1/match-answer-keys', {
@@ -25,6 +32,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-answer-keys', () =
     vi.clearAllMocks();
     getAuthenticatedUser.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     bookIngestionRun.findFirst.mockResolvedValue({ id: 'run-1', sourceDocumentId: 'doc-1' });
+    loadConfirmedChapters.mockResolvedValue([]); // no manifest → heuristic path (default)
   });
 
   it('rejects non-admin callers', async () => {
@@ -255,5 +263,54 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-answer-keys', () =
     expect(data.noCandidate).toBe(0);
     expect(question.update).not.toHaveBeenCalled();
     expect(data.details).toContainEqual(expect.objectContaining({ outcome: 'low_coverage_page_1_of_8' }));
+  });
+
+  describe('with a confirmed chapter manifest', () => {
+    const manifestChapter = {
+      id: 'ch-3dg', name: 'Three Dimensional Geometry', topic: 'Three Dimensional Geometry',
+      startPage: 360, endPage: 372, manifestConfirmedAt: new Date(),
+      exercises: [{
+        id: 'sec-mcq', sectionType: 'MCQ', startPage: 366, endPage: 369,
+        inlineAnswers: false, noAnswers: false,
+        answerKeyStartPage: 370, answerKeyEndPage: 370, solutionsStartPage: null, solutionsEndPage: null,
+      }],
+    };
+
+    it('scopes candidates to the section question range and skips the coverage heuristic', async () => {
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([
+        { pageNumber: 370, rawText: 'Answers\n1. (b) 2. (d) 3. (a) 4. (c)' },
+      ]);
+      const seenRanges: unknown[] = [];
+      question.findMany.mockImplementation(async ({ where }: any) => {
+        seenRanges.push(where.sourcePageStart);
+        if (where.printedNumber === '1') return [{ id: 'q-1', options: ['a', 'b', 'c', 'd'], sourcePageStart: 367, reviewNotes: null }];
+        return []; // 2-4 have no candidate -> coverage would be 1/4 = 0.25, below the bar
+      });
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({}), { params }) as Response).json();
+
+      expect(data.manifestConfirmed).toBe(true);
+      expect(data.manifestScopedPages).toBe(1);
+      expect(data.lowCoveragePagesSkipped).toBe(0); // heuristic skipped under a confirmed range
+      expect(data.matched).toBe(1);
+      // The lookup used the section's page range, not the 40-page lookback.
+      expect(seenRanges[0]).toEqual({ gte: 366, lte: 369 });
+    });
+
+    it('skips an answer-key page inside a confirmed chapter but outside every confirmed key range', async () => {
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([
+        { pageNumber: 365, rawText: 'Answers\n1. (b) 2. (d) 3. (a) 4. (c) 5. (b) 6. (a)' },
+      ]);
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({}), { params }) as Response).json();
+
+      expect(data.manifestSkippedPages).toBe(1);
+      expect(question.findMany).not.toHaveBeenCalled();
+      expect(data.details).toContainEqual(expect.objectContaining({ outcome: 'not_in_confirmed_answer_key_range' }));
+    });
   });
 });
