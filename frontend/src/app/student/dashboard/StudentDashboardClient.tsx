@@ -9,6 +9,7 @@ import { joinBatchAction } from "@/actions/studentActions";
 import { setStudentGoalAction } from "@/actions/goalActions";
 import PerformanceAnalytics from "@/components/PerformanceAnalytics";
 import AchieveJourney from "@/components/AchieveJourney";
+import { TodayDashboard } from "@/components/dashboard/TodayDashboard";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Legend } from 'recharts';
 interface Props {
     initialEnrollments: any[];
@@ -118,9 +119,30 @@ export default function StudentDashboardClient({
         <div className="min-h-screen bg-gray-50 p-4 md:p-8">
             <div className="max-w-7xl mx-auto text-gray-900">
 
+                <TodayDashboard
+                    role="Student"
+                    title={`Welcome back, ${(session?.user as any)?.firstName || 'Student'}`}
+                    description="Your next lesson, assessment, and practice options are gathered here so you can start quickly."
+                    metrics={[
+                        { label: 'Batches', value: enrolledBatches.length, hint: 'active enrollments', icon: BookOpen, tone: 'indigo' },
+                        { label: 'Assigned tests', value: assignedTests.length, hint: 'available assessments', icon: ClipboardList, tone: 'amber' },
+                        { label: 'Completed', value: attempts.length, hint: 'test attempts', icon: CheckCircle, tone: 'emerald' },
+                        { label: 'Fees due', value: `₹${paymentSummary.totalOutstanding.toLocaleString('en-IN')}`, hint: paymentSummary.overdueAmount ? 'includes overdue fees' : 'current outstanding', icon: CreditCard, tone: paymentSummary.overdueAmount ? 'rose' : 'sky' },
+                    ]}
+                    priorities={[
+                        { title: assignedTests.length ? `${assignedTests.length} assigned tests` : 'No tests waiting', detail: assignedTests.length ? 'Choose an assessment and continue your progress.' : 'Use Practice Arena to keep your skills moving.', tone: assignedTests.length ? 'attention' : 'success' },
+                        { title: notices.length ? `${notices.length} class notices` : 'No new notices', detail: notices.length ? 'Read the latest updates from your teachers.' : 'You are caught up with classroom updates.', tone: notices.length ? 'neutral' : 'success' },
+                    ]}
+                    actions={[
+                        { label: 'Start practice', href: '/student/practice', icon: Target },
+                        { label: 'Ask Doubt Buddy', href: '/student/doubt-buddy', icon: Bot },
+                        { label: 'View assigned tests', icon: ClipboardList, onClick: () => setActiveTab('tests') },
+                    ]}
+                />
+
                 {/* Welcome Header */}
-                <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-3xl p-8 mb-8 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                    <div>
+                <div className="today-panel mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="hidden">
                         <h1 className="text-3xl font-bold mb-2">Welcome back, {(session?.user as any)?.firstName || 'Student'}! 👋</h1>
                         <p className="text-indigo-100 mb-6">Ready to conquer mathematics today? Your personalized dashboard is ready.</p>
                         <div className="flex flex-wrap gap-3">
@@ -133,54 +155,63 @@ export default function StudentDashboardClient({
                         </div>
                     </div>
 
-                    <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-sm border border-white/20 w-full md:w-auto">
-                        <h3 className="text-sm font-semibold mb-3 text-indigo-50 tracking-wide uppercase">Enroll in a new Batch</h3>
-                        <form onSubmit={handleJoinBatch} className="flex gap-2">
+                    <div className="w-full">
+                        <p className="today-kicker">Enrollment</p>
+                        <h2 className="today-title">Join another batch</h2>
+                        <p className="mb-4 mt-1 text-sm text-slate-500">Enter the batch code shared by your teacher.</p>
+                        <form onSubmit={handleJoinBatch} className="flex flex-col gap-2 sm:flex-row">
                             <input
                                 type="text"
                                 name="batchCode"
+                                aria-label="Batch code"
                                 placeholder="BATCH CODE"
                                 value={batchCodeInput}
                                 onChange={(e) => setBatchCodeInput(e.target.value.toUpperCase())}
-                                className="px-4 py-2.5 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 w-48 font-mono text-center font-bold tracking-widest"
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-center font-mono font-bold tracking-widest text-slate-900 outline-none transition focus:ring-2 focus:ring-indigo-500 sm:w-48"
                             />
                             <button
                                 type="submit"
-                                className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-50 transition flex items-center gap-2"
+                                className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 font-bold text-white transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                             >
                                 <PlusCircle className="w-5 h-5" /> Join
                             </button>
                         </form>
-                        {joinSuccess && <p className="text-emerald-300 text-sm mt-2 flex items-center gap-1 font-medium"><CheckCircle className="w-4 h-4" /> Successfully requested!</p>}
-                        {joinError && <p className="text-red-300 text-sm mt-2">{joinError}</p>}
+                        {joinSuccess && <p className="mt-2 flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle className="w-4 h-4" /> Successfully requested!</p>}
+                        {joinError && <p className="mt-2 text-sm text-rose-600">{joinError}</p>}
                     </div>
                 </div>
 
                 {/* Navigation Tabs */}
-                <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100 max-w-fit mb-8 overflow-x-auto scrollbar-none">
-                    <button onClick={() => setActiveTab('batches')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition ${activeTab === 'batches' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                <div className="dashboard-tabs mb-8" aria-label="Student dashboard sections">
+                    <button onClick={() => setActiveTab('batches')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'batches' ? 'dashboard-tab-active' : ''}`}>
                         <BookOpen className="w-4 h-4" /> My Batches
                     </button>
-                    <button onClick={() => setActiveTab('live-classes')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition ${activeTab === 'live-classes' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                    <button onClick={() => setActiveTab('live-classes')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'live-classes' ? 'dashboard-tab-active' : ''}`}>
                         <Video className="w-4 h-4" /> Live Classes
                     </button>
-                    <button onClick={() => setActiveTab('tests')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition ${activeTab === 'tests' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                    <button onClick={() => setActiveTab('tests')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'tests' ? 'dashboard-tab-active' : ''}`}>
                         <ClipboardList className="w-4 h-4" /> Assigned Tests
                         {assignedTests.length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{assignedTests.length}</span>}
                     </button>
-                    <button onClick={() => setActiveTab('materials')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition ${activeTab === 'materials' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                    <button onClick={() => setActiveTab('materials')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'materials' ? 'dashboard-tab-active' : ''}`}>
                         <FileText className="w-4 h-4" /> Study Materials
                     </button>
-                    <button onClick={() => setActiveTab('performance')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition ${activeTab === 'performance' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                    <button onClick={() => setActiveTab('performance')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'performance' ? 'dashboard-tab-active' : ''}`}>
                         <BarChart3 className="w-4 h-4" /> Performance
                     </button>
-                    <button onClick={() => setActiveTab('achieve')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition ${activeTab === 'achieve' ? 'bg-amber-500 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                    <Link href="/student/mastery" className="dashboard-tab flex items-center gap-2">
+                        <Target className="w-4 h-4" /> My Mastery
+                    </Link>
+                    <Link href="/student/interventions" className="dashboard-tab flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" /> Support Plans
+                    </Link>
+                    <button onClick={() => setActiveTab('achieve')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'achieve' ? 'dashboard-tab-active' : ''}`}>
                         <Star className="w-4 h-4" /> Achieve
                     </button>
-                    <button onClick={() => setActiveTab('profile')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition ${activeTab === 'profile' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                    <button onClick={() => setActiveTab('profile')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'profile' ? 'dashboard-tab-active' : ''}`}>
                         <UserCircle className="w-4 h-4" /> Profile
                     </button>
-                    <button onClick={() => setActiveTab('payments')} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium whitespace-nowrap transition ${activeTab === 'payments' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}>
+                    <button onClick={() => setActiveTab('payments')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'payments' ? 'dashboard-tab-active' : ''}`}>
                         <CreditCard className="w-4 h-4" /> Fee & Payments
                     </button>
                 </div>
@@ -358,11 +389,11 @@ export default function StudentDashboardClient({
 
                     {activeTab === 'tests' && (
                         <div className="animate-in fade-in duration-300">
-                            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2"><ClipboardList className="w-5 h-5 text-indigo-600" /> Assigned Tests</h2>
+                            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2"><ClipboardList className="w-5 h-5 text-indigo-600" /> Tests &amp; Homework</h2>
                             {assignedTests.length === 0 ? (
                                 <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl">
                                     <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 font-medium">No tests assigned yet.</p>
+                                    <p className="text-gray-500 font-medium">No tests or homework assigned yet.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
@@ -376,10 +407,11 @@ export default function StudentDashboardClient({
                                             <div key={assignment.id} className="border border-gray-200 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:shadow-md transition">
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${ assignment.test?.mode === 'STRICT' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{assignment.test?.mode}</span>
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${assignment.kind === 'HOMEWORK' ? 'bg-violet-100 text-violet-700' : 'bg-red-100 text-red-700'}`}>{assignment.kind === 'HOMEWORK' ? 'Homework' : 'Test'}</span>
                                                         {isExpired && <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500">Expired</span>}
                                                     </div>
                                                     <h3 className="text-lg font-black text-gray-900">{assignment.test?.title}</h3>
+                                                    {assignment.instructions && <p className="text-sm text-gray-600 mt-1">{assignment.instructions}</p>}
                                                     <div className="flex items-center gap-4 text-xs text-gray-500 font-medium mt-1">
                                                         <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{assignment.test?.duration} mins</span>
                                                         <span>{assignment.test?.totalMarks} marks</span>
@@ -397,7 +429,7 @@ export default function StudentDashboardClient({
                                                             </div>
                                                         ) : (
                                                             <Link href={`/student/tests/${assignment.test?.id}/take`} className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-black text-sm transition shadow-lg shadow-indigo-900/20">
-                                                                <PlayCircle className="w-4 h-4" /> Start Test
+                                                                <PlayCircle className="w-4 h-4" /> {assignment.kind === 'HOMEWORK' ? 'Start Homework' : 'Start Test'}
                                                             </Link>
                                                         )
                                                     ) : (

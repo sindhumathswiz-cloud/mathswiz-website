@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -36,7 +36,8 @@ import {
     Youtube,
     FolderOpen,
     Sparkles,
-    RefreshCw
+    RefreshCw,
+    LogOut
 } from 'lucide-react';
 import { 
     LineChart, 
@@ -55,6 +56,7 @@ import {
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { useTheme } from 'next-themes';
+import { signOut } from 'next-auth/react';
 
 import { PlatformOverview } from "@/components/admin/PlatformOverview";
 import { UserDirectoryTable } from "@/components/admin/UserDirectoryTable";
@@ -69,6 +71,7 @@ import { FeeStructureGenerator } from "@/components/admin/FeeStructureGenerator"
 import { ManageWebsiteStudio } from "@/components/admin/ManageWebsiteStudio";
 
 import { QuestionReviewQueue } from "@/components/admin/QuestionReviewQueue";
+import { TodayDashboard } from "@/components/dashboard/TodayDashboard";
 interface AdminDashboardClientProps {
     stats: {
         totalUsers: number;
@@ -102,12 +105,17 @@ export default function AdminDashboardClient({
 }: AdminDashboardClientProps) {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         setMounted(true);
     }, []);
-    const [activeKpiModal, setActiveKpiModal] = useState<string | null>(null);
+
+    const handleSignOut = async () => {
+        setIsSigningOut(true);
+        await signOut({ callbackUrl: '/login' });
+    };
     const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
     const [newLead, setNewLead] = useState({ name: '', phone: '', courseInterest: '' });
     const [leads, setLeads] = useState(initialLeads);
@@ -336,39 +344,41 @@ export default function AdminDashboardClient({
                             </div>
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-lg border-2 border-white shadow-sm">A</div>
                         </div>
+                        <button
+                            type="button"
+                            onClick={handleSignOut}
+                            disabled={isSigningOut}
+                            aria-label="Sign out of administrator account"
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-wait disabled:opacity-60"
+                        >
+                            {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                            <span className="hidden xl:inline">Sign out</span>
+                        </button>
                     </div>
                 </div>
             </div>
 
             <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-                {/* Metrics Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {[
-                        { title: 'Global Users', value: stats.totalUsers, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100', trend: '+12%', id: 'users' },
-                        { title: 'Active Batches', value: stats.totalBatches, icon: LayoutDashboard, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', trend: '+3', id: 'batches' },
-                        { title: 'Live Now', value: stats.activeSessions, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', trend: 'Live', id: 'active' },
-                        { title: 'Gross Revenue', value: `â‚¹${stats.revenue.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', trend: '+18%', id: 'revenue' },
-                    ].map((m, i) => (
-                        <div key={i} onClick={() => setActiveKpiModal(m.id)} className={`bg-white p-6 rounded-2xl border ${m.border} shadow-sm hover:shadow-md transition-all cursor-pointer group relative overflow-hidden`}>
-                            <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity`}>
-                                <m.icon className="w-16 h-16" />
-                            </div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className={`p-2 ${m.bg} ${m.color} rounded-xl`}>
-                                    <m.icon className="w-5 h-5" />
-                                </div>
-                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{m.title}</span>
-                            </div>
-                            <div className="flex items-end justify-between">
-                                <h3 className="text-3xl font-black text-gray-900 tracking-tight" suppressHydrationWarning>{m.value}</h3>
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${m.trend.includes('+') ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                                    {m.trend}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
+                <TodayDashboard
+                    role="Administrator"
+                    title="Today across Mathswiz"
+                    description="Start with the items that need attention, then move into detailed platform operations."
+                    metrics={[
+                        { label: 'Users', value: stats.totalUsers, hint: 'registered accounts', icon: Users, tone: 'indigo' },
+                        { label: 'Active batches', value: stats.totalBatches, hint: 'teaching groups', icon: LayoutDashboard, tone: 'amber' },
+                        { label: 'Active today', value: stats.activeSessions, hint: 'last 24 hours', icon: Activity, tone: 'sky' },
+                        { label: 'Revenue', value: `₹${stats.revenue.toLocaleString('en-IN')}`, hint: 'paid records', icon: DollarSign, tone: 'emerald' },
+                    ]}
+                    priorities={[
+                        { title: `${pendingApprovals.length} account approvals`, detail: pendingApprovals.length ? 'Review new users before they can enter protected workspaces.' : 'All account requests have been reviewed.', tone: pendingApprovals.length ? 'attention' : 'success' },
+                        { title: `${questionBankStats?.pending ?? 0} questions awaiting review`, detail: 'Keep the shared question bank accurate and classroom-ready.', tone: (questionBankStats?.pending ?? 0) ? 'attention' : 'success' },
+                    ]}
+                    actions={[
+                        { label: 'Review approvals', icon: UserCheck, onClick: () => setActiveTab('Approvals') },
+                        { label: 'Create a batch', icon: Plus, onClick: () => setIsCreateBatchOpen(true) },
+                        { label: 'Open question bank', icon: BookOpen, onClick: () => setActiveTab('Question Bank') },
+                    ]}
+                />
                 {/* DEEP INTELLIGENCE / QUICK ACTIONS - Prominent Ingestion & Explorer */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <button onClick={() => window.location.href = '/admin/ingestion'} className="group bg-gradient-to-br from-indigo-900 to-indigo-950 p-6 rounded-3xl border border-indigo-500/30 shadow-xl shadow-indigo-950/20 hover:scale-[1.01] transition-all flex items-center justify-between overflow-hidden relative">
@@ -427,15 +437,15 @@ export default function AdminDashboardClient({
                 </div>
 
                 {/* Pill-Shaped Secondary Navigation */}
-                <div className="flex space-x-2 mb-8 overflow-x-auto pb-2 scrollbar-none w-full">
+                <div className="dashboard-tabs mb-8" aria-label="Administrator workspace sections">
                     {['Platform Overview', 'User Directory', 'Curriculum Manager', 'Manage Website', 'Approvals', 'Lead CRM', 'Test & Exam Engine', 'Fee Management', 'Reports & Export', 'System Features', 'Question Bank'].map((tab) => (
                         <button 
                             key={tab} 
                             onClick={() => setActiveTab(tab as any)} 
-                            className={`px-6 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all duration-200 border ${
+                            className={`dashboard-tab ${
                                 activeTab === tab 
-                                    ? 'bg-indigo-900 text-white border-indigo-900 shadow-md transform scale-105' 
-                                    : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-200 hover:border-gray-300'
+                                    ? 'dashboard-tab-active'
+                                    : ''
                             }`}
                         >
                             {tab === 'Manage Website' ? 'Manage Website' : tab}
@@ -588,25 +598,6 @@ export default function AdminDashboardClient({
                 </div>
             )}
 
-            {/* KPI Modal - Simplified for now */}
-            {activeKpiModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl border border-gray-100">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-900 border-b-2 border-indigo-600 pb-2 uppercase tracking-tight">Active {activeKpiModal} Analytics</h3>
-                            <button onClick={() => setActiveKpiModal(null)} className="text-gray-400 hover:text-gray-900 transition"><XCircle className="w-5 h-5" /></button>
-                        </div>
-                        <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-                            <Activity className="w-12 h-12 text-indigo-300 mx-auto mb-4 animate-pulse" />
-                            <h3 className="text-lg font-bold text-gray-700">Detailed Analytics compiling...</h3>
-                            <p className="text-xs text-gray-500 mt-2 font-medium">Crunching live usage telemetry and historical enrollment vectors.</p>
-                        </div>
-                        <div className="mt-6 flex justify-end">
-                            <button onClick={() => setActiveKpiModal(null)} className="px-6 py-2.5 bg-gray-900 text-white font-bold rounded-xl text-xs transition">Dismiss Report</button>
-                        </div>
-                    </div>
-                </div>
-            )}
             {/* Drawer: Create Batch */}
             {isCreateBatchOpen && (
                 <>

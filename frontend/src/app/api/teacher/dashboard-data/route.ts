@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { buildWeeklyEngagement } from "@/lib/teacher-dashboard-metrics";
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,9 @@ export async function GET(req: Request) {
 
         let pendingAssignments = 0;
         let liveTests = 0;
+        let activeNow = 0;
+        let doubtsCount = 0;
+        let engagementData: Array<{ week: string; score: number }> = [];
         try {
             pendingAssignments = await prisma.testAssignment.count({
                 where: {
@@ -78,6 +82,25 @@ export async function GET(req: Request) {
                     isPublished: true 
                 } 
             });
+            const activeSince = new Date(Date.now() - 15 * 60 * 1000);
+            [activeNow, doubtsCount] = await Promise.all([
+                prisma.user.count({
+                    where: {
+                        lastActiveAt: { gte: activeSince },
+                        enrollments: { some: { status: 'APPROVED', batch: { teacherId: userId } } },
+                    },
+                }),
+                prisma.teacherQuery.count({ where: { teacherId: userId, status: 'OPEN' } }),
+            ]);
+            const attempts = await prisma.testAttempt.findMany({
+                where: {
+                    status: { in: ['COMPLETED', 'SUBMITTED', 'AUTO_SUBMITTED'] },
+                    endTime: { gte: new Date(Date.now() - 42 * 24 * 60 * 60 * 1000) },
+                    user: { enrollments: { some: { status: 'APPROVED', batch: { teacherId: userId } } } },
+                },
+                select: { startTime: true, endTime: true, totalScore: true, test: { select: { totalMarks: true } } },
+            });
+            engagementData = buildWeeklyEngagement(attempts);
         } catch (e) {
             console.error("Scoping error in teacher dashboard-data:", e);
         }
@@ -88,6 +111,9 @@ export async function GET(req: Request) {
             totalStudents: totalEnrollments,
             pendingAssignments,
             liveTests,
+            activeNow,
+            doubtsCount,
+            engagementData,
             batches: batches.map((b: any) => ({
                 id: b.id,
                 batchCode: b.code || b.batchCode,

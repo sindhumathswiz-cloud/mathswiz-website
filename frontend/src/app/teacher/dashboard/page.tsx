@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import TeacherDashboardClient from "./TeacherDashboardClient";
 import { Lock } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import { buildWeeklyEngagement } from '@/lib/teacher-dashboard-metrics';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -17,8 +19,7 @@ export default async function TeacherDashboard() {
     const userId = (session?.user as any)?.id;
 
     if (!userId) {
-        // Fallback for absolute resilience during testing
-        console.warn("Teacher Dashboard: No session userId found, proceeding with placeholder or nuclear fetch");
+        redirect('/login');
     }
 
     if ((session?.user as any)?.accountStatus === 'PENDING') {
@@ -63,7 +64,11 @@ export default async function TeacherDashboard() {
 
         // Parents waiting approval — not batch-specific, keep unfiltered
         const pendingParents = await (prisma as any).user.findMany({
-            where: { role: 'PARENT', accountStatus: 'PENDING' }
+            where: {
+                role: 'PARENT',
+                accountStatus: 'PENDING',
+                children: { some: { enrollments: { some: { batchId: { in: batchIds } } } } },
+            }
         }).catch(() => []);
 
         // Payments only from teacher's batches
@@ -132,6 +137,9 @@ export default async function TeacherDashboard() {
 
         let pendingAssignments = 0;
         let liveTests = 0;
+        let activeNow = 0;
+        let doubtsCount = 0;
+        let engagementData: Array<{ week: string; score: number }> = [];
         try {
             if (prisma.testAssignment) pendingAssignments = await prisma.testAssignment.count({
                 where: { batch: { teacherId: userId || '' } }
@@ -139,6 +147,25 @@ export default async function TeacherDashboard() {
             if (prisma.test) liveTests = await prisma.test.count({
                 where: { isPublished: true, createdById: userId || '' }
             });
+            const activeSince = new Date(Date.now() - 15 * 60 * 1000);
+            [activeNow, doubtsCount] = await Promise.all([
+                prisma.user.count({
+                    where: {
+                        lastActiveAt: { gte: activeSince },
+                        enrollments: { some: { status: 'APPROVED', batch: { teacherId: userId } } },
+                    },
+                }),
+                prisma.teacherQuery.count({ where: { teacherId: userId, status: 'OPEN' } }),
+            ]);
+            const attempts = await prisma.testAttempt.findMany({
+                where: {
+                    status: { in: ['COMPLETED', 'SUBMITTED', 'AUTO_SUBMITTED'] },
+                    endTime: { gte: new Date(Date.now() - 42 * 24 * 60 * 60 * 1000) },
+                    user: { enrollments: { some: { status: 'APPROVED', batch: { teacherId: userId } } } },
+                },
+                select: { startTime: true, endTime: true, totalScore: true, test: { select: { totalMarks: true } } },
+            });
+            engagementData = buildWeeklyEngagement(attempts);
         } catch (e) {
             console.error("Test stats fetch error:", e);
         }
@@ -152,12 +179,14 @@ export default async function TeacherDashboard() {
             initialLeads={leads}
             initialUsers={users}
             initialNotices={notices}
+            initialEngagementData={engagementData}
+            initialDoubtsCount={doubtsCount}
             teacherId={userId || ''}
             initialStats={{
                 totalStudents: totalEnrollments,
                 pendingAssignments,
                 liveTests,
-                activeNow: Math.floor(Math.random() * 5) + 3
+                activeNow
             }}
         />;
     } catch (error) {

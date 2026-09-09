@@ -9,7 +9,7 @@ export default async function DashboardRouter() {
         redirect("/login");
     }
 
-    const role = (session.user as any).role;
+    const role = session.user.role;
 
     if (role === "ADMIN") {
         redirect("/admin/dashboard");
@@ -17,6 +17,8 @@ export default async function DashboardRouter() {
         redirect("/teacher/dashboard");
     } else if (role === "STUDENT") {
         redirect("/student/dashboard");
+    } else if (role === "PARENT") {
+        redirect("/parent/dashboard");
     } else {
         // Fallback for unexpected roles
         redirect("/login");

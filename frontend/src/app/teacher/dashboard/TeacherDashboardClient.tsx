@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Layers, FileText, TrendingUp, Plus, Users, CheckCircle2, Lock, MessageSquare, LineChart, AlertCircle, XCircle, ClipboardList, PenSquare, Trash2, Download, Video, Link as LinkIcon, Book, Loader2, RefreshCw } from 'lucide-react';
+import { Layers, FileText, TrendingUp, Plus, Users, CheckCircle2, Lock, MessageSquare, LineChart, AlertCircle, XCircle, ClipboardList, PenSquare, Trash2, Download, Video, Link as LinkIcon, Book, Loader2, RefreshCw, LogOut } from 'lucide-react';
 import { QuestionBankStudio } from "@/components/admin/QuestionBankStudio";
 import { TestEngineCreator } from "@/components/admin/TestEngineCreator";
 import { PlatformOverview } from "@/components/admin/PlatformOverview";
+import { TodayDashboard } from "@/components/dashboard/TodayDashboard";
 import { LiveClassCalendar } from "@/components/admin/LiveClassCalendar";
 import { FeeManagement } from "@/components/admin/FeeManagement";
 import { FeeStructureGenerator } from "@/components/admin/FeeStructureGenerator";
@@ -16,9 +17,8 @@ import { createMaterialAction, updateMaterialAction, deleteMaterialAction } from
 // @ts-ignore
 import { MaterialType } from "@prisma/client";
 import { toast } from "react-hot-toast";
-import { useSession } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 interface Batch {
     id: string;
@@ -26,20 +26,6 @@ interface Batch {
     course: { title: string };
     studentCount: number;
 }
-
-const mockEngagementData = [
-    { week: 'Week 1', score: 65 },
-    { week: 'Week 2', score: 70 },
-    { week: 'Week 3', score: 68 },
-    { week: 'Week 4', score: 75 },
-    { week: 'Week 5', score: 82 },
-    { week: 'Week 6', score: 85 },
-];
-
-const mockDoubts = [
-    { id: 1, student: "Aarav Sharma", question: "Can someone re-explain the substitution method for this integral? I am stuck on question 4.", time: "10 mins ago", status: "PENDING" },
-    { id: 2, student: "Priya Das", question: "Why does the matrix determinant equal zero in this specific edge case?", time: "1 hour ago", status: "PENDING" },
-];
 
 export default function TeacherDashboardClient({ 
     initialBatches = [], 
@@ -50,9 +36,12 @@ export default function TeacherDashboardClient({
     initialLeads = [],
     initialUsers = [],
     initialNotices = [],
+    initialEngagementData = [],
+    initialDoubtsCount = 0,
     teacherId = '',
     initialStats = { totalStudents: 0, pendingAssignments: 0, liveTests: 0, activeNow: 0 }
 }: any) {
+    const [isSigningOut, setIsSigningOut] = useState(false);
     const { data: session } = useSession();
     const [activeTab, setActiveTab] = useState<'Platform Overview' | 'Live Classes' | 'User Directory' | 'Lead CRM' | 'Question Bank' | 'Test & Exam Engine' | 'Study Materials' | 'Fee Management' | 'Reports & Export' | 'System Features' | 'AI Training Content'>('Platform Overview');
 
@@ -69,7 +58,8 @@ export default function TeacherDashboardClient({
     const [leads, setLeads] = useState<any[]>(initialLeads);
     const [users, setUsers] = useState<any[]>(initialUsers);
     const [notices, setNotices] = useState<any[]>(initialNotices);
-    const [doubts, setDoubts] = useState(mockDoubts);
+    const [engagementData, setEngagementData] = useState(initialEngagementData);
+    const [doubtsCount, setDoubtsCount] = useState(initialDoubtsCount);
     const [isSyncingTeams, setIsSyncingTeams] = useState(false);
 
     // Notice form state
@@ -103,6 +93,8 @@ export default function TeacherDashboardClient({
             if (typeof data.pendingAssignments === 'number') setPendingAssignments(data.pendingAssignments);
             if (typeof data.liveTests === 'number') setLiveTests(data.liveTests);
             if (typeof data.activeNow === 'number') setActiveNow(data.activeNow);
+            if (Array.isArray(data.engagementData)) setEngagementData(data.engagementData);
+            if (typeof data.doubtsCount === 'number') setDoubtsCount(data.doubtsCount);
             if (data.materials) setMaterials(data.materials);
             if (data.payments) setPayments(data.payments);
             if (data.users) setUsers(data.users);
@@ -271,66 +263,78 @@ export default function TeacherDashboardClient({
 
     const totalPending = pendingEnrollments.length + pendingParents.length;
 
+    const handleSignOut = async () => {
+        setIsSigningOut(true);
+        await signOut({ callbackUrl: '/login' });
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             <div className="flex-1 p-8">
                 <div className="max-w-7xl mx-auto">
-                    {/* Workspace Header */}
-                    <div className="mb-8">
-                        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Teacher Workspace</h1>
-                        <p className="text-lg text-gray-500 mt-2 font-medium">Platform Analytics, User Management & Lead CRM</p>
-                    </div>
+                    <TodayDashboard
+                        role="Teacher"
+                        title="Your teaching day"
+                        description="See the learners and classroom work that need your attention before opening the full workspace."
+                        metrics={[
+                            { label: 'Students', value: totalStudents, hint: 'across your batches', icon: Users, tone: 'indigo' },
+                            { label: 'Active batches', value: batches.length, hint: 'your teaching groups', icon: Layers, tone: 'amber' },
+                            { label: 'Pending work', value: pendingAssignments, hint: 'assignments to action', icon: ClipboardList, tone: 'rose' },
+                            { label: 'Live tests', value: liveTests, hint: 'currently available', icon: CheckCircle2, tone: 'emerald' },
+                        ]}
+                        priorities={[
+                            { title: `${totalPending} enrollment requests`, detail: totalPending ? 'Approve or decline learners and parent links.' : 'No enrollment requests are waiting.', tone: totalPending ? 'attention' : 'success' },
+                            { title: `${doubtsCount} open student doubts`, detail: doubtsCount ? 'Reply to learners who need help.' : 'Student questions are up to date.', tone: doubtsCount ? 'attention' : 'success' },
+                        ]}
+                        actions={[
+                            { label: 'Review students', icon: Users, onClick: () => setActiveTab('User Directory') },
+                            { label: 'Plan a live class', icon: Video, onClick: () => setActiveTab('Live Classes') },
+                            { label: 'Create or assign a test', icon: ClipboardList, onClick: () => setActiveTab('Test & Exam Engine') },
+                        ]}
+                    />
+                    <div className="grid items-start gap-6 md:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)]">
+                        <aside className="sticky top-4 z-20 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm md:top-6" aria-label="Teacher workspace navigation">
+                            <div className="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
+                                {['Platform Overview', 'Live Classes', 'User Directory', 'Lead CRM', 'Question Bank', 'Test & Exam Engine', 'AI Training Content', 'Study Materials', 'Fee Management', 'Reports & Export', 'System Features'].map((tab) => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab as any)}
+                                        aria-current={activeTab === tab ? 'page' : undefined}
+                                        className={`dashboard-tab flex shrink-0 items-center text-left md:w-full ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="mt-3 border-t border-slate-200 pt-3">
+                                <Link href="/teacher/mastery" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 md:justify-start">
+                                    <TrendingUp className="h-4 w-4" /> Student mastery
+                                </Link>
+                                <Link href="/teacher/interventions" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 md:justify-start">
+                                    <Users className="h-4 w-4" /> Interventions
+                                </Link>
+                                <Link href="/teacher/homework" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 md:justify-start">
+                                    <ClipboardList className="h-4 w-4" /> Homework review
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={handleSignOut}
+                                    disabled={isSigningOut}
+                                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60 md:justify-start"
+                                >
+                                    {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                                    {isSigningOut ? 'Signing out…' : 'Sign out'}
+                                </button>
+                            </div>
+                        </aside>
 
-                    {/* Top Metric Cards Row — Clickable to jump to tab */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        {[
-                            { title: 'My Total Students', value: totalStudents, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100', trend: '+5', tab: 'User Directory' },
-                            { title: 'My Active Batches', value: batches.length, icon: Layers, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', trend: 'Live', tab: 'User Directory' },
-                            { title: 'Pending Assignments', value: pendingAssignments, icon: ClipboardList, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', trend: 'Action Needed', tab: 'Test & Exam Engine' },
-                            { title: 'Live Tests', value: liveTests, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', trend: 'Active', tab: 'Test & Exam Engine' },
-                        ].map((m, i) => (
-                            <button key={i} onClick={() => setActiveTab(m.tab as any)} className={`bg-white p-6 rounded-2xl border ${m.border} shadow-sm hover:shadow-md transition-all group relative overflow-hidden text-left w-full cursor-pointer hover:scale-[1.02] active:scale-100`}>
-                                <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity`}>
-                                    <m.icon className="w-16 h-16" />
-                                </div>
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className={`p-2 ${m.bg} ${m.color} rounded-xl`}>
-                                        <m.icon className="w-5 h-5" />
-                                    </div>
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{m.title}</span>
-                                </div>
-                                <div className="flex items-end justify-between">
-                                    <h3 className="text-3xl font-black text-gray-900 tracking-tight" suppressHydrationWarning>{m.value}</h3>
-                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${m.trend.includes('+') ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                                        {m.trend}
-                                    </span>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Pill-Shaped Secondary Navigation */}
-                    <div className="flex space-x-2 mb-8 overflow-x-auto pb-2 scrollbar-none w-full">
-                        {['Platform Overview', 'Live Classes', 'User Directory', 'Lead CRM', 'Question Bank', 'Test & Exam Engine', 'AI Training Content', 'Study Materials', 'Fee Management', 'Reports & Export', 'System Features'].map((tab) => (
-                            <button 
-                                key={tab} 
-                                onClick={() => setActiveTab(tab as any)} 
-                                className={`px-6 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all duration-200 border ${
-                                    activeTab === tab 
-                                        ? 'bg-indigo-900 text-white border-indigo-900 shadow-md transform scale-105' 
-                                        : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-200 hover:border-gray-300'
-                                }`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Tab Content */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 min-h-[500px]">
+                        {/* Tab Content */}
+                        <div className="min-h-[500px] min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                         {activeTab === 'Platform Overview' && (
                             <PlatformOverview 
                                 totalPending={totalPending} 
+                                doubtsCount={doubtsCount}
+                                engagementData={engagementData}
                                 onActionNow={() => setActiveTab('User Directory')} 
                             />
                         )}
@@ -762,6 +766,7 @@ export default function TeacherDashboardClient({
                                 <KnowledgeBasePage />
                             </div>
                         )}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-    Users, 
-    BarChart3, 
     Activity, 
     Flame, 
     CalendarCheck, 
@@ -13,7 +11,8 @@ import {
     ShieldAlert,
     Clock
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { TodayDashboard } from '@/components/dashboard/TodayDashboard';
+import { DashboardState } from '@/components/dashboard/DashboardState';
 
 export default function ParentDashboard() {
     const [loading, setLoading] = useState(true);
@@ -43,68 +42,39 @@ export default function ParentDashboard() {
         fetchDashboard();
     }, []);
 
-    if (loading) return <div className="flex justify-center items-center h-screen"><Activity className="w-8 h-8 text-indigo-500 animate-pulse" /></div>;
+    if (loading) return (
+        <main className="min-h-screen bg-slate-50 p-6 sm:p-8">
+            <div className="mx-auto max-w-3xl pt-24">
+                <DashboardState loading title="Preparing the parent dashboard" description="Loading the latest attendance and assessment information." />
+            </div>
+        </main>
+    );
 
     return (
         <div className="min-h-screen bg-slate-50 p-8 pb-32">
             <div className="max-w-6xl mx-auto space-y-8">
+                <TodayDashboard
+                    role="Parent"
+                    title={`${stats.studentName}'s learning today`}
+                    description="A clear view of attendance, recent progress, and anything that may need your support."
+                    metrics={[
+                        { label: 'Attendance', value: `${stats.attendancePercent}%`, hint: 'recorded attendance', icon: CalendarCheck, tone: 'emerald' },
+                        { label: 'Learning streak', value: stats.currentStreak, hint: 'consecutive days', icon: Flame, tone: 'amber' },
+                        { label: 'Questions asked', value: stats.aiTokensUsed, hint: 'AI learning conversations', icon: Activity, tone: 'indigo' },
+                        { label: 'Batch percentile', value: `Top ${stats.globalRank}%`, hint: 'current cohort position', icon: Award, tone: 'sky' },
+                    ]}
+                    priorities={[
+                        { title: stats.attendancePercent < 75 ? 'Attendance needs attention' : 'Attendance is on track', detail: stats.attendancePercent < 75 ? 'Review missed classes and available recordings together.' : 'Keep supporting the current learning routine.', tone: stats.attendancePercent < 75 ? 'attention' : 'success' },
+                        { title: stats.recentScores.length ? 'Review the latest test' : 'No recent test results', detail: stats.recentScores.length ? 'Discuss what went well and choose one area to improve.' : 'Results will appear here after the next completed assessment.', tone: 'neutral' },
+                    ]}
+                    actions={[
+                        { label: 'Review recent results', icon: TrendingUp, onClick: () => document.getElementById('recent-results')?.scrollIntoView({ behavior: 'smooth' }) },
+                    ]}
+                />
                 
-                {/* Header */}
-                <div className="bg-slate-950 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
-                    <div className="absolute -right-16 -top-16 opacity-5">
-                        <Users className="w-64 h-64" />
-                    </div>
-                    
-                    <div className="relative z-10">
-                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.3em] block mb-2">Guardian Portal</span>
-                        <h1 className="text-4xl font-black tracking-tight mb-2">Welcome, Guardian</h1>
-                        <p className="text-slate-400 font-bold max-w-xl">
-                            Monitoring progress for <span className="text-white">{stats.studentName}</span>.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Top Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm">
-                        <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4">
-                            <CalendarCheck className="w-6 h-6 text-emerald-600" />
-                        </div>
-                        <h3 className="text-4xl font-black text-slate-900 mb-1">{stats.attendancePercent}%</h3>
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Attendance</p>
-                    </motion.div>
-
-                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm">
-                        <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-4">
-                            <Flame className="w-6 h-6 text-orange-600" />
-                        </div>
-                        <h3 className="text-4xl font-black text-slate-900 mb-1">{stats.currentStreak}</h3>
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Day Streak</p>
-                    </motion.div>
-
-                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative overflow-hidden group">
-                        <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4 relative z-10">
-                            <Activity className="w-6 h-6 text-indigo-600" />
-                        </div>
-                        <h3 className="text-4xl font-black text-slate-900 mb-1 relative z-10">{stats.aiTokensUsed}</h3>
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest relative z-10">AI Doubts Asked</p>
-                        <div className="absolute right-0 bottom-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <Activity className="w-32 h-32" />
-                        </div>
-                    </motion.div>
-
-                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-gradient-to-br from-amber-400 to-yellow-500 p-8 rounded-[2.5rem] shadow-xl shadow-yellow-200 text-white">
-                        <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm">
-                            <Award className="w-6 h-6" />
-                        </div>
-                        <h3 className="text-4xl font-black mb-1">Top {stats.globalRank}%</h3>
-                        <p className="text-xs font-black text-yellow-900 uppercase tracking-widest">Batch Percentile</p>
-                    </motion.div>
-                </div>
-
                 <div className="grid lg:grid-cols-3 gap-8">
                     {/* Performance Analytics */}
-                    <div className="lg:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100">
+                    <div id="recent-results" className="lg:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 scroll-mt-8">
                         <div className="flex items-center justify-between mb-8">
                             <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
                                 <TrendingUp className="w-6 h-6 text-indigo-600" />
@@ -113,7 +83,9 @@ export default function ParentDashboard() {
                         </div>
                         
                         <div className="space-y-4">
-                            {stats.recentScores.map((score, i) => (
+                            {stats.recentScores.length === 0 ? (
+                                <DashboardState title="No recent results" description="Completed assessment results will appear here automatically." />
+                            ) : stats.recentScores.map((score, i) => (
                                 <div key={i} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-50 transition-all group">
                                     <div className="flex items-center gap-6">
                                         <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center font-black text-xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">

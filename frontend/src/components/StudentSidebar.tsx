@@ -57,7 +57,7 @@ export default function StudentSidebar({ active }: { active?: string }) {
     const menuItems = [
         { href: '/student/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
         { href: '/student/tests', icon: <ClipboardList size={18} />, label: 'My Tests' },
-        { href: '/student/practice-arena', icon: <Target size={18} />, label: 'Practice Arena' },
+        { href: '/student/practice', icon: <Target size={18} />, label: 'Practice Arena' },
         { href: '/student/materials', icon: <FileText size={18} />, label: 'Study Materials' },
         { href: '/student/performance', icon: <BarChart3 size={18} />, label: 'Performance' },
         { href: '/student/achieve', icon: <Star size={18} />, label: 'Achieve' },

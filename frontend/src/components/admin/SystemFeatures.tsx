@@ -31,6 +31,7 @@ interface Banner {
     title: string;
     imageUrl: string;
     isActive: boolean;
+    linkUrl?: string;
 }
 
 interface SystemFeaturesProps {
@@ -43,6 +44,8 @@ export const SystemFeatures = ({ coupons: initialCoupons, banners: initialBanner
     const [activeSubTab, setActiveSubTab] = useState('Coupons');
     const [coupons, setCoupons] = useState(initialCoupons || []);
     const [banners, setBanners] = useState(initialBanners || []);
+    const [isAddBannerOpen, setIsAddBannerOpen] = useState(false);
+    const [newBanner, setNewBanner] = useState({ title: '', imageUrl: '', linkUrl: '', isActive: true });
 
     const [isAddCouponOpen, setIsAddCouponOpen] = useState(false);
     const [newCoupon, setNewCoupon] = useState({ code: '', discountPct: 0, isActive: true });
@@ -109,6 +112,25 @@ export const SystemFeatures = ({ coupons: initialCoupons, banners: initialBanner
             }
         } catch (error) {
             toast.error('Failed to update banner');
+        }
+    };
+
+    const handleAddBanner = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const res = await fetch('/api/admin/banners', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newBanner),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to add banner');
+            setBanners([data, ...banners]);
+            setNewBanner({ title: '', imageUrl: '', linkUrl: '', isActive: true });
+            setIsAddBannerOpen(false);
+            toast.success('Banner added successfully');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to add banner');
         }
     };
 
@@ -206,15 +228,24 @@ export const SystemFeatures = ({ coupons: initialCoupons, banners: initialBanner
                         <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
                             <Monitor className="w-5 h-5 text-indigo-600" /> Platform Banners
                         </h3>
-                        <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
-                            <Plus className="w-4 h-4" /> Upload Banner
+                        <button onClick={() => setIsAddBannerOpen((open) => !open)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                            <Plus className="w-4 h-4" /> Add Banner
                         </button>
                     </div>
+
+                    {isAddBannerOpen && (
+                        <form onSubmit={handleAddBanner} className="bg-white border border-indigo-100 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input required value={newBanner.title} onChange={(e) => setNewBanner({ ...newBanner, title: e.target.value })} placeholder="Banner title" className="border border-gray-200 rounded-xl px-4 py-2 text-sm" />
+                            <input required type="url" value={newBanner.imageUrl} onChange={(e) => setNewBanner({ ...newBanner, imageUrl: e.target.value })} placeholder="https://…/banner.jpg" className="border border-gray-200 rounded-xl px-4 py-2 text-sm" />
+                            <input type="url" value={newBanner.linkUrl} onChange={(e) => setNewBanner({ ...newBanner, linkUrl: e.target.value })} placeholder="Optional destination URL" className="border border-gray-200 rounded-xl px-4 py-2 text-sm" />
+                            <button type="submit" className="md:col-span-3 bg-indigo-600 text-white rounded-xl px-4 py-2 text-sm font-bold">Save Banner</button>
+                        </form>
+                    )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {banners.map(banner => (
                             <div key={banner.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden group">
-                                <div className="h-40 bg-gray-100 relative group-hover:scale-[1.02] transition-transform duration-500">
+                                <div className="h-40 bg-gray-100 bg-cover bg-center relative group-hover:scale-[1.02] transition-transform duration-500" style={{ backgroundImage: `url(${banner.imageUrl})` }}>
                                     <div className="absolute inset-0 flex items-center justify-center text-gray-300">
                                         <ImageIcon className="w-12 h-12" />
                                     </div>
@@ -225,7 +256,7 @@ export const SystemFeatures = ({ coupons: initialCoupons, banners: initialBanner
                                 <div className="p-6 flex items-center justify-between">
                                     <div>
                                         <h4 className="font-bold text-gray-900">{banner.title}</h4>
-                                        <p className="text-xs text-gray-500 mt-1 font-medium">Link: /courses/class-12</p>
+                                        <p className="text-xs text-gray-500 mt-1 font-medium">Link: {banner.linkUrl || 'No destination'}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <button 
