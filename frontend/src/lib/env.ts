@@ -23,7 +23,6 @@ const envSchema = z.object({
   GEMINI_API_KEY_3: z.string().optional(),
   TOGETHER_API_KEY: z.string().optional(),
   TOGETHER_API_KEY_1: z.string().optional(),
-  OPENROUTER_API_KEY: z.string().optional(),
   MATHPIX_APP_ID: z.string().optional(),
   MATHPIX_APP_KEY: z.string().optional(),
 });

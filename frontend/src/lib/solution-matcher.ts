@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { fetchFromLLM } from './llm';
 
 interface QuestionCandidate {
     id: string;
@@ -143,34 +144,13 @@ export function matchSolutionsFromMarkdown(
 }
 
 export async function verifyMatchWithLLM(questionText: string, solutionText: string) {
-    if (!process.env.OPENROUTER_API_KEY) {
-        return { isCorrect: false, confidence: 0, reason: 'No API key' };
-    }
-
     try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'google/gemini-2.0-flash-exp:free',
-                messages: [{
-                    role: 'user',
-                    content: `Verify if this solution correctly answers this question. Return JSON: {"isCorrect": boolean, "confidence": 0-1, "reason": "brief explanation"}\n\nQuestion: ${questionText}\n\nSolution: ${solutionText}`
-                }],
-                response_format: { type: 'json_object' },
-                max_tokens: 200
-            })
-        });
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content) {
-            const cleaned = content.replace(/```json/gi, '').replace(/```/g, '').trim();
-            return JSON.parse(cleaned);
-        }
+        const content = await fetchFromLLM(
+            'You verify whether a proposed mathematics solution answers its question. Return only JSON.',
+            `Return {"isCorrect": boolean, "confidence": number from 0 to 1, "reason": "brief explanation"}.\n\nQuestion: ${questionText}\n\nSolution: ${solutionText}`,
+        );
+        const cleaned = content.replace(/```json/gi, '').replace(/```/g, '').trim();
+        return JSON.parse(cleaned);
     } catch (e) {
         console.error('LLM verification failed:', e);
     }

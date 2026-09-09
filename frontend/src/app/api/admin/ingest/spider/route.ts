@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import * as cheerio from 'cheerio';
+import { fetchFromLLM } from '@/lib/llm';
 
 const appendLog = async (jobId: string, message: string) => {
   const job = await prisma.ingestionJob.findUnique({ where: { id: jobId } });
@@ -11,64 +12,6 @@ const appendLog = async (jobId: string, message: string) => {
     where: { id: jobId },
     data: { logs: [...currentLogs, `[${new Date().toLocaleTimeString()}] ${message}`] },
   });
-};
-
-const fetchFromLLM = async (systemPrompt: string, userPrompt: string): Promise<string> => {
-  const keys = [
-    ...(process.env.OPENAI_API_KEY ? [process.env.OPENAI_API_KEY] : []),
-    ...(process.env.OPENAI_API_KEY_1 ? [process.env.OPENAI_API_KEY_1] : []),
-    ...(process.env.GEMINI_API_KEY ? [process.env.GEMINI_API_KEY] : []),
-    ...(process.env.GEMINI_API_KEY_1 ? [process.env.GEMINI_API_KEY_1] : []),
-    ...(process.env.TOGETHER_API_KEY ? [process.env.TOGETHER_API_KEY] : []),
-    ...(process.env.OPENROUTER_API_KEY ? [process.env.OPENROUTER_API_KEY] : []),
-  ].filter(Boolean);
-
-  if (keys.length === 0) throw new Error("No LLM API keys configured");
-
-  const apiKey = keys[Math.floor(Math.random() * keys.length)];
-
-  if (apiKey.startsWith("sk-proj-")) {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
-    const data = await res.json();
-    return data.choices[0].message.content;
-  }
-
-  if (apiKey.startsWith("AIza")) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ parts: [{ text: userPrompt }] }],
-        generationConfig: { responseMimeType: "application/json" },
-      }),
-    });
-    if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
-    const data = await res.json();
-    return data.candidates[0].content.parts[0].text;
-  }
-
-  const res = await fetch("https://api.together.xyz/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-      response_format: { type: "json_object" },
-    }),
-  });
-  if (!res.ok) throw new Error(`Together API error: ${res.status}`);
-  const data = await res.json();
-  return data.choices[0].message.content;
 };
 
 export async function POST(request: NextRequest) {
