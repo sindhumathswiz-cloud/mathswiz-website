@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { readJsonResponse } from "@/lib/http-json";
 
 // Re-use the same load balancer logic from Task 4
 const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) => {
@@ -45,8 +46,9 @@ const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) =>
             method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
             body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: safeSystemPrompt }, { role: "user", content: safeUserPrompt }], response_format: { type: "json_object" } })
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(`Groq API Error: ${data.error?.message || res.statusText}`);
+        const data = await readJsonResponse<any>(res);
+        if (!res.ok) throw new Error(`Groq API Error: ${data?.error?.message || res.statusText}`);
+        if (!data) throw new Error("Groq returned an empty or invalid response.");
         if (!data.choices || !data.choices[0]) throw new Error("Invalid response format from Groq API.");
         return data.choices[0].message.content;
     } else {
@@ -55,8 +57,9 @@ const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) =>
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ systemInstruction: { parts: [{ text: safeSystemPrompt }] }, contents: [{ parts: [{ text: safeUserPrompt }] }], generationConfig: { responseMimeType: "application/json" } })
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(`Gemini API Error: ${data.error?.message || res.statusText}`);
+        const data = await readJsonResponse<any>(res);
+        if (!res.ok) throw new Error(`Gemini API Error: ${data?.error?.message || res.statusText}`);
+        if (!data) throw new Error("Gemini returned an empty or invalid response.");
         if (!data.candidates || !data.candidates[0]) throw new Error("Invalid response format from Gemini API.");
         return data.candidates[0].content.parts[0].text;
     }
@@ -195,18 +198,24 @@ export async function POST(req: Request) {
 
                  const saved = await prisma.question.create({
                      data: {
-                         content: nq.content, 
-                         options: nq.options || [], 
-                         correctAnswer: String(nq.correctAnswer || ""), 
+                         content: nq.content,
+                         options: nq.options || [],
+                         correctAnswer: String(nq.correctAnswer || ""),
                          explanation: nq.explanation || "",
-                         tags: autoTags, 
-                         type: searchType, 
-                         difficulty: searchDiff, 
-                         subject: "Mathematics", 
+                         tags: autoTags,
+                         type: searchType,
+                         difficulty: searchDiff,
+                         subject: "Mathematics",
                          class: "Class 11/12",
-                         topic: nq.topic || topic, 
-                         subTopic: nq.subTopic || subtopic || "", 
-                         status: "APPROVED",
+                         topic: nq.topic || topic,
+                         subTopic: nq.subTopic || subtopic || "",
+                         // Freshly LLM-generated questions are unverified — they must go
+                         // through the same review queue as every other question, not
+                         // enter the shared APPROVED pool automatically. The requesting
+                         // student can still answer it immediately (see practice/submit),
+                         // but other students won't see it via /practice/next until a
+                         // teacher/admin approves it in the review queue.
+                         status: "PENDING_REVIEW",
                          createdById: user.id
                      }
                  });
