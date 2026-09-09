@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,12 +48,27 @@ export async function POST(req: Request) {
             if (topic) updateData.topic = topic;
             if (subTopic) updateData.subTopic = subTopic;
         } else {
-            updateData.status = 'REJECTED';
+            // QuestionStatus has no REJECTED member (DRAFT / PENDING_REVIEW /
+            // APPROVED / REPORTED / ARCHIVED only) -- using it here threw
+            // "Invalid value for argument `status`. Expected QuestionStatus."
+            // on every reject, so this branch has never actually worked.
+            // ARCHIVED is the correct "retired, not live, not deleted" state.
+            updateData.status = 'ARCHIVED';
         }
 
         const updated = await prisma.question.update({
             where: { id: questionId },
             data: updateData
+        });
+
+        await recordAuditLog({
+            actorId: (session.user as any).id,
+            actorRole: (session.user as any).role,
+            action: action === 'APPROVE' ? 'QUESTION_APPROVED' : 'QUESTION_REJECTED',
+            entityType: 'Question',
+            entityId: questionId,
+            metadata: { status: updateData.status, scope: updateData.scope },
+            ...requestAuditContext(req),
         });
 
         return NextResponse.json({ success: true, question: updated });

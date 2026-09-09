@@ -27,6 +27,14 @@ export async function GET(req: Request) {
       targetBatchId = enrollments[0]?.batchId;
     }
 
+    const ownEnrollment = await (prisma as any).batchEnrollment.findFirst({
+      where: { batchId: targetBatchId, studentId, status: 'APPROVED' },
+      select: { id: true },
+    });
+    if (!ownEnrollment) {
+      return NextResponse.json({ error: 'You are not enrolled in this batch' }, { status: 403 });
+    }
+
     if (!targetBatchId) {
       return NextResponse.json({ success: true, leaderboard: [], userRank: null, totalStudents: 0 });
     }

@@ -60,7 +60,7 @@ export default function PerformanceAnalytics() {
 
     if (!data) return <div>Error loading data.</div>;
 
-    const { attempt, behavioral } = data;
+    const { attempt, behavioral, rank, totalTakers } = data;
     
     // Data for charts
     const behavioralData = [
@@ -110,7 +110,7 @@ export default function PerformanceAnalytics() {
                         { label: 'Total Questions', value: attempt.responses.length, icon: MousePointer2, color: 'text-slate-600', bg: 'bg-slate-100' },
                         { label: 'Accuracy', value: `${attempt.totalCorrect + attempt.totalIncorrect > 0 ? Math.round((attempt.totalCorrect / (attempt.totalCorrect + attempt.totalIncorrect)) * 100) : 0}%`, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                         { label: 'Avg Time/Q', value: `${Math.round(behavioral.medianTime)}s`, icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
-                        { label: 'Rank Estimate', value: '72/450', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50' },
+                        { label: 'Rank', value: rank ? `${rank}/${totalTakers}` : 'Not available', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50' },
                     ].map((stat, i) => (
                         <div key={i} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
                             <div className={`p-4 ${stat.bg} ${stat.color} rounded-2xl`}>

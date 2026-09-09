@@ -9,10 +9,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
   try {
     const { attemptId } = await params;
     const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const attempt = await prisma.testAttempt.findUnique({
-      where: { id: attemptId },
+    const attempt = await prisma.testAttempt.findFirst({
+      where: { id: attemptId, userId: session.user.id },
       include: {
         test: {
           include: {
@@ -70,7 +70,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
       }
     });
 
-    return NextResponse.json({ attempt, behavioral: stats });
+    let rank: number | null = null;
+    let totalTakers = 0;
+    if (attempt.testId) {
+      const cohortWhere = {
+        testId: attempt.testId,
+        status: { in: ['COMPLETED', 'SUBMITTED', 'AUTO_SUBMITTED'] },
+      };
+      const [higherScores, takers] = await Promise.all([
+        prisma.testAttempt.count({ where: { ...cohortWhere, totalScore: { gt: attempt.totalScore } } }),
+        prisma.testAttempt.count({ where: cohortWhere }),
+      ]);
+      rank = higherScores + 1;
+      totalTakers = takers;
+    }
+
+    return NextResponse.json({ attempt, behavioral: stats, rank, totalTakers });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

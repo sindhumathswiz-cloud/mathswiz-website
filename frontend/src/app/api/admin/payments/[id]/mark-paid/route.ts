@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
+import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -12,6 +13,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         }
 
         const { paidAt } = await req.json();
+
+        if ((session.user as any).role === 'TEACHER') {
+            const payment = await (prisma as any).paymentRecord.findUnique({
+                where: { id },
+                select: { enrollment: { select: { batch: { select: { teacherId: true } } } } }
+            });
+            if (!payment || payment.enrollment.batch.teacherId !== (session.user as any).id) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+            }
+        }
 
         const updatedPayment = await (prisma as any).paymentRecord.update({
             where: { id },
@@ -31,6 +42,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                     }
                 }
             }
+        });
+
+        await recordAuditLog({
+            actorId: (session.user as any).id,
+            actorRole: (session.user as any).role,
+            action: "PAYMENT_MARKED_PAID",
+            entityType: "PaymentRecord",
+            entityId: id,
+            metadata: { paidAt: updatedPayment.paidAt?.toISOString?.() || null },
+            ...requestAuditContext(req),
         });
 
         return NextResponse.json(updatedPayment);

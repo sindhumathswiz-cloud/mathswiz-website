@@ -58,6 +58,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 });
     }
 
+    const teacherAccess = await (prisma as any).batchEnrollment.findFirst({
+      where: { studentId, status: 'APPROVED', batch: { teacherId: receiverId } },
+      select: { id: true },
+    });
+    if (!teacherAccess) {
+      return NextResponse.json({ error: 'You can only message a teacher for one of your batches' }, { status: 403 });
+    }
+
+    if (replyToId) {
+      const original = await (prisma as any).message.findFirst({
+        where: {
+          id: replyToId,
+          OR: [
+            { senderId: studentId, receiverId },
+            { senderId: receiverId, receiverId: studentId },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!original) return NextResponse.json({ error: 'Message thread not found' }, { status: 403 });
+    }
+
     const message = await (prisma as any).message.create({
       data: {
         senderId: studentId,
@@ -87,8 +109,8 @@ export async function POST(req: Request) {
 
     // Mark original message as read
     if (replyToId) {
-      await (prisma as any).message.update({
-        where: { id: replyToId },
+      await (prisma as any).message.updateMany({
+        where: { id: replyToId, receiverId: studentId },
         data: { isRead: true },
       });
     }

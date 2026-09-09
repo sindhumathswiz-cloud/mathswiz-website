@@ -13,10 +13,34 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
     const studentId = (session.user as any).id;
+    const now = new Date();
+
+    const assignment = await (prisma as any).testAssignment.findFirst({
+      where: {
+        testId: id,
+        AND: [
+          { OR: [
+            { studentId },
+            { batch: { enrollments: { some: { studentId, status: 'APPROVED' } } } },
+          ] },
+          { OR: [{ scheduledFor: null }, { scheduledFor: { lte: now } }] },
+          { OR: [{ deadline: null }, { deadline: { gte: now } }] },
+        ],
+      },
+      select: { id: true, maxAttempts: true },
+    });
+    if (!assignment) return NextResponse.json({ error: 'This test is not assigned to you' }, { status: 403 });
+
+    const submittedAttempts = await prisma.testAttempt.count({
+      where: { testId: id, userId: studentId, status: { in: ['SUBMITTED', 'AUTO_SUBMITTED'] } },
+    });
+    if (submittedAttempts >= assignment.maxAttempts) {
+      return NextResponse.json({ error: 'Maximum attempts reached' }, { status: 403 });
+    }
 
     // Fetch the test with sections and questions, meticulously excluding correct answers
     const test = await prisma.test.findUnique({
-      where: { id },
+      where: { id, isPublished: true },
       include: {
         sections: {
           include: {

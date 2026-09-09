@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Role } from "@prisma/client";
+import { hash } from "bcryptjs";
 
 export async function updateUserDetailsAction(userId: string, data: {
     firstName?: string;
@@ -18,6 +19,7 @@ export async function updateUserDetailsAction(userId: string, data: {
     try {
         const updateData: any = { ...data };
         if (data.role) updateData.role = data.role as Role;
+        if (data.password) updateData.password = await hash(data.password, 12);
         
         await prisma.user.update({
             where: { id: userId },

@@ -29,10 +29,11 @@ export async function POST(request: NextRequest) {
 
     if (folderId) {
       folderIds = [folderId];
-      const folder = await prisma.knowledgeFolder.findUnique({
-        where: { id: folderId },
+      const folder = await prisma.knowledgeFolder.findFirst({
+        where: { id: folderId, ...(userRole === "ADMIN" ? {} : { userId }) },
         select: { topicName: true, className: true, subject: true }
       });
+      if (!folder) return NextResponse.json({ success: false, error: "Folder not found or not owned by you" }, { status: 403 });
       if (folder && !searchQuery) searchQuery = folder.topicName || folder.subject || folder.className || '';
     }
 

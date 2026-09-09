@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
 
 export const dynamic = 'force-dynamic';
 
@@ -126,6 +127,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             }
         }
 
+
+        await recordAuditLog({
+            actorId: userId,
+            actorRole: role,
+            action: "QUESTION_UPDATED",
+            entityType: "Question",
+            entityId: questionId,
+            metadata: { changedFields: Object.keys(updateData), status: updateData.status },
+            ...requestAuditContext(req),
+        });
+
         return NextResponse.json({ success: true, question });
     } catch (error) {
         console.error("Failed to patch question:", error);
@@ -140,8 +152,18 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
             return NextResponse.json({ error: "Unauthorized - Admin only" }, { status: 403 });
         }
 
+        const questionId = (await params).id;
         await prisma.question.delete({
-            where: { id: (await params).id }
+            where: { id: questionId }
+        });
+
+        await recordAuditLog({
+            actorId: (session.user as any).id,
+            actorRole: (session.user as any).role,
+            action: "QUESTION_DELETED",
+            entityType: "Question",
+            entityId: questionId,
+            ...requestAuditContext(req),
         });
 
         return NextResponse.json({ success: true });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,16 @@ export async function PATCH(req: Request) {
                 data: { accountStatus: action } as any
             });
         }
+
+        await recordAuditLog({
+            actorId: userId,
+            actorRole: (session?.user as any)?.role,
+            action: type === 'ENROLLMENT' ? "ENROLLMENT_STATUS_CHANGED" : "PARENT_ACCOUNT_STATUS_CHANGED",
+            entityType: type === 'ENROLLMENT' ? "BatchEnrollment" : "User",
+            entityId: targetId,
+            metadata: { status: action },
+            ...requestAuditContext(req),
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

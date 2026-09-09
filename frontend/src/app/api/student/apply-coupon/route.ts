@@ -13,6 +13,15 @@ export async function POST(req: Request) {
     }
 
     const { code, batchId } = await req.json();
+    const studentId = session.user.id;
+
+    const enrollment = await (prisma as any).batchEnrollment.findFirst({
+      where: { batchId, studentId, status: 'APPROVED' },
+      select: { id: true },
+    });
+    if (!enrollment) {
+      return NextResponse.json({ error: 'You are not enrolled in this batch' }, { status: 403 });
+    }
 
     const coupon = await (prisma as any).discountCoupon.findUnique({
       where: { code }

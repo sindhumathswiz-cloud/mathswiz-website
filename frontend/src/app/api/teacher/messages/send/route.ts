@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id || (session.user as any).role !== 'TEACHER') {
+    if (!session?.user?.id || !['TEACHER', 'ADMIN'].includes(session.user.role || '')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -18,6 +18,12 @@ export async function POST(req: Request) {
     if (!batchId || !content) {
       return NextResponse.json({ error: 'Batch ID and content are required' }, { status: 400 });
     }
+
+    const ownedBatch = await prisma.batch.findFirst({
+      where: { id: batchId, ...(session.user.role === 'ADMIN' ? {} : { teacherId }) },
+      select: { id: true },
+    });
+    if (!ownedBatch) return NextResponse.json({ error: 'Batch not found or not owned by you' }, { status: 403 });
 
     // Get all students in the batch
     const enrollments = await (prisma as any).batchEnrollment.findMany({

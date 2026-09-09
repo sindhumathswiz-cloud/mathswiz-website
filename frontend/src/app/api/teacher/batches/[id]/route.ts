@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { unstable_noStore as noStore } from "next/cache";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(
     req: Request,
@@ -9,9 +11,13 @@ export async function GET(
     noStore();
     try {
         const { id: batchId } = await params;
+        const session = await getServerSession(authOptions);
+        const userId = session?.user?.id;
+        const role = session?.user?.role;
+        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         
-        const batch = await prisma.batch.findUnique({
-            where: { id: batchId },
+        const batch = await prisma.batch.findFirst({
+            where: { id: batchId, ...(role === "ADMIN" ? {} : { teacherId: userId }) },
             include: { teacher: true }
         });
 

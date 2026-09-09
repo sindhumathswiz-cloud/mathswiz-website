@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Lock, Phone, LogIn } from "lucide-react";
 
 export default function Login() {
@@ -10,8 +11,6 @@ export default function Login() {
 
     const [mobile, setMobile] = useState("");
     const [password, setPassword] = useState("");
-    const [otp, setOtp] = useState("");
-    const [useOtp, setUseOtp] = useState(false);
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
@@ -23,31 +22,33 @@ export default function Login() {
         try {
             const res = await signIn("credentials", {
                 mobile,
-                password: useOtp ? undefined : password,
-                otp: useOtp ? otp : undefined,
+                password,
                 redirect: false,
             });
 
             if (res?.error) {
-                console.error("Login error:", res.error);
-                setError(res.error || "Invalid credentials. Please try again.");
+                setError(
+                    res.error === "CredentialsSignin"
+                        ? "The mobile number or password is incorrect. Please try again."
+                        : "We could not sign you in right now. Please try again."
+                );
             } else {
                 // Get the updated session to check role
                 const sessionRes = await fetch('/api/auth/session');
                 const session = await sessionRes.json();
-                console.log("Session after login:", session);
                 const role = session?.user?.role;
-                console.log("Role:", role);
 
                 if (role === 'ADMIN') {
                     router.push("/admin/dashboard");
                 } else if (role === 'TEACHER') {
                     router.push("/teacher/dashboard");
+                } else if (role === 'PARENT') {
+                    router.push("/parent/dashboard");
                 } else {
                     router.push("/student/dashboard");
                 }
             }
-        } catch (err) {
+        } catch {
             setError("An error occurred during login.");
         } finally {
             setIsLoading(false);
@@ -66,7 +67,7 @@ export default function Login() {
                     Sign In
                 </h2>
                 <p className="mt-2 text-center text-sm text-gray-600">
-                    Welcome back to Sindhu's Mathswiz Classes
+                    Welcome back to Sindhu&apos;s Mathswiz Classes
                 </p>
             </div>
 
@@ -80,12 +81,14 @@ export default function Login() {
                         )}
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Mobile Number *</label>
+                            <label htmlFor="mobile" className="block text-sm font-medium text-gray-700">Mobile Number *</label>
                             <div className="mt-1 relative rounded-md shadow-sm flex items-center">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <Phone className="h-5 w-5 text-gray-400" />
                                 </div>
                                 <input
+                                    id="mobile"
+                                    name="mobile"
                                     type="tel"
                                     required
                                     value={mobile}
@@ -96,28 +99,15 @@ export default function Login() {
                             </div>
                         </div>
 
-                        {useOtp ? (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">One-Time Password (OTP) *</label>
-                                <div className="mt-1 relative rounded-md shadow-sm">
-                                    <input
-                                        type="text"
-                                        required
-                                        value={otp}
-                                        onChange={(e) => setOtp(e.target.value)}
-                                        className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                        placeholder="Enter 1234 for testing"
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Password *</label>
+                        <div>
+                                <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password *</label>
                                 <div className="mt-1 relative rounded-md shadow-sm flex items-center">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                         <Lock className="h-5 w-5 text-gray-400" />
                                     </div>
                                     <input
+                                        id="password"
+                                        name="password"
                                         type="password"
                                         required
                                         value={password}
@@ -125,23 +115,6 @@ export default function Login() {
                                         className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                     />
                                 </div>
-                            </div>
-                        )}
-
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setUseOtp(!useOtp);
-                                        setOtp("");
-                                        setPassword("");
-                                    }}
-                                    className="font-medium text-indigo-600 hover:text-indigo-500"
-                                >
-                                    {useOtp ? "Use Password instead" : "Login with OTP instead"}
-                                </button>
-                            </div>
                         </div>
 
                         <div>
@@ -181,10 +154,10 @@ export default function Login() {
                         </div>
 
                         <div className="text-sm text-center">
-                            <span className="text-gray-600">Don't have an account? </span>
-                            <a href="/register" className="font-medium text-blue-600 hover:text-blue-500">
+                            <span className="text-gray-600">Don&apos;t have an account? </span>
+                            <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
                                 Register now
-                            </a>
+                            </Link>
                         </div>
                     </form>
                 </div>

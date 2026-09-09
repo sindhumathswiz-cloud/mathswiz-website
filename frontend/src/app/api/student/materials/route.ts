@@ -59,17 +59,6 @@ export async function GET() {
             }
         });
 
-        // Fallback dummy data if nothing exists in DB yet, but marked as filtered
-        if (materials.length === 0) {
-            return NextResponse.json({
-                data: [
-                    { id: 'f1', title: `${userClass || 'General'} Math PYQs`, type: 'PDF', isFree: true, class: userClass },
-                    { id: 'f2', title: `${userClass || 'General'} Sample Paper`, type: 'PDF', isFree: true, class: userClass }
-                ],
-                isLive: false
-            });
-        }
-
         return NextResponse.json({ data: materials, isLive: true });
 
     } catch (error) {

@@ -7,7 +7,7 @@ import { unstable_noStore as noStore } from "next/cache";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
+export async function GET() {
     noStore();
     try {
         const session = await getServerSession(authOptions);
@@ -15,6 +15,7 @@ export async function GET(req: Request) {
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const coupons = await (prisma as any).discountCoupon.findMany({
+            where: { batch: { teacherId: userId } },
             orderBy: { createdAt: 'desc' }
         });
 
@@ -32,14 +33,20 @@ export async function POST(req: Request) {
 
         const { code, discountPct, discountAmt, batchId } = await req.json();
 
-        if (!code) return NextResponse.json({ error: "Code is required" }, { status: 400 });
+        if (!code || !batchId) return NextResponse.json({ error: "Code and batch are required" }, { status: 400 });
+
+        const batch = await prisma.batch.findFirst({
+            where: { id: batchId, teacherId: userId },
+            select: { id: true },
+        });
+        if (!batch) return NextResponse.json({ error: "Batch not found or not owned by you" }, { status: 403 });
 
         const coupon = await (prisma as any).discountCoupon.create({
             data: {
                 code: code.toUpperCase(),
                 discountPct: discountPct ? parseFloat(discountPct) : null,
                 discountAmt: discountAmt ? parseFloat(discountAmt) : null,
-                batchId: batchId || null
+                batchId
             }
         });
 

@@ -116,8 +116,36 @@ export async function PATCH(req: Request) {
             return NextResponse.json({ error: "Challenge not found" }, { status: 404 });
         }
 
+        const isParticipant = challenge.opponentId === studentId || challenge.challengerId === studentId;
+        if (!isParticipant) {
+            return NextResponse.json({ error: "You are not a participant in this challenge" }, { status: 403 });
+        }
+
+        const otherParticipantId = challenge.opponentId === studentId
+            ? challenge.challengerId
+            : challenge.opponentId;
+        const sharedBatch = await (prisma as any).batchEnrollment.findFirst({
+            where: {
+                studentId,
+                status: "APPROVED",
+                batch: { enrollments: { some: { studentId: otherParticipantId, status: "APPROVED" } } },
+            },
+            select: { id: true },
+        });
+        if (!sharedBatch) {
+            return NextResponse.json({ error: "You can only challenge students in your batches" }, { status: 403 });
+        }
+
         if (challenge.opponentId !== studentId && action !== 'complete') {
             return NextResponse.json({ error: "Only the opponent can accept/decline" }, { status: 403 });
+        }
+
+        if (action === 'complete' && challenge.status !== 'ACCEPTED') {
+            return NextResponse.json({ error: "Only accepted challenges can be completed" }, { status: 400 });
+        }
+
+        if (winnerId && ![challenge.challengerId, challenge.opponentId].includes(winnerId)) {
+            return NextResponse.json({ error: "Winner must be a challenge participant" }, { status: 400 });
         }
 
         let newStatus = challenge.status;

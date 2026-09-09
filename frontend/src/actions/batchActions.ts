@@ -17,16 +17,9 @@ export async function createBatchAction(formData: FormData) {
 
     // Get current teacher session
     const session = await getServerSession(authOptions);
-    let teacherId = (session?.user as any)?.id;
-
-    if (!teacherId) {
-        // Fallback for absolute resilience during testing
-        teacherId = "admin-placeholder-id";
-        await (prisma as any).user.upsert({
-            where: { id: teacherId },
-            update: {},
-            create: { id: teacherId, name: "Admin", email: "admin@mathswiz.com", role: "ADMIN" }
-        });
+    const teacherId = (session?.user as any)?.id;
+    if (!teacherId || !['TEACHER', 'ADMIN'].includes((session?.user as any)?.role)) {
+        throw new Error("Unauthorized: a teacher or administrator session is required.");
     }
 
     // Catch Duplicate Codes Gracefully

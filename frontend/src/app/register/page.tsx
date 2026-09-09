@@ -231,7 +231,7 @@ export default function RegisterPage() {
                                         <Lock className="h-5 w-5 text-gray-400" />
                                     </div>
                                     <input
-                                        type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                                        type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)}
                                         className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-lg py-3 bg-gray-50 border outline-none"
                                         placeholder="••••••••"
                                     />

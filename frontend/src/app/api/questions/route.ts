@@ -17,6 +17,9 @@ export async function GET(req: Request) {
         const difficulty = searchParams.get("difficulty");
         const type = searchParams.get("type");
         const scope = searchParams.get("scope");
+        const bookId = searchParams.get("bookId");
+        const bookChapterId = searchParams.get("bookChapterId");
+        const bookExerciseId = searchParams.get("bookExerciseId");
 
         const session = await getServerSession(authOptions);
 
@@ -29,6 +32,9 @@ export async function GET(req: Request) {
         if (examType) filter.examType = examType;
         if (difficulty) filter.difficulty = difficulty;
         if (type) filter.type = type;
+        if (bookId) filter.bookId = bookId;
+        if (bookChapterId) filter.bookChapterId = bookChapterId;
+        if (bookExerciseId) filter.bookExerciseId = bookExerciseId;
 
         // Scope filtering: teachers see their private questions + public, admin sees all
         if (session?.user) {
@@ -69,7 +75,10 @@ export async function GET(req: Request) {
                             select: { name: true, type: true }
                         }
                     }
-                }
+                },
+                book: { select: { id: true, title: true, edition: true, publisher: true, className: true } },
+                bookChapter: { select: { id: true, chapterNumber: true, name: true } },
+                bookExercise: { select: { id: true, code: true, title: true } },
             },
             orderBy: {
                 createdAt: 'desc'
@@ -197,7 +206,14 @@ export async function POST(req: Request) {
                         class: q.class || "Class 12",
                         scope,
                         status: role === 'ADMIN' ? (q.status || "APPROVED") : "PENDING_REVIEW",
-                        createdById: userId
+                        createdById: userId,
+                        bookId: role === 'ADMIN' && q.bookId ? q.bookId : null,
+                        bookChapterId: role === 'ADMIN' && q.bookChapterId ? q.bookChapterId : null,
+                        bookExerciseId: role === 'ADMIN' && q.bookExerciseId ? q.bookExerciseId : null,
+                        printedNumber: role === 'ADMIN' ? (q.printedNumber || null) : null,
+                        printedSubpart: role === 'ADMIN' ? (q.printedSubpart || null) : null,
+                        sourcePageStart: role === 'ADMIN' && Number.isInteger(q.sourcePageStart) ? q.sourcePageStart : null,
+                        sourcePageEnd: role === 'ADMIN' && Number.isInteger(q.sourcePageEnd) ? q.sourcePageEnd : null,
                     }
                 });
                 const tagIds: string[] = [];

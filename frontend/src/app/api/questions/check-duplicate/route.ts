@@ -1,5 +1,7 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +40,10 @@ function trigramSimilarity(a: string, b: string): number {
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id || !session.user.role) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { content } = await req.json();
     if (!content || typeof content !== "string") {
       return NextResponse.json({ error: "content is required" }, { status: 400 });
@@ -46,6 +52,12 @@ export async function POST(req: Request) {
     const needle = normalizeText(content);
 
     const candidates = await prisma.question.findMany({
+      where: session.user.role === "ADMIN" ? {} : {
+        OR: [
+          { scope: "PUBLIC" },
+          { scope: "TEACHER_PRIVATE", createdById: session.user.id },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
       take: 500,
       select: {

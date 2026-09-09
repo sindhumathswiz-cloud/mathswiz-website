@@ -5,12 +5,18 @@ import { authOptions } from "@/lib/auth";
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     try {
         const { searchParams } = new URL(req.url);
         const testId = searchParams.get('testId');
         if (!testId) return NextResponse.json({ error: "testId is required" }, { status: 400 });
+
+        const ownAttempt = await prisma.testAttempt.findFirst({
+            where: { testId, userId: session.user.id, status: "COMPLETED" },
+            select: { id: true },
+        });
+        if (!ownAttempt) return NextResponse.json({ error: "You do not have access to analytics for this test" }, { status: 403 });
 
         // Retrieve all attempts for this test
         const attempts = await prisma.testAttempt.findMany({

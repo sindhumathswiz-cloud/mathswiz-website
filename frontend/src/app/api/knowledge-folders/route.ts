@@ -22,6 +22,14 @@ export async function POST(req: Request) {
         const { topicName, className, subject, parentId } = await req.json();
         if (!topicName) return NextResponse.json({ error: "Topic name is required" }, { status: 400 });
 
+        if (parentId) {
+            const parent = await prisma.knowledgeFolder.findFirst({
+                where: { id: parentId, ...(session?.user?.role === "ADMIN" ? {} : { userId: dbUser.id }) },
+                select: { id: true },
+            });
+            if (!parent) return NextResponse.json({ error: "Parent folder not found or not owned by you" }, { status: 403 });
+        }
+
         const folder = await prisma.knowledgeFolder.create({
             data: {
                 topicName,

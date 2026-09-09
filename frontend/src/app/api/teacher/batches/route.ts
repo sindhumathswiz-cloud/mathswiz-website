@@ -5,16 +5,18 @@ import { authOptions } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
+export async function GET() {
     try {
-        console.log("Nuclear Fix: Fetching all batches - API Hit");
-        // NUCLEAR FIX: We are intentionally ignoring teacherId filtering here 
-        // to prove the batch exists in the database and survives a refresh.
+        const session = await getServerSession(authOptions);
+        const userId = session?.user?.id;
+        const role = session?.user?.role;
+        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const batches = await (prisma as any).batch.findMany({
+            where: role === "ADMIN" ? {} : { teacherId: userId },
             orderBy: { createdAt: 'desc' }
         });
 
-        console.log(`Successfully fetched ${batches.length} batches from DB (Nuclear)`);
         return NextResponse.json(batches || []);
     } catch (error: any) {
         console.error("Teacher Batches GET Error:", error);
@@ -28,9 +30,10 @@ export async function POST(req: Request) {
         const userId = (session?.user as any)?.id;
         
         const body = await req.json();
-        const { name, code, startDate, teacherId } = body; 
+        const { name, code, startDate, teacherId } = body;
+        const role = session?.user?.role;
         
-        const resolvedTeacherId = userId || teacherId;
+        const resolvedTeacherId = role === "ADMIN" ? teacherId : userId;
 
         if (!name || !code) return NextResponse.json({ error: "Name and code are required" }, { status: 400 });
         if (!resolvedTeacherId) return NextResponse.json({ error: "Unauthorized: Missing Teacher ID" }, { status: 401 });

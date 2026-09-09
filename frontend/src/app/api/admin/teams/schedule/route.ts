@@ -12,11 +12,13 @@ export async function POST(req: Request) {
     try {
         const { title, start, end, batchId } = await req.json();
         const accessToken = (session as any).accessToken;
-        const batch = await prisma.batch.findUnique({ where: { id: batchId } });
+        const teacherId = session.user.id;
+        const batch = await prisma.batch.findFirst({
+            where: { id: batchId, ...(session.user.role === "ADMIN" ? {} : { teacherId }) },
+        });
         if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
 
         // 🩺 IDENTITY HEALING: Ensure we use the persistent DB CUID, not the Microsoft ID
-        const teacherId = (session?.user as any)?.id;
         const dbTeacher = await prisma.user.findUnique({
             where: { id: teacherId }
         });
@@ -121,7 +123,9 @@ export async function PATCH(req: Request) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
-        const liveClass = await prisma.liveClass.findUnique({ where: { id } });
+        const liveClass = await prisma.liveClass.findFirst({
+            where: { id, ...(session.user.role === "ADMIN" ? {} : { batch: { teacherId: session.user.id } }) },
+        });
         if (!liveClass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
         if (liveClass.eventId && accessToken) {
@@ -170,7 +174,9 @@ export async function DELETE(req: Request) {
 
         if (!id) return NextResponse.json({ error: "Missing class ID" }, { status: 400 });
 
-        const liveClass = await prisma.liveClass.findUnique({ where: { id } });
+        const liveClass = await prisma.liveClass.findFirst({
+            where: { id, ...(session.user.role === "ADMIN" ? {} : { batch: { teacherId: session.user.id } }) },
+        });
         if (!liveClass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
         // 🛑 Cancel Microsoft Teams Event if it exists

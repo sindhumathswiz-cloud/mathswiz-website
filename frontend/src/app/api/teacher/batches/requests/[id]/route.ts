@@ -19,6 +19,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             return NextResponse.json({ error: "Invalid status" }, { status: 400 });
         }
 
+        const enrollmentAccess = await (prisma as any).batchEnrollment.findFirst({
+            where: { id, batch: { teacherId: userId } },
+            select: { id: true, batch: { select: { teacherId: true } } },
+        });
+        if (!enrollmentAccess) return NextResponse.json({ error: "Enrollment not found or not owned by you" }, { status: 403 });
+
+        if (feeStructureId) {
+            const ownedFee = await (prisma as any).feeStructure.findFirst({
+                where: { id: feeStructureId, teacherId: userId },
+                select: { id: true },
+            });
+            if (!ownedFee) return NextResponse.json({ error: "Fee structure not found or not owned by you" }, { status: 403 });
+        }
+
         const result = await prisma.$transaction(async (tx) => {
             const updateData: any = { status };
             if (feeStructureId) {

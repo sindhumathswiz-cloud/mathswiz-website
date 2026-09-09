@@ -91,6 +91,10 @@ export async function POST(req: Request) {
 
             // --- UPSERT BATCH ---
             let batch = await prisma.batch.findUnique({ where: { microsoftTeamId: team.id } });
+            if (batch && session.user.role !== "ADMIN" && batch.teacherId !== validTeacherId) {
+                syncLogs.push(`Skipped Team "${team.displayName}": it is already linked to another teacher.`);
+                continue;
+            }
             if (!batch) {
                 batch = await prisma.batch.findFirst({ where: { name: team.displayName, teacherId: validTeacherId } });
             }
@@ -98,7 +102,12 @@ export async function POST(req: Request) {
             if (batch) {
                 batch = await prisma.batch.update({
                     where: { id: batch.id },
-                    data: { microsoftTeamId: team.id, oneNoteUrl, teamChatUrl, teacherId: validTeacherId }
+                    data: {
+                        microsoftTeamId: team.id,
+                        oneNoteUrl,
+                        teamChatUrl,
+                        ...(session.user.role === "ADMIN" ? { teacherId: validTeacherId } : {}),
+                    }
                 });
             } else {
                 batch = await prisma.batch.create({
@@ -175,7 +184,6 @@ export async function POST(req: Request) {
                         }
 
                         const meetingUrl = ev.onlineMeeting?.joinUrl || teamChatUrl;
-                        // @ts-ignore - recordingUrl added in latest schema migration
                         await prisma.liveClass.upsert({
                             where: { eventId: ev.id },
                             update: { 

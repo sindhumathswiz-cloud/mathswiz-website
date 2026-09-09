@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,16 @@ export async function POST(req: Request) {
                 recordedBy: teacherId,
                 transactionId: `MANUAL_${recordedMode || 'CASH'}_${Date.now()}`
             }
+        });
+
+        await recordAuditLog({
+            actorId: teacherId,
+            actorRole: (session?.user as any)?.role,
+            action: "PAYMENT_MARKED_PAID",
+            entityType: "PaymentRecord",
+            entityId: paymentId,
+            metadata: { recordedMode: recordedMode || 'CASH' },
+            ...requestAuditContext(req),
         });
 
         return NextResponse.json(updatedPayment);

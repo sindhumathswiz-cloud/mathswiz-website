@@ -15,13 +15,15 @@ export default function PerformanceClient({
     topper, 
     averageScore = 0, 
     totalTakers = 0,
-    batchName = "Class"
+    batchName = "Class",
+    rank = null,
 }: { 
     attempt: any, 
     topper: any, 
     averageScore?: number, 
     totalTakers?: number,
-    batchName?: string
+    batchName?: string,
+    rank?: number | null
 }) {
     
     const accuracy = attempt.totalCorrect + attempt.totalIncorrect > 0 
@@ -117,7 +119,7 @@ export default function PerformanceClient({
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
                             {/* Student */}
                             <div className="bg-white/10 p-6 rounded-2xl border border-white/20 backdrop-blur-sm relative overflow-hidden">
-                                <h3 className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-2 px-2 py-0.5 bg-indigo-950/50 rounded inline-block">Your Rank: #{Math.floor(Math.random() * 5) + 1}</h3>
+                                <h3 className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-2 px-2 py-0.5 bg-indigo-950/50 rounded inline-block">Your Rank: {rank ? `#${rank}` : 'Not available'}</h3>
                                 <div className="flex items-end gap-3 mb-2 mt-4">
                                     <span className="text-5xl font-black">{attempt.totalScore}</span>
                                     <span className="text-indigo-300 text-sm font-bold mb-1 max-w-[50px] leading-tight">TOTAL SCORE</span>

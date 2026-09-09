@@ -6,16 +6,13 @@ import { authOptions } from "@/lib/auth";
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
-        let teacherId = searchParams.get("teacherId");
+        const requestedTeacherId = searchParams.get("teacherId");
         const session = await getServerSession(authOptions);
 
-        // 🩺 IDENTITY HEALING: Always lookup the DB-persistent CUID
         const sessionUserId = (session?.user as any)?.id;
-        const dbUser = sessionUserId ? await prisma.user.findUnique({ 
-            where: { id: sessionUserId } 
-        }) : null;
-
-        const activeTeacherId = dbUser?.id || teacherId || sessionUserId;
+        const activeTeacherId = session?.user?.role === "ADMIN"
+            ? (requestedTeacherId || sessionUserId)
+            : sessionUserId;
 
         if (!activeTeacherId) {
             return NextResponse.json({ error: "Unauthorized: No valid session or ID found." }, { status: 401 });

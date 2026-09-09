@@ -18,6 +18,21 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing batchId or studentId" }, { status: 400 });
         }
 
+        const role = session?.user?.role;
+        const batch = await prisma.batch.findFirst({
+            where: { id: batchId, ...(role === "ADMIN" ? {} : { teacherId: userId }) },
+            select: { id: true, teacherId: true },
+        });
+        if (!batch) return NextResponse.json({ error: "Batch not found or not owned by you" }, { status: 403 });
+
+        if (feeStructureId) {
+            const feeStructure = await (prisma as any).feeStructure.findFirst({
+                where: { id: feeStructureId, teacherId: batch.teacherId },
+                select: { id: true },
+            });
+            if (!feeStructure) return NextResponse.json({ error: "Fee structure does not belong to this batch teacher" }, { status: 403 });
+        }
+
         // Check if enrollment already exists
         const existing = await (prisma as any).batchEnrollment.findFirst({
             where: { batchId, studentId }

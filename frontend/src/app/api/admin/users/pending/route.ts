@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,16 @@ export async function PATCH(req: NextRequest) {
         const updatedUser = await (prisma as any).user.update({
             where: { id: userId },
             data: { accountStatus: status }
+        });
+
+        await recordAuditLog({
+            actorId: (session.user as any).id,
+            actorRole: (session.user as any).role,
+            action: "USER_STATUS_CHANGED",
+            entityType: "User",
+            entityId: userId,
+            metadata: { accountStatus: status },
+            ...requestAuditContext(req),
         });
 
         return NextResponse.json({ success: true, user: updatedUser }, { status: 200 });
