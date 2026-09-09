@@ -3,6 +3,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border-subtle: #e2e8f0;
+  --brand: #4f46e5;
+  --brand-deep: #312e81;
+  --radius-card: 1.5rem;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 12px 32px rgb(15 23 42 / 0.05);
 }
 
 @theme inline {
@@ -23,6 +30,23 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .today-shell { @apply mb-8 space-y-5; }
+  .today-hero { @apply relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-indigo-800 to-violet-700 p-7 shadow-xl shadow-indigo-950/10 sm:p-9; }
+  .today-hero-orb { @apply absolute -right-16 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl; }
+  .today-metrics { @apply grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4; }
+  .today-card { @apply rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md; }
+  .today-icon { @apply inline-flex h-10 w-10 items-center justify-center rounded-xl; }
+  .today-panel { @apply rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6; }
+  .today-kicker { @apply text-xs font-black uppercase tracking-[0.16em] text-indigo-600; }
+  .today-title { @apply mt-1 text-xl font-black tracking-tight text-slate-950; }
+  .today-action { @apply flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-bold text-slate-800 transition hover:border-indigo-200 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500; }
+  .dashboard-tabs { @apply flex w-full gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm; scrollbar-width: thin; }
+  .dashboard-tab { @apply min-h-11 whitespace-nowrap rounded-xl border border-transparent px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500; }
+  .dashboard-tab-active { @apply bg-indigo-700 text-white shadow-sm hover:bg-indigo-800; }
+  .dashboard-empty { @apply rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500; }
 }
 
 @media print {

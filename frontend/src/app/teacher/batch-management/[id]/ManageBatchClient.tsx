@@ -801,19 +801,29 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                         <div className="animate-in fade-in duration-300">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
-                                    <ClipboardList className="w-5 h-5 text-indigo-500" /> Test Assignments
+                                    <ClipboardList className="w-5 h-5 text-indigo-500" /> Tests &amp; Homework
                                 </h2>
                                 <button 
                                     onClick={() => setShowAssignmentForm(!showAssignmentForm)} 
                                     className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 transition text-sm shadow-md"
                                 >
-                                    <Plus className="w-4 h-4" /> {showAssignmentForm ? 'Cancel' : 'Assign New Test'}
+                                    <Plus className="w-4 h-4" /> {showAssignmentForm ? 'Cancel' : 'Assign Work'}
                                 </button>
                             </div>
+                            <a href="/teacher/homework" className="mb-6 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50">
+                                <CheckCircle2 className="h-4 w-4" /> Review submitted homework
+                            </a>
 
                             {showAssignmentForm && (
                                 <div className="mb-8 border border-indigo-100 bg-indigo-50/30 rounded-2xl p-6 shadow-sm">
-                                    <form onSubmit={handleAssignTest} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                    <form onSubmit={handleAssignTest} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Work Type</label>
+                                            <select name="kind" defaultValue="HOMEWORK" className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                                                <option value="HOMEWORK">Homework</option>
+                                                <option value="TEST">Test</option>
+                                            </select>
+                                        </div>
                                         <div className="md:col-span-1">
                                             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Select Test</label>
                                             <select name="testId" required className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition">
@@ -840,6 +850,10 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                                                 Assign
                                             </button>
                                         </div>
+                                        <div className="md:col-span-6">
+                                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Instructions (optional)</label>
+                                            <textarea name="instructions" maxLength={2000} rows={2} placeholder="What should students complete or submit?" className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition" />
+                                        </div>
                                     </form>
                                 </div>
                             )}
@@ -857,11 +871,12 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                                                 <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-110 transition-transform">
                                                     <ClipboardList className="w-6 h-6" />
                                                 </div>
-                                                <span className={`text-[10px] font-black px-2 py-1 rounded-full border uppercase tracking-widest ${assignment.test?.mode === 'STRICT' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                                                    {assignment.test?.mode || 'STRICT'}
+                                                <span className={`text-[10px] font-black px-2 py-1 rounded-full border uppercase tracking-widest ${assignment.kind === 'HOMEWORK' ? 'bg-violet-50 text-violet-700 border-violet-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                                                    {assignment.kind === 'HOMEWORK' ? 'Homework' : 'Test'}
                                                 </span>
                                             </div>
                                             <h3 className="text-lg font-black text-gray-900 mb-2">{assignment.test?.title}</h3>
+                                            {assignment.instructions && <p className="text-sm text-gray-600 mb-3">{assignment.instructions}</p>}
                                             <div className="space-y-2 text-xs font-bold text-gray-500">
                                                 <div className="flex justify-between border-b border-gray-50 pb-1">
                                                     <span>Scheduled:</span>

@@ -3,14 +3,20 @@ import prisma from "@/lib/prisma";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — TS language server incorrectly reports this as missing; file exists at ./ManageBatchClient.tsx
 import ManageBatchClient from "./ManageBatchClient";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 export default async function ManageBatchPage({ params }: { params: Promise<{ id: string }> }) {
     noStore(); // Prevent aggressive caching
     const resolvedParams = await params;
+    const session = await getServerSession(authOptions);
+    const teacherId = session?.user?.id;
+    if (!teacherId || session.user.role !== "TEACHER") redirect('/login');
 
     // Fetch the batch AND its enrolled students simultaneously
     const batch = await (prisma as any).batch.findUnique({
-        where: { id: resolvedParams.id },
+        where: { id: resolvedParams.id, teacherId },
         include: {
             enrollments: {
                 where: { status: { in: ['APPROVED', 'SUSPENDED'] } },
@@ -28,6 +34,7 @@ export default async function ManageBatchPage({ params }: { params: Promise<{ id
 
     // Fetch tests to allow assigning them
     const tests = await prisma.test.findMany({
+        where: { createdById: teacherId, isPublished: true },
         orderBy: { createdAt: 'desc' },
         select: { id: true, title: true }
     }).catch(() => []);

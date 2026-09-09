@@ -117,3 +117,24 @@ If using Google OAuth:
 - Verify redirect URIs in Azure match your domain
 - Check tenant ID is correct
 - Ensure app has required API permissions
+# Persistent rate limiting
+
+Production authentication and AI endpoints require a Redis REST connection for distributed rate limiting. Create an Upstash Redis database and configure these environment variables in the deployment platform:
+
+```env
+UPSTASH_REDIS_REST_URL=https://your-database.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_rest_token
+```
+
+The limiter uses an atomic Redis script, so counters and expiry windows are shared across all serverless instances. In production, authentication and AI endpoints return `503` if Redis is unavailable; ordinary authenticated APIs remain available. Local development remains usable without Redis credentials.
+
+# Health monitoring
+
+- `GET /api/health/live` confirms the application process is responding.
+- `GET /api/health` checks PostgreSQL and, in production, Upstash Redis. It returns `503` when a required dependency is unavailable.
+- Configure an external uptime monitor to check `/api/health` every five minutes and alert after two consecutive failures.
+- Responses are uncached and expose only component status, never credentials or connection details.
+
+# Backup and recovery
+
+Run `npm run recovery:check` from `frontend` before deployment. See `RECOVERY.md` for the backup policy, quarterly isolated restore drill, and incident procedure. Supabase management credentials are optional; when omitted, the script verifies the live schema and reports that backup inventory needs a manual dashboard check.
