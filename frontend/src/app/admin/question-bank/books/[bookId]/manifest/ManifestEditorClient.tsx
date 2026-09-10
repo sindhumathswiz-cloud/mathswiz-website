@@ -252,6 +252,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
     let saved = 0;
     let failures = 0;
     let alreadyExtracted = 0;
+    const emptySectionPages = new Set<number>();
     try {
       for (;;) {
         setExtractProgress((p) => ({ ...p, [index]: `pages ${cursor}–${end}… ${saved} saved` }));
@@ -263,6 +264,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         if (!res.ok) throw new Error(data.error || 'Extraction failed');
         saved += data.batch?.saved ?? 0;
         failures += data.batch?.failures?.length ?? 0;
+        for (const p of data.batch?.emptySectionPages ?? []) emptySectionPages.add(p);
         alreadyExtracted = data.alreadyExtracted ?? alreadyExtracted;
         if (data.complete || data.nextStartPage == null) break;
         cursor = data.nextStartPage;
@@ -272,8 +274,13 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         setExtractProgress((p) => ({ ...p, [index]: `${alreadyExtracted} pages already extracted · ${chapter.questionsInRange} questions` }));
         setMessage({ kind: 'info', text: `${chapter.name}: all ${alreadyExtracted} pages were already extracted earlier (${chapter.questionsInRange} questions in this range). Use "Re-extract" to reprocess them under the manifest, or "Re-file existing questions" to move them into this chapter.` });
       } else {
+        const emptyList = [...emptySectionPages].sort((a, b) => a - b);
         setExtractProgress((p) => ({ ...p, [index]: `done — ${saved} saved${failures ? `, ${failures} page failures` : ''}` }));
-        setMessage({ kind: 'success', text: `${chapter.name}: extracted ${saved} question${saved === 1 ? '' : 's'}${failures ? ` (${failures} page failures)` : ''}.` });
+        setMessage({
+          kind: emptyList.length ? 'info' : 'success',
+          text: `${chapter.name}: extracted ${saved} question${saved === 1 ? '' : 's'}${failures ? ` (${failures} page failures)` : ''}.`
+            + (emptyList.length ? ` ${emptyList.length} page${emptyList.length === 1 ? '' : 's'} inside a question section produced no questions — check ${emptyList.slice(0, 12).join(', ')}${emptyList.length > 12 ? '…' : ''} (OCR gap, or the section range needs trimming).` : ''),
+        });
       }
     } catch (e) {
       setExtractProgress((p) => ({ ...p, [index]: `stopped — ${saved} saved` }));
