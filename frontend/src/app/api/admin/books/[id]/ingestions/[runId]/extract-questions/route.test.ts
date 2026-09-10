@@ -467,6 +467,40 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       expect(data.nextStartPage).toBeNull();
     });
 
+    it('re-picks COMPLETED zero-question pages inside a confirmed section on a per-chapter extraction', async () => {
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([]);
+      documentPage.count.mockResolvedValue(0);
+
+      const { POST } = await import('./route');
+      await POST(post({ startPage: 1, endPage: 20, batchSize: 5 }), { params });
+
+      // Not-force + endPage set -> the page query also matches already-COMPLETED
+      // pages that produced 0 questions but sit in the MCQ section (pages 1-5).
+      expect(documentPage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [
+            { status: { not: 'COMPLETED' } },
+            { status: 'COMPLETED', detectedQuestions: 0, pageNumber: { in: [1, 2, 3, 4, 5] } },
+          ],
+        }),
+      }));
+    });
+
+    it('reports pages inside a section that still produced no questions as emptySectionPages', async () => {
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-4', pageNumber: 4, nativeText: 'text', pageImagePath: '/p4.png', processedImagePath: null, layoutData: null },
+      ]);
+      getPageRawText.mockResolvedValueOnce({ provider: 'NATIVE_TEXT', rawText: 'page four text', ocrConfidence: null });
+      structurePageQuestions.mockResolvedValueOnce([]);
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({ startPage: 1, endPage: 20, batchSize: 5 }), { params }) as Response).json();
+
+      expect(data.batch.emptySectionPages).toEqual([4]);
+    });
+
     it('does not set distrustEmpty for a page outside every confirmed section', async () => {
       loadConfirmedChapters.mockResolvedValue([manifestChapter]);
       documentPage.findMany.mockResolvedValue([

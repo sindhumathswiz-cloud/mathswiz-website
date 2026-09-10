@@ -215,13 +215,47 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const book = await prisma.book.findUnique({ where: { id }, select: { className: true, subject: true } });
   if (!book) return NextResponse.json({ error: 'Book not found' }, { status: 404 });
 
+  // Confirmed chapter manifest (if any). Loaded up front because it also
+  // decides which already-COMPLETED pages are worth a second pass (below).
+  // When a page falls inside a confirmed chapter, its questions are filed
+  // under that chapter directly (not the LLM's per-question topic guess);
+  // when it falls inside a confirmed *section* the provider fallback chain is
+  // told to distrust an empty result (p.479 fix).
+  const confirmedChapters = await loadConfirmedChapters(id);
+
+  // On a per-chapter extraction (endPage set) that isn't a full forced
+  // re-run, also re-pick pages that were marked COMPLETED with ZERO questions
+  // but sit inside a confirmed question section. Those are almost always a
+  // silent miss from an earlier run -- a provider returned parseable-empty
+  // under load, before any manifest existed to distrust it -- not a
+  // genuinely empty page. Bounded to the chapter's own page window; dedup and
+  // the distrustEmpty provider chain keep the re-pass safe and cheap. Without
+  // this, "Extract this chapter" skips every such page as already-COMPLETED
+  // and the chapter stays permanently under-extracted unless the admin knows
+  // to hit the heavier full "Re-extract (force)".
+  const recoverableEmptyPages: number[] = [];
+  if (!force && endPage != null) {
+    for (let p = Math.max(1, requestedStart); p <= endPage; p++) {
+      if (sectionForPage(confirmedChapters, p)) recoverableEmptyPages.push(p);
+    }
+  }
+
   const pageWindow = { gte: Math.max(1, requestedStart), ...(endPage != null ? { lte: endPage } : {}) };
   const pages = await prisma.documentPage.findMany({
     where: {
       documentId: run.sourceDocumentId,
       pageNumber: pageWindow,
       pageImagePath: { not: null },
-      ...(force ? {} : { status: { not: 'COMPLETED' } }),
+      ...(force
+        ? {}
+        : recoverableEmptyPages.length
+          ? {
+              OR: [
+                { status: { not: 'COMPLETED' as const } },
+                { status: 'COMPLETED' as const, detectedQuestions: 0, pageNumber: { in: recoverableEmptyPages } },
+              ],
+            }
+          : { status: { not: 'COMPLETED' as const } }),
     },
     orderBy: { pageNumber: 'asc' },
     take: batchSize,
@@ -298,18 +332,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await prisma.bookIngestionRun.update({ where: { id: run.id }, data: { status: 'IN_PROGRESS', stage: 'QUESTION_EXTRACTION', errorMessage: null } });
 
-  // Confirmed chapter manifest (if any). When a page falls inside a confirmed
-  // chapter, its questions are filed under that chapter directly (not the LLM's
-  // per-question topic guess); when it falls inside a confirmed *section* the
-  // provider fallback chain is told to distrust an empty result (p.479 fix).
-  const confirmedChapters = await loadConfirmedChapters(id);
-
   let savedCount = 0;
   let duplicateCount = 0;
   let reviewCount = 0;
   let detectedCount = 0;
   let manifestFiledCount = 0;
   let distrustEmptyPages = 0;
+  // Pages inside a confirmed question section that STILL produced zero
+  // questions after the full provider chain — surfaced in the response and
+  // audit log so a silent under-extraction is visible (and re-checkable)
+  // rather than looking identical to a genuinely blank page.
+  const emptySectionPages: number[] = [];
   const failures: string[] = [];
   // Cross-run + intra-batch dedupe: skip content that already exists as an
   // APPROVED question anywhere, or that this book already has on file under
@@ -488,6 +521,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
       }
 
+      if (distrustEmpty && structured.length === 0) emptySectionPages.push(page.pageNumber);
+
       await prisma.documentPage.update({
         where: { id: page.id },
         data: {
@@ -566,14 +601,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     action: 'BOOK_PAGE_BATCH_QUESTIONS_EXTRACTED',
     entityType: 'BookIngestionRun',
     entityId: run.id,
-    metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, manifestFiledCount, distrustEmptyPages, failures },
+    metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, manifestFiledCount, distrustEmptyPages, emptySectionPages, failures },
     ...requestAuditContext(request),
   });
 
   const lastPage = pages[pages.length - 1]?.pageNumber ?? requestedStart;
   const reachedWindowEnd = endPage != null && lastPage >= endPage;
   return NextResponse.json({
-    batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, manifestFiled: manifestFiledCount, distrustEmptyPages, failures },
+    batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, manifestFiled: manifestFiledCount, distrustEmptyPages, emptySectionPages, failures },
     extractedQuestions: updatedRun.extractedQuestions,
     reviewRequired: updatedRun.reviewRequired,
     stage: updatedRun.stage,
