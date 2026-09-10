@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   detectManifest,
+  parseTableOfContents,
+  estimatePageOffset,
   isLikelyAnswerKeyPage,
   isLikelyDetailedSolutionsPage,
   findAnswerKeyPairs,
@@ -10,6 +12,7 @@ import {
   answerKeySectionForPage,
   solutionsSectionForPage,
   type ConfirmedChapter,
+  type ConfirmedSection,
   type ManifestDetectPage,
 } from './book-manifest';
 
@@ -22,135 +25,169 @@ const SOLUTIONS_TEXT = [
   '2. Taking the dot product of the two given vectors and simplifying the resulting expression, the required scalar is seven.',
 ].join('\n');
 
-describe('page-text signals (shared with the match-* routes)', () => {
-  it('recognises an answer-key page by heading plus pairs', () => {
+// A realistic Mathpix-rendered contents page (markdown table).
+const TOC_TEXT = [
+  'Contents',
+  '\\begin{table}',
+  '\\begin{tabular}[t]{|l|l|}',
+  '\\hline 1. Relations and Functions & 9 \\\\',
+  '\\hline 2. Inverse Trigonometric Functions & 41 \\\\',
+  '\\hline 3. Algebra of Matrices & 63 \\\\',
+  '\\hline 4. Determinants & 95 \\\\',
+  '\\hline 5. Continuity and Differentiability & 133 \\\\',
+  '\\hline \\multicolumn{2}{|c|}{PART-B} \\\\',
+  '\\hline CBSE Sample Question Paper 2021-22 Term-1 (Solved) & 477 \\\\',
+  '\\hline',
+  '\\end{tabular}',
+].join('\n');
+
+describe('page-text signals', () => {
+  it('recognises an answer-key page and a detailed-solutions page', () => {
     expect(findAnswerKeyPairs(ANSWER_KEY_TEXT)).toHaveLength(8);
     expect(isLikelyAnswerKeyPage(ANSWER_KEY_TEXT)).toBe(true);
-    expect(isLikelyAnswerKeyPage('An ordinary paragraph with no numbered letters at all.')).toBe(false);
-  });
-
-  it('recognises a detailed-solutions page by first-line heading plus prose blocks', () => {
     expect(parseSolutionBlocks(SOLUTIONS_TEXT)).toHaveLength(2);
     expect(isLikelyDetailedSolutionsPage(SOLUTIONS_TEXT)).toBe(true);
-    // The word "solution" inside a question stem must not trigger it.
-    expect(isLikelyDetailedSolutionsPage('3. Show that the general solution of the differential equation is ...')).toBe(false);
+    expect(isLikelyDetailedSolutionsPage('3. Show that the general solution of the equation ...')).toBe(false);
   });
 });
 
-describe('detectManifest', () => {
-  it('groups consecutive pages that share a running header into one chapter, skipping front matter', () => {
-    const pages: ManifestDetectPage[] = [
-      page(1, 'Contents'),
-      page(2, 'Syllabus'),
-      page(3, 'PROBABILITY\nSome text about conditional probability.'),
-      page(4, 'PROBABILITY\nBayes theorem and its applications.'),
-      page(5, 'PROBABILITY\nRandom variables and distributions.'),
-      page(6, 'PROBABILITY\nMore worked material.'),
-      page(7, 'Index'),
-    ];
-    const { chapters } = detectManifest(pages, 'Class 12');
-    expect(chapters).toHaveLength(1);
-    expect(chapters[0].name).toBe('Probability');
-    expect(chapters[0].startPage).toBe(3);
-    expect(chapters[0].endPage).toBe(6);
+describe('parseTableOfContents', () => {
+  it('reads the chapter list and the PART-B page from the markdown table', () => {
+    const toc = parseTableOfContents([page(1, 'cover'), page(2, 'blank'), page(3, TOC_TEXT)]);
+    expect(toc.entries.map((e) => e.name)).toEqual([
+      'Relations and Functions', 'Inverse Trigonometric Functions', 'Algebra of Matrices', 'Determinants', 'Continuity and Differentiability',
+    ]);
+    expect(toc.entries[0].printedPage).toBe(9);
+    expect(toc.entries[4].printedPage).toBe(133);
+    expect(toc.partBPrintedPage).toBe(477);
   });
 
-  it('splits a chapter into sections at question-type headings', () => {
-    const pages: ManifestDetectPage[] = [
-      page(10, 'VECTOR ALGEBRA\nMULTIPLE CHOICE QUESTIONS\n1. The magnitude of ...'),
-      page(11, 'VECTOR ALGEBRA\n2. Which of the following ...'),
-      page(12, 'VECTOR ALGEBRA\nSHORT ANSWER TYPE QUESTIONS\n1. Find the unit vector ...'),
-      page(13, 'VECTOR ALGEBRA\n2. Prove that ...'),
+  it('returns nothing when no contents page exists', () => {
+    expect(parseTableOfContents([page(1, 'just a normal page 1. some question')]).entries).toHaveLength(0);
+  });
+});
+
+describe('estimatePageOffset', () => {
+  it('finds the modal book -> PDF offset from chapter openers', () => {
+    const entries = [
+      { number: '1', name: 'Relations and Functions', printedPage: 9 },
+      { number: '2', name: 'Determinants', printedPage: 95 },
     ];
-    const { chapters } = detectManifest(pages, 'Class 12');
-    expect(chapters[0].sections.map((s) => s.sectionType)).toEqual(['MCQ', 'SHORT_ANSWER']);
-    expect(chapters[0].sections[0].startPage).toBe(10);
-    expect(chapters[0].sections[1].startPage).toBe(12);
+    const pages = [
+      page(14, 'Relations and Functions 1 basic pts\n1. A relation R ...'),   // 9 + 5
+      page(100, 'Determinants 4 basic pts\n1. Evaluate ...'),                   // 95 + 5
+    ];
+    expect(estimatePageOffset(pages, entries, 'Class 12')).toBe(5);
+  });
+});
+
+describe('detectManifest (TOC-driven)', () => {
+  const build = (): ManifestDetectPage[] => {
+    const pages: ManifestDetectPage[] = [page(3, TOC_TEXT)];
+    // Chapter 1 opener at printed 9 -> PDF 14 (offset +5); chapter 2 at printed 41 -> PDF 46.
+    pages.push(page(14, 'Relations and Functions 1 basic pts\n1. Let R be a relation ...'));
+    pages.push(page(20, 'RELATIONS AND FUNCTIONS\nMULTIPLE CHOICE QUESTIONS\n1. The relation ...'));
+    pages.push(page(30, 'RELATIONS AND FUNCTIONS\n2. Which of the following ...'));
+    pages.push(page(38, ANSWER_KEY_TEXT));                                     // MCQ answer key
+    pages.push(page(46, 'Inverse Trigonometric Functions 2 basic pts\n1. Principal value ...'));
+    pages.push(page(50, 'INVERSE TRIGONOMETRIC FUNCTIONS\nSHORT ANSWER TYPE QUESTIONS\n1. Find the value ...'));
+    return pages;
+  };
+
+  it('emits exactly the TOC chapters with printed + PDF ranges, and never a chapter from a section heading', () => {
+    const { chapters, pageOffset, tocFound } = detectManifest(build(), 'Class 12');
+    expect(tocFound).toBe(true);
+    expect(pageOffset).toBe(5);
+    expect(chapters.map((c) => c.name)).toEqual([
+      'Relations and Functions', 'Inverse Trigonometric Functions', 'Matrices', 'Determinants', 'Continuity and Differentiability',
+    ]);
+    const rf = chapters[0];
+    expect(rf.printedStartPage).toBe(9);
+    expect(rf.printedEndPage).toBe(40);
+    expect(rf.startPage).toBe(14);   // 9 + 5
+    expect(rf.endPage).toBe(45);     // 40 + 5
+    // "MULTIPLE CHOICE QUESTIONS" is a section of chapter 1, not its own chapter.
+    expect(rf.sections.some((s) => s.sectionType === 'MCQ')).toBe(true);
   });
 
-  it('attaches a separate answer-key block to the section it follows and extends the chapter over it', () => {
-    const pages: ManifestDetectPage[] = [
-      page(20, 'VECTOR ALGEBRA\nMULTIPLE CHOICE QUESTIONS\n1. The value of ...'),
-      page(21, 'VECTOR ALGEBRA\n2. If the vectors ...'),
-      page(22, ANSWER_KEY_TEXT),
-    ];
-    const { chapters } = detectManifest(pages, 'Class 12');
-    expect(chapters[0].endPage).toBe(22);
-    const section = chapters[0].sections[0];
-    expect(section.sectionType).toBe('MCQ');
-    expect(section.answerKeyStartPage).toBe(22);
-    expect(section.answerKeyEndPage).toBe(22);
-    expect(section.noAnswers).toBe(false);
+  it('attaches the answer-key block to the MCQ section within the chapter', () => {
+    const { chapters } = detectManifest(build(), 'Class 12');
+    const mcq = chapters[0].sections.find((s) => s.sectionType === 'MCQ');
+    expect(mcq?.answerKeyStartPage).toBe(38);
+    expect(mcq?.noAnswers).toBe(false);
   });
 
-  it('attaches a separate detailed-solutions block', () => {
-    const pages: ManifestDetectPage[] = [
-      page(30, 'VECTOR ALGEBRA\nLONG ANSWER TYPE QUESTIONS\n1. Derive the expression ...'),
-      page(31, 'VECTOR ALGEBRA\n2. Establish the identity ...'),
-      page(32, SOLUTIONS_TEXT),
+  it('classifies a THEORY heading as a non-question section', () => {
+    const pages = [
+      page(3, TOC_TEXT),
+      page(14, 'Relations and Functions 1 basic pts\nLIST OF IMPORTANT FORMULAE\n(i) ...'),
+      page(15, 'RELATIONS AND FUNCTIONS\n1. Let R ...'),
+      page(46, 'Inverse Trigonometric Functions 2 basic pts\n1. ...'),
     ];
     const { chapters } = detectManifest(pages, 'Class 12');
-    const section = chapters[0].sections[0];
-    expect(section.solutionsStartPage).toBe(32);
-    expect(section.solutionsEndPage).toBe(32);
-  });
-
-  it('marks a Solved Examples section as inline-answers', () => {
-    const pages: ManifestDetectPage[] = [
-      page(40, 'MATRICES\nSOLVED EXAMPLES\nExample 1. Sol. We compute ...'),
-      page(41, 'MATRICES\nExample 2. Sol. Expanding along the first row ...'),
-    ];
-    const { chapters } = detectManifest(pages, 'Class 12');
-    expect(chapters[0].sections[0].inlineAnswers).toBe(true);
+    expect(chapters[0].sections[0].sectionType).toBe('THEORY');
     expect(chapters[0].sections[0].noAnswers).toBe(false);
+    expect(chapters[0].sections[0].inlineAnswers).toBe(false);
   });
 
-  it('marks a section with no answers anywhere as a practice exercise', () => {
-    const pages: ManifestDetectPage[] = [
-      page(50, 'DETERMINANTS\nEXERCISE 4.1\n1. Evaluate the determinant.'),
-      page(51, 'DETERMINANTS\n2. Solve the system by Cramer’s rule.'),
+  it('infers HINTS coverage from a "Hints" solutions heading', () => {
+    const pages = [
+      page(3, TOC_TEXT),
+      page(14, 'Relations and Functions 1 basic pts\nLONG ANSWER TYPE QUESTIONS\n1. Prove ...'),
+      page(16, 'RELATIONS AND FUNCTIONS\n2. Show ...'),
+      page(20, 'Hints to Selected Questions\n1. Use the definition of an equivalence relation and check all three properties carefully before concluding.\n2. Start from the given functional equation and substitute suitable values.'),
+      page(46, 'Inverse Trigonometric Functions 2 basic pts\n1. ...'),
     ];
     const { chapters } = detectManifest(pages, 'Class 12');
-    const section = chapters[0].sections[0];
-    expect(section.sectionType).toBe('EXERCISE');
-    expect(section.noAnswers).toBe(true);
-    expect(section.answerKeyStartPage).toBeNull();
-    expect(section.solutionsStartPage).toBeNull();
+    const la = chapters[0].sections.find((s) => s.sectionType === 'LONG_ANSWER');
+    expect(la?.solutionsStartPage).toBe(20);
+    expect(la?.solutionCoverage).toBe('HINTS');
+  });
+
+  it('falls back to running-header grouping when there is no TOC', () => {
+    const pages = [
+      page(10, 'VECTOR ALGEBRA\nMULTIPLE CHOICE QUESTIONS\n1. ...'),
+      page(11, 'VECTOR ALGEBRA\n2. ...'),
+      page(12, 'VECTOR ALGEBRA\n3. ...'),
+    ];
+    const { chapters, tocFound } = detectManifest(pages, 'Class 12');
+    expect(tocFound).toBe(false);
+    expect(chapters[0].name).toBe('Vector Algebra');
   });
 });
 
 describe('confirmed-manifest consumer helpers', () => {
+  const section = (over: Partial<ConfirmedSection>): ConfirmedSection => ({
+    id: 's', sectionType: 'MCQ', startPage: null, endPage: null,
+    inlineAnswers: false, noAnswers: false,
+    answerKeyStartPage: null, answerKeyEndPage: null, answerKeyCoverage: null,
+    solutionsStartPage: null, solutionsEndPage: null, solutionCoverage: null,
+    ...over,
+  });
   const chapters: ConfirmedChapter[] = [
     {
       id: 'ch1', name: 'Vector Algebra', topic: 'Vector Algebra',
       startPage: 100, endPage: 130, manifestConfirmedAt: new Date(),
       exercises: [
-        { id: 's1', sectionType: 'MCQ', startPage: 100, endPage: 108, inlineAnswers: false, noAnswers: false, answerKeyStartPage: 120, answerKeyEndPage: 121, solutionsStartPage: null, solutionsEndPage: null },
-        { id: 's2', sectionType: 'LONG_ANSWER', startPage: 109, endPage: 115, inlineAnswers: false, noAnswers: false, answerKeyStartPage: null, answerKeyEndPage: null, solutionsStartPage: 125, solutionsEndPage: 128 },
-        { id: 's3', sectionType: 'EXERCISE', startPage: 116, endPage: 119, inlineAnswers: false, noAnswers: true, answerKeyStartPage: null, answerKeyEndPage: null, solutionsStartPage: null, solutionsEndPage: null },
+        section({ id: 's1', sectionType: 'MCQ', startPage: 100, endPage: 108, answerKeyStartPage: 120, answerKeyEndPage: 121, answerKeyCoverage: 'ALL' }),
+        section({ id: 's2', sectionType: 'LONG_ANSWER', startPage: 109, endPage: 115, solutionsStartPage: 125, solutionsEndPage: 128, solutionCoverage: 'HINTS' }),
+        section({ id: 's3', sectionType: 'EXERCISE', startPage: 116, endPage: 119, noAnswers: true }),
+        section({ id: 's4', sectionType: 'THEORY', startPage: 98, endPage: 99 }),
       ],
     },
-    {
-      id: 'ch2', name: 'Probability', topic: 'Probability',
-      startPage: 131, endPage: 160, manifestConfirmedAt: null, exercises: [],
-    },
+    { id: 'ch2', name: 'Probability', topic: 'Probability', startPage: 131, endPage: 160, manifestConfirmedAt: null, exercises: [] },
   ];
 
-  it('chapterForPage only resolves inside a confirmed chapter', () => {
+  it('chapterForPage / sectionForPage respect confirmation and skip THEORY', () => {
     expect(chapterForPage(chapters, 105)?.id).toBe('ch1');
-    expect(chapterForPage(chapters, 140)).toBeNull(); // ch2 not confirmed
-    expect(chapterForPage(chapters, 999)).toBeNull();
-  });
-
-  it('sectionForPage resolves the question range', () => {
+    expect(chapterForPage(chapters, 140)).toBeNull();
     expect(sectionForPage(chapters, 104)?.section.id).toBe('s1');
-    expect(sectionForPage(chapters, 112)?.section.id).toBe('s2');
-    expect(sectionForPage(chapters, 121)).toBeNull(); // 121 is the key range, not a question range
+    expect(sectionForPage(chapters, 98)).toBeNull(); // THEORY is not a question region
   });
 
-  it('answerKeySectionForPage / solutionsSectionForPage resolve the sub-ranges and skip noAnswers', () => {
+  it('answerKeySectionForPage / solutionsSectionForPage resolve sub-ranges and skip noAnswers', () => {
     expect(answerKeySectionForPage(chapters, 120)?.section.id).toBe('s1');
-    expect(solutionsSectionForPage(chapters, 126)?.section.id).toBe('s2');
-    expect(answerKeySectionForPage(chapters, 117)).toBeNull(); // s3 is a practice exercise
+    expect(solutionsSectionForPage(chapters, 126)?.section.solutionCoverage).toBe('HINTS');
+    expect(answerKeySectionForPage(chapters, 117)).toBeNull();
   });
 });

@@ -108,6 +108,9 @@ export function isLikelyDetailedSolutionsPage(rawText: string, blocks: SolutionB
 // Manifest types
 // ---------------------------------------------------------------------------
 
+export type AnswerKeyCoverage = 'ALL' | 'SELECTED';
+export type SolutionCoverage = 'ALL' | 'SELECTED' | 'HINTS';
+
 export interface ManifestSection {
   sectionType: string | null;
   title: string | null;
@@ -118,8 +121,10 @@ export interface ManifestSection {
   noAnswers: boolean;
   answerKeyStartPage: number | null;
   answerKeyEndPage: number | null;
+  answerKeyCoverage: AnswerKeyCoverage | null;
   solutionsStartPage: number | null;
   solutionsEndPage: number | null;
+  solutionCoverage: SolutionCoverage | null;
 }
 
 export interface ManifestChapter {
@@ -127,11 +132,19 @@ export interface ManifestChapter {
   name: string;
   startPage: number;
   endPage: number;
+  // The book's own printed page numbers (from the table of contents). PDF
+  // startPage/endPage = printed + the detected page offset.
+  printedStartPage: number | null;
+  printedEndPage: number | null;
   sections: ManifestSection[];
 }
 
 export interface ProposedManifest {
   chapters: ManifestChapter[];
+  /** PDF pageNumber - book-printed pageNumber, from the TOC + chapter openers. */
+  pageOffset: number;
+  /** True when a table of contents was found and used to place chapters. */
+  tocFound: boolean;
 }
 
 export interface ManifestDetectPage {
@@ -140,16 +153,33 @@ export interface ManifestDetectPage {
   layoutData?: unknown;
 }
 
+export interface TocEntry {
+  number: string | null;
+  name: string;
+  printedPage: number;
+}
+
+export interface ParsedToc {
+  entries: TocEntry[];
+  /** Book-printed page where PART-B (sample papers etc.) starts, if any. */
+  partBPrintedPage: number | null;
+}
+
 // Chapter-level running header / opener detection.
 const CHAPTER_MARKER_RE = /^\s*(?:CHAPTER|UNIT)\s+([IVXLC]+|\d{1,2})\b[\s:.–—-]*(.*)$/i;
 
 // Question-type section headings, most specific first. `EXERCISE` last so a
-// more descriptive heading on the same page wins.
+// more descriptive heading on the same page wins. `THEORY` marks non-question
+// sections (formula lists, basic concepts) so they aren't offered as question
+// sections.
 const SECTION_PATTERNS: Array<{ re: RegExp; type: string }> = [
+  { re: /\blist\s+of\s+important\s+formulae\b|\bbasic\s+(?:concepts?|pts)\b|\bbasic\s+points\b/i, type: 'THEORY' },
   { re: /\bsolved\s+examples?\b/i, type: 'SOLVED_EXAMPLES' },
+  { re: /\bselected\s+ncert\s+questions?\b/i, type: 'NCERT_SELECTED' },
   { re: /\bmultiple\s+choice\s+questions?\b|\bMCQ['’]?s?\b/i, type: 'MCQ' },
   { re: /\bassertion[\s-]*(?:and\s+)?reason(?:ing)?\b/i, type: 'ASSERTION_REASON' },
-  { re: /\bcase[\s-]*(?:based|study)\b|\bsource[\s-]*based\b/i, type: 'CASE_STUDY' },
+  { re: /\bcase[\s-]*(?:based|study)\b|\bsource[\s-]*based\b|\bdata[\s-]*based\b/i, type: 'CASE_STUDY' },
+  { re: /\bself[\s-]*assessment\b/i, type: 'SELF_ASSESSMENT' },
   { re: /\bvery\s+short\s+answer\b/i, type: 'VERY_SHORT_ANSWER' },
   { re: /\bshort\s+answer\b/i, type: 'SHORT_ANSWER' },
   { re: /\blong\s+answer\b/i, type: 'LONG_ANSWER' },
@@ -158,6 +188,105 @@ const SECTION_PATTERNS: Array<{ re: RegExp; type: string }> = [
   { re: /\bobjective\s+type\b/i, type: 'OBJECTIVE' },
   { re: /\bexercise\b[\s.]*([0-9]+[0-9a-z.]*)?/i, type: 'EXERCISE' },
 ];
+
+const NON_QUESTION_SECTION_TYPES = new Set(['THEORY']);
+
+// A TOC row: an optional "\hline", a chapter number, the name, "&", the page.
+// Handles the Mathpix markdown-table shape ("\hline 10. Vector Algebra & 329 \\").
+const TOC_ROW_RE = /^(?:\\hline\s*)?(\d{1,2})\.\s+(.+?)\s*&\s*(\d{1,4})\s*\\{0,2}\s*$/;
+const PART_B_RE = /\bPART[\s-]*B\b|\\multicolumn/i;
+const TOC_PAGE_RE = /\bcontents\b/i;
+
+/**
+ * Find the table of contents and read the chapter list + printed start pages
+ * from it. Returns empty entries when no TOC-shaped page is found in the first
+ * ~15 pages.
+ */
+export function parseTableOfContents(pages: ManifestDetectPage[]): ParsedToc {
+  const head = [...pages].sort((a, b) => a.pageNumber - b.pageNumber).slice(0, 15);
+  for (const page of head) {
+    const text = page.rawText || '';
+    if (!TOC_PAGE_RE.test(text)) continue;
+    const lines = text.split('\n');
+    const entries: TocEntry[] = [];
+    let partBPrintedPage: number | null = null;
+    let hitPartB = false;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (PART_B_RE.test(line)) {
+        hitPartB = true;
+        const m = line.match(/&\s*(\d{1,4})/);
+        if (m && partBPrintedPage === null) partBPrintedPage = Number(m[1]);
+        continue;
+      }
+      if (hitPartB) {
+        // After PART-B, the first row with a "& page" number is where it starts.
+        if (partBPrintedPage === null) {
+          const m = line.match(/&\s*(\d{1,4})/);
+          if (m) partBPrintedPage = Number(m[1]);
+        }
+        continue;
+      }
+      const m = line.match(TOC_ROW_RE);
+      if (!m) continue;
+      const printedPage = Number(m[3]);
+      const number = m[1];
+      const name = m[2].replace(/\s+/g, ' ').trim();
+      // Numbers should ascend; a reset means we've left the chapter list.
+      if (entries.length && Number(number) <= Number(entries[entries.length - 1].number)) continue;
+      entries.push({ number, name, printedPage });
+    }
+    if (entries.length >= 3) return { entries, partBPrintedPage };
+  }
+  return { entries: [], partBPrintedPage: null };
+}
+
+/**
+ * For each TOC entry, the PDF page where its chapter actually opens (name near
+ * the top, often followed by "basic pts" / "BASIC CONCEPTS"). Keyed by the
+ * entry's printed page.
+ */
+export function findChapterOpeners(pages: ManifestDetectPage[], entries: TocEntry[], className?: string): Map<number, number> {
+  const byPage = new Map(pages.map((p) => [p.pageNumber, p.rawText || '']));
+  const openers = new Map<number, number>();
+  for (const entry of entries) {
+    const target = normalizeName(entry.name);
+    const snapped = snapToChapter(entry.name, className);
+    for (let pdf = entry.printedPage - 1; pdf <= entry.printedPage + 14; pdf++) {
+      const text = byPage.get(pdf);
+      if (!text) continue;
+      const first = nonEmptyLines(text).slice(0, 2).map(normalizeName).join(' ');
+      const matches = first.includes(target)
+        || (snapped && first.includes(normalizeName(snapped)))
+        || (target.length > 8 && first.includes(target.slice(0, Math.ceil(target.length * 0.7))));
+      if (matches) {
+        openers.set(entry.printedPage, pdf);
+        break;
+      }
+    }
+  }
+  return openers;
+}
+
+/** PDF pageNumber - book-printed pageNumber, as the modal per-chapter offset. */
+export function estimatePageOffset(pages: ManifestDetectPage[], entries: TocEntry[], className?: string): number {
+  const openers = findChapterOpeners(pages, entries, className);
+  const counts = new Map<number, number>();
+  for (const [printed, pdf] of openers) {
+    const offset = pdf - printed;
+    counts.set(offset, (counts.get(offset) ?? 0) + 1);
+  }
+  let best = 0;
+  let bestCount = 0;
+  for (const [offset, count] of counts) {
+    if (count > bestCount) { best = offset; bestCount = count; }
+  }
+  return best;
+}
+
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+}
 
 // Answers/solutions printed right next to the questions.
 const INLINE_ANSWER_RE = /(?:^|\n)\s*(?:Sol\.|Ans\.|Answer\s*[:.]|Solution\s*[:.])/gi;
@@ -182,6 +311,8 @@ interface PageSignal {
   isFrontMatter: boolean;
   section: { type: string; title: string } | null;
   inlineAnswerHits: number;
+  /** First line of an answer-key / solutions page (used to infer coverage). */
+  blockHeading: string | null;
 }
 
 function analysePage(page: ManifestDetectPage, className?: string): PageSignal {
@@ -235,8 +366,9 @@ function analysePage(page: ManifestDetectPage, className?: string): PageSignal {
   }
 
   const inlineAnswerHits = (rawText.match(INLINE_ANSWER_RE) || []).length;
+  const blockHeading = (isAnswerKey || isSolutions) ? (lines[0] ?? null) : null;
 
-  return { pageNumber: page.pageNumber, chapter, chapterNumber, isAnswerKey, isSolutions, isFrontMatter, section, inlineAnswerHits };
+  return { pageNumber: page.pageNumber, chapter, chapterNumber, isAnswerKey, isSolutions, isFrontMatter, section, inlineAnswerHits, blockHeading };
 }
 
 // Collapse a per-page label array into maximal runs, bridging gaps of up to
@@ -282,140 +414,217 @@ function boolRuns(signals: PageSignal[], pred: (s: PageSignal) => boolean): Arra
 
 const MIN_CHAPTER_PAGES = 2;
 
+interface ChapterRange {
+  name: string;
+  chapterNumber: string | null;
+  startPage: number;
+  endPage: number;
+  printedStartPage: number | null;
+  printedEndPage: number | null;
+}
+
+function coverageFromTitle(title: string | null): { key: AnswerKeyCoverage | null; sol: SolutionCoverage | null } {
+  const t = (title || '').toLowerCase();
+  const selected = /\bselected\b|\bof\s+selected\b/.test(t);
+  const hints = /\bhints?\b/.test(t);
+  return {
+    key: selected ? 'SELECTED' : null,
+    sol: hints ? 'HINTS' : selected ? 'SELECTED' : null,
+  };
+}
+
+/** Detect the question-type sections that live inside one chapter's page range. */
+function sectionsForChapter(
+  signals: PageSignal[],
+  chapterStart: number,
+  chapterEnd: number,
+  answerKeyRuns: Array<{ start: number; end: number }>,
+  solutionsRuns: Array<{ start: number; end: number }>,
+): ManifestSection[] {
+  const chapterPages = signals.filter((s) => s.pageNumber >= chapterStart && s.pageNumber <= chapterEnd);
+  // Section openers, with consecutive same-type headings collapsed to the first.
+  const rawOpeners = chapterPages
+    .filter((s) => s.section && !s.isAnswerKey && !s.isSolutions)
+    .map((s) => ({ page: s.pageNumber, type: s.section!.type, title: s.section!.title }));
+  const openers = rawOpeners.filter((o, i) => i === 0 || o.type !== rawOpeners[i - 1].type);
+
+  const keyRunsHere = answerKeyRuns.filter((r) => r.start >= chapterStart && r.start <= chapterEnd);
+  const solRunsHere = solutionsRuns.filter((r) => r.start >= chapterStart && r.start <= chapterEnd);
+  const firstBlockPage = Math.min(
+    ...keyRunsHere.map((r) => r.start),
+    ...solRunsHere.map((r) => r.start),
+    chapterEnd + 1,
+  );
+
+  let bounds: Array<{ startPage: number; endPage: number; type: string | null; title: string | null }>;
+  if (openers.length === 0) {
+    bounds = [{ startPage: chapterStart, endPage: Math.max(chapterStart, firstBlockPage - 1), type: null, title: null }];
+  } else {
+    bounds = openers.map((opener, index) => {
+      const nextOpener = openers[index + 1]?.page ?? chapterEnd + 1;
+      const blockAfter = Math.min(
+        ...keyRunsHere.filter((r) => r.start > opener.page).map((r) => r.start),
+        ...solRunsHere.filter((r) => r.start > opener.page).map((r) => r.start),
+        chapterEnd + 1,
+      );
+      const endPage = Math.max(opener.page, Math.min(nextOpener, blockAfter) - 1);
+      return { startPage: opener.page, endPage, type: opener.type, title: opener.title };
+    });
+
+    // If the only detected headings are non-question (theory / formulae) or a
+    // big gap sits between the last section and the chapter's questions/blocks,
+    // add a catch-all question section for the remainder.
+    const last = bounds[bounds.length - 1];
+    const questionsEnd = firstBlockPage - 1;
+    const allNonQuestion = bounds.every((b) => b.type != null && NON_QUESTION_SECTION_TYPES.has(b.type));
+    if ((allNonQuestion || last.type == null || NON_QUESTION_SECTION_TYPES.has(last.type)) && questionsEnd - last.endPage >= 3) {
+      bounds.push({ startPage: last.endPage + 1, endPage: Math.max(last.endPage + 1, questionsEnd), type: null, title: null });
+    }
+  }
+
+  return bounds.map((bound, index) => {
+    const nextStart = bounds[index + 1]?.startPage ?? chapterEnd + 1;
+    const isNonQuestion = bound.type != null && NON_QUESTION_SECTION_TYPES.has(bound.type);
+
+    const keyRun = isNonQuestion ? undefined : (
+      keyRunsHere.find((r) => r.start > bound.startPage && r.start < nextStart)
+      ?? (index === bounds.length - 1 ? keyRunsHere.find((r) => r.start > bound.startPage) : undefined)
+    );
+    const solRun = isNonQuestion ? undefined : (
+      solRunsHere.find((r) => r.start > bound.startPage && r.start < nextStart)
+      ?? (index === bounds.length - 1 ? solRunsHere.find((r) => r.start > bound.startPage) : undefined)
+    );
+
+    const sectionSignalPages = signals.filter((s) => s.pageNumber >= bound.startPage && s.pageNumber <= bound.endPage);
+    const inlineAnswers = !isNonQuestion && (
+      bound.type === 'SOLVED_EXAMPLES'
+      || (sectionSignalPages.length > 0
+        && sectionSignalPages.filter((s) => s.inlineAnswerHits >= 2).length / sectionSignalPages.length >= 0.5)
+    );
+    const noAnswers = !isNonQuestion && !inlineAnswers && !keyRun && !solRun;
+
+    const keyHeading = keyRun ? signals.find((s) => s.pageNumber === keyRun.start)?.blockHeading ?? null : null;
+    const solHeading = solRun ? signals.find((s) => s.pageNumber === solRun.start)?.blockHeading ?? null : null;
+
+    return {
+      sectionType: bound.type,
+      title: bound.title,
+      code: null,
+      startPage: bound.startPage,
+      endPage: bound.endPage,
+      inlineAnswers,
+      noAnswers,
+      answerKeyStartPage: keyRun?.start ?? null,
+      answerKeyEndPage: keyRun?.end ?? null,
+      answerKeyCoverage: keyRun ? coverageFromTitle(keyHeading).key : null,
+      solutionsStartPage: solRun?.start ?? null,
+      solutionsEndPage: solRun?.end ?? null,
+      solutionCoverage: solRun ? coverageFromTitle(solHeading).sol : null,
+    };
+  });
+}
+
+export interface DetectManifestOptions {
+  tocEntries?: TocEntry[];
+  partBPrintedPage?: number | null;
+  pageOffset?: number;
+}
+
 /**
  * Propose a full chapter manifest from a run's OCR'd page text. Pure; writes
- * nothing. The result is a starting point for an admin to confirm/edit — every
- * range is a best guess from running headers and section headings.
+ * nothing.
+ *
+ * Chapters come from the book's table of contents when one is found (accurate
+ * count, names and printed page numbers) + a detected PDF/book page offset.
+ * A book with no parseable TOC falls back to running-header grouping. Either
+ * way, sections are ONLY ever detected inside a chapter's page range — a
+ * section heading never creates a chapter.
  */
-export function detectManifest(pages: ManifestDetectPage[], className?: string): ProposedManifest {
+export function detectManifest(pages: ManifestDetectPage[], className?: string, options: DetectManifestOptions = {}): ProposedManifest {
   const ordered = [...pages].sort((a, b) => a.pageNumber - b.pageNumber);
   const signals = ordered.map((page) => analysePage(page, className));
   const byPage = new Map(signals.map((s) => [s.pageNumber, s]));
-
-  const known = new Set(canonicalChapters(className));
-
-  const chapterRuns = runsOf(signals, (s) => (s.chapter && known.has(s.chapter) ? s.chapter : null))
-    .filter((run) => run.end - run.start + 1 >= MIN_CHAPTER_PAGES);
+  const maxPage = ordered[ordered.length - 1]?.pageNumber ?? 0;
 
   const answerKeyRuns = boolRuns(signals, (s) => s.isAnswerKey);
   const solutionsRuns = boolRuns(signals, (s) => s.isSolutions && !s.isAnswerKey);
 
-  // A chapter's trailing answer-key / detailed-solutions pages often carry no
-  // running header (the heading stands alone), so the header-based run stops
-  // short of them. Extend each chapter's end forward to cover any answer-key /
-  // solutions pages that follow it (tolerating a blank page or two between
-  // blocks), stopping before the next chapter and before any real content.
-  for (let i = 0; i < chapterRuns.length; i++) {
-    const nextStart = chapterRuns[i + 1]?.start ?? Number.MAX_SAFE_INTEGER;
-    let end = chapterRuns[i].end;
-    let blanksSinceExtend = 0;
-    for (let p = end + 1; p < nextStart; p++) {
-      const sig = byPage.get(p);
-      if (!sig) break;
-      const isOwnBlock = sig.isAnswerKey || sig.isSolutions
-        || (sig.chapter === chapterRuns[i].value && !sig.isFrontMatter);
-      if (isOwnBlock) {
-        end = p;
-        blanksSinceExtend = 0;
-      } else if (sig.isFrontMatter && blanksSinceExtend < 2) {
-        blanksSinceExtend++;
-      } else {
-        break;
-      }
-    }
-    chapterRuns[i].end = end;
-  }
+  // --- chapter ranges ---
+  const parsedToc = options.tocEntries
+    ? { entries: options.tocEntries, partBPrintedPage: options.partBPrintedPage ?? null }
+    : parseTableOfContents(pages);
+  const tocFound = parsedToc.entries.length >= 3;
 
-  const chapters: ManifestChapter[] = chapterRuns.map((run) => {
-    const chapterPages = signals.filter((s) => s.pageNumber >= run.start && s.pageNumber <= run.end);
-    const chapterNumber = chapterPages.find((s) => s.chapterNumber)?.chapterNumber ?? null;
+  let pageOffset = 0;
+  let chapterRanges: ChapterRange[];
 
-    // Section openers: pages inside the chapter with a heading that are NOT
-    // themselves an answer-key or solutions page.
-    const openers = chapterPages
-      .filter((s) => s.section && !s.isAnswerKey && !s.isSolutions)
-      .map((s) => ({ page: s.pageNumber, type: s.section!.type, title: s.section!.title }));
-
-    // First answer-key / solutions page inside the chapter bounds a section's
-    // question range even when no later section heading follows.
-    const firstBlockPage = Math.min(
-      ...answerKeyRuns.filter((r) => r.start >= run.start && r.start <= run.end).map((r) => r.start),
-      ...solutionsRuns.filter((r) => r.start >= run.start && r.start <= run.end).map((r) => r.start),
-      run.end + 1,
-    );
-
-    let sectionBounds: Array<{ startPage: number; endPage: number; type: string | null; title: string | null }>;
-    if (openers.length === 0) {
-      sectionBounds = [{ startPage: run.start, endPage: Math.max(run.start, firstBlockPage - 1), type: null, title: null }];
-    } else {
-      sectionBounds = openers.map((opener, index) => {
-        const nextOpener = openers[index + 1]?.page ?? run.end + 1;
-        // The section's question pages stop before the next heading OR the
-        // first answer/solutions block after this opener, whichever is first.
-        const blockAfter = Math.min(
-          ...answerKeyRuns.filter((r) => r.start > opener.page && r.start <= run.end).map((r) => r.start),
-          ...solutionsRuns.filter((r) => r.start > opener.page && r.start <= run.end).map((r) => r.start),
-          run.end + 1,
-        );
-        const endPage = Math.max(opener.page, Math.min(nextOpener, blockAfter) - 1);
-        return { startPage: opener.page, endPage, type: opener.type, title: opener.title };
-      });
-    }
-
-    const sections: ManifestSection[] = sectionBounds.map((bound, index) => {
-      const nextStart = sectionBounds[index + 1]?.startPage ?? run.end + 1;
-
-      // An answer-key run assigned to this section: the first one starting
-      // after the section opens and before the next section opens (a shared
-      // chapter-end key lands on the last section — the admin can reassign).
-      const keyRun = answerKeyRuns.find((r) => r.start > bound.startPage && r.start < nextStart && r.start <= run.end)
-        ?? (index === sectionBounds.length - 1
-          ? answerKeyRuns.find((r) => r.start > bound.startPage && r.start <= run.end)
-          : undefined);
-      const solRun = solutionsRuns.find((r) => r.start > bound.startPage && r.start < nextStart && r.start <= run.end)
-        ?? (index === sectionBounds.length - 1
-          ? solutionsRuns.find((r) => r.start > bound.startPage && r.start <= run.end)
-          : undefined);
-
-      const sectionSignalPages = signals.filter((s) => s.pageNumber >= bound.startPage && s.pageNumber <= bound.endPage);
-      const inlineAnswers = bound.type === 'SOLVED_EXAMPLES'
-        || (sectionSignalPages.length > 0
-          && sectionSignalPages.filter((s) => s.inlineAnswerHits >= 2).length / sectionSignalPages.length >= 0.5);
-
-      const noAnswers = !inlineAnswers && !keyRun && !solRun;
-
+  if (tocFound) {
+    const openers = findChapterOpeners(pages, parsedToc.entries, className);
+    pageOffset = options.pageOffset ?? estimatePageOffset(pages, parsedToc.entries, className);
+    const off = pageOffset;
+    // Where each chapter's PDF page sits: its own detected opener when we
+    // found one (books drift by a page mid-way), else printed + modal offset.
+    const startFor = (entry: TocEntry) => openers.get(entry.printedPage) ?? entry.printedPage + off;
+    chapterRanges = parsedToc.entries.map((entry, index) => {
+      const next = parsedToc.entries[index + 1];
+      const nextPrinted = next?.printedPage ?? parsedToc.partBPrintedPage ?? (maxPage - off) + 1;
+      const printedEnd = nextPrinted - 1;
+      const startPage = startFor(entry);
+      const endPage = next ? Math.max(startPage, startFor(next) - 1) : Math.min(maxPage, printedEnd + off);
       return {
-        sectionType: bound.type,
-        title: bound.title,
-        code: null,
-        startPage: bound.startPage,
-        endPage: bound.endPage,
-        inlineAnswers,
-        noAnswers,
-        answerKeyStartPage: keyRun?.start ?? null,
-        answerKeyEndPage: keyRun?.end ?? null,
-        solutionsStartPage: solRun?.start ?? null,
-        solutionsEndPage: solRun?.end ?? null,
+        name: snapToChapter(entry.name, className) ?? entry.name,
+        chapterNumber: entry.number,
+        printedStartPage: entry.printedPage,
+        printedEndPage: printedEnd,
+        startPage,
+        endPage: Math.min(maxPage, endPage),
       };
     });
+  } else {
+    // Fallback: running-header runs.
+    const known = new Set(canonicalChapters(className));
+    const runs = runsOf(signals, (s) => (s.chapter && known.has(s.chapter) ? s.chapter : null))
+      .filter((run) => run.end - run.start + 1 >= MIN_CHAPTER_PAGES);
+    for (let i = 0; i < runs.length; i++) {
+      const nextStart = runs[i + 1]?.start ?? Number.MAX_SAFE_INTEGER;
+      let end = runs[i].end;
+      let blanks = 0;
+      for (let p = end + 1; p < nextStart; p++) {
+        const sig = byPage.get(p);
+        if (!sig) break;
+        if (sig.isAnswerKey || sig.isSolutions || (sig.chapter === runs[i].value && !sig.isFrontMatter)) { end = p; blanks = 0; }
+        else if (sig.isFrontMatter && blanks < 2) blanks++;
+        else break;
+      }
+      runs[i].end = end;
+    }
+    chapterRanges = runs.map((run) => {
+      const chapterNumber = signals.find((s) => s.pageNumber >= run.start && s.pageNumber <= run.end && s.chapterNumber)?.chapterNumber ?? null;
+      return { name: run.value, chapterNumber, startPage: run.start, endPage: run.end, printedStartPage: null, printedEndPage: null };
+    });
+  }
 
-    return {
-      chapterNumber,
-      name: run.value,
-      startPage: run.start,
-      endPage: run.end,
-      sections,
-    };
-  });
+  const chapters: ManifestChapter[] = chapterRanges.map((range) => ({
+    chapterNumber: range.chapterNumber,
+    name: range.name,
+    startPage: range.startPage,
+    endPage: range.endPage,
+    printedStartPage: range.printedStartPage,
+    printedEndPage: range.printedEndPage,
+    sections: sectionsForChapter(signals, range.startPage, range.endPage, answerKeyRuns, solutionsRuns),
+  }));
 
-  void byPage;
-  return { chapters };
+  return { chapters, pageOffset, tocFound };
 }
 
 // ---------------------------------------------------------------------------
 // Consumer helpers — used by extract-questions / match-answer-keys /
 // match-detailed-solutions to prefer a confirmed manifest over their heuristics.
 // ---------------------------------------------------------------------------
+
+// Section types that hold theory / formulae, not questions — never a question
+// region for extraction or matching.
+export const NON_QUESTION_SECTIONS = NON_QUESTION_SECTION_TYPES;
 
 export interface ConfirmedSection {
   id: string;
@@ -426,8 +635,10 @@ export interface ConfirmedSection {
   noAnswers: boolean;
   answerKeyStartPage: number | null;
   answerKeyEndPage: number | null;
+  answerKeyCoverage: string | null;
   solutionsStartPage: number | null;
   solutionsEndPage: number | null;
+  solutionCoverage: string | null;
 }
 
 export interface ConfirmedChapter {
@@ -475,8 +686,10 @@ export async function loadConfirmedChapters(bookId: string): Promise<ConfirmedCh
           noAnswers: true,
           answerKeyStartPage: true,
           answerKeyEndPage: true,
+          answerKeyCoverage: true,
           solutionsStartPage: true,
           solutionsEndPage: true,
+          solutionCoverage: true,
         },
       },
     },
@@ -489,11 +702,15 @@ export function chapterForPage(chapters: ConfirmedChapter[], page: number): Conf
   return chapters.find((c) => c.manifestConfirmedAt && inRange(page, c.startPage, c.endPage)) ?? null;
 }
 
-/** The confirmed section whose QUESTION page range contains `page`, if any. */
+/**
+ * The confirmed QUESTION section whose page range contains `page`, if any.
+ * Theory / formula sections are not question regions.
+ */
 export function sectionForPage(chapters: ConfirmedChapter[], page: number): { chapter: ConfirmedChapter; section: ConfirmedSection } | null {
   for (const chapter of chapters) {
     if (!chapter.manifestConfirmedAt) continue;
     for (const section of chapter.exercises) {
+      if (section.sectionType && NON_QUESTION_SECTION_TYPES.has(section.sectionType)) continue;
       if (inRange(page, section.startPage, section.endPage)) return { chapter, section };
     }
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
@@ -7,17 +8,23 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /**
- * The confirmed chapter manifest for a book: each chapter's page range plus,
- * per question-type section, where its answers live (a separate letter-key
- * block, a separate detailed-solutions block, inline with the questions, or
- * nowhere -- a practice exercise). extract-questions / match-answer-keys /
- * match-detailed-solutions prefer a confirmed manifest over their heuristics;
- * see lib/book-manifest.ts.
+ * The chapter manifest for a book: each chapter's PDF + printed page range
+ * plus, per question-type section, where its answers live (a separate
+ * letter-key block, a separate detailed-solutions block, inline with the
+ * questions, or nowhere -- a practice exercise) and how much of the section a
+ * separate block covers. extract-questions / match-answer-keys /
+ * match-detailed-solutions prefer a confirmed manifest over their heuristics.
  *
- *  - GET  returns the stored manifest (whether or not it's confirmed).
- *  - PUT  upserts an edited manifest and marks every chapter confirmed.
- *  - POST .../manifest/detect proposes one from the OCR'd page text.
+ *  - GET  returns the stored manifest (managed chapters only).
+ *  - PUT  upserts an edited manifest; confirmation is PER CHAPTER.
+ *  - POST .../manifest/detect proposes one from the OCR'd page text + the TOC.
+ *  - POST .../manifest/refile re-files existing questions by the confirmed ranges.
  */
+
+// orderIndex >= UNMANAGED_ORDER_BASE is a chapter parked out of the manifest
+// (e.g. a stale LLM topic-guess chapter that still owns questions). GET hides
+// them; they keep their question links until "Re-file" empties them.
+const UNMANAGED_ORDER_BASE = 900;
 
 const SECTION_SELECT = {
   id: true,
@@ -31,9 +38,13 @@ const SECTION_SELECT = {
   noAnswers: true,
   answerKeyStartPage: true,
   answerKeyEndPage: true,
+  answerKeyCoverage: true,
   solutionsStartPage: true,
   solutionsEndPage: true,
+  solutionCoverage: true,
 } as const;
+
+const normalize = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await getAuthenticatedUser(['ADMIN']);
@@ -47,6 +58,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       title: true,
       className: true,
       chapters: {
+        where: { orderIndex: { lt: UNMANAGED_ORDER_BASE } },
         orderBy: { orderIndex: 'asc' },
         select: {
           id: true,
@@ -56,8 +68,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           topic: true,
           startPage: true,
           endPage: true,
+          printedStartPage: true,
+          printedEndPage: true,
           manifestConfirmedAt: true,
-          manifestConfirmedById: true,
           exercises: { orderBy: { orderIndex: 'asc' }, select: SECTION_SELECT },
         },
       },
@@ -79,11 +92,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 // ---------------------------------------------------------------------------
-// PUT — validate + upsert an edited manifest
+// PUT — validate + upsert an edited manifest, per-chapter confirm
 // ---------------------------------------------------------------------------
 
 interface IncomingSection {
-  id?: string;
   sectionType?: string | null;
   code?: string | null;
   title?: string | null;
@@ -93,8 +105,10 @@ interface IncomingSection {
   noAnswers?: boolean;
   answerKeyStartPage?: number | null;
   answerKeyEndPage?: number | null;
+  answerKeyCoverage?: string | null;
   solutionsStartPage?: number | null;
   solutionsEndPage?: number | null;
+  solutionCoverage?: string | null;
 }
 interface IncomingChapter {
   id?: string;
@@ -102,13 +116,23 @@ interface IncomingChapter {
   name?: string;
   startPage?: number | null;
   endPage?: number | null;
+  printedStartPage?: number | null;
+  printedEndPage?: number | null;
   topic?: string | null;
+  confirmed?: boolean;
   sections?: IncomingSection[];
 }
 
 const intOrNull = (value: unknown): number | null => (Number.isInteger(value) ? (value as number) : null);
 const str = (value: unknown, max: number): string | null =>
   typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : null;
+
+const ANSWER_KEY_COVERAGE = new Set(['ALL', 'SELECTED']);
+const SOLUTION_COVERAGE = new Set(['ALL', 'SELECTED', 'HINTS']);
+const coverage = (value: unknown, allowed: Set<string>): string | null => {
+  const v = typeof value === 'string' ? value.toUpperCase() : '';
+  return allowed.has(v) ? v : null;
+};
 
 function validate(chapters: IncomingChapter[], totalPages: number | null): string | null {
   const cap = totalPages && totalPages > 0 ? totalPages : Number.MAX_SAFE_INTEGER;
@@ -121,6 +145,9 @@ function validate(chapters: IncomingChapter[], totalPages: number | null): strin
     const ce = intOrNull(chapter.endPage);
     if (!inBook(cs) || !inBook(ce)) return `Chapter "${chapter.name}" has a page outside 1..${cap}.`;
     if (cs != null && ce != null && cs > ce) return `Chapter "${chapter.name}" ends before it starts.`;
+    const ps = intOrNull(chapter.printedStartPage);
+    const pe = intOrNull(chapter.printedEndPage);
+    if (ps != null && pe != null && ps > pe) return `Chapter "${chapter.name}" printed pages end before they start.`;
     if (cs != null && ce != null) ordered.push({ start: cs, end: ce, name: chapter.name || '' });
 
     for (const section of chapter.sections ?? []) {
@@ -134,13 +161,18 @@ function validate(chapters: IncomingChapter[], totalPages: number | null): strin
       for (const [a, b, label] of ranges) {
         if (!inBook(a) || !inBook(b)) return `A ${label} range in "${chapter.name}" is outside 1..${cap}.`;
         if (a != null && b != null && a > b) return `A ${label} range in "${chapter.name}" ends before it starts.`;
-        // Every sub-range must sit inside the chapter's bounds when both are set.
         if (cs != null && ce != null && a != null && (a < cs || (b ?? a) > ce)) {
           return `A ${label} range in "${chapter.name}" falls outside the chapter's pages.`;
         }
       }
       if (section.noAnswers && (section.inlineAnswers || intOrNull(section.answerKeyStartPage) != null || intOrNull(section.solutionsStartPage) != null)) {
         return `A section in "${chapter.name}" is marked "no answers" but also has an answer range.`;
+      }
+      if (section.answerKeyCoverage && !ANSWER_KEY_COVERAGE.has(String(section.answerKeyCoverage).toUpperCase())) {
+        return `A section in "${chapter.name}" has an invalid answer-key coverage.`;
+      }
+      if (section.solutionCoverage && !SOLUTION_COVERAGE.has(String(section.solutionCoverage).toUpperCase())) {
+        return `A section in "${chapter.name}" has an invalid solution coverage.`;
       }
     }
   }
@@ -167,7 +199,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const book = await prisma.book.findUnique({
     where: { id },
-    select: { id: true, ingestionRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { totalPages: true } } },
+    select: {
+      id: true,
+      ingestionRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { totalPages: true } },
+    },
   });
   if (!book) return NextResponse.json({ error: 'Book not found' }, { status: 404 });
 
@@ -176,31 +211,65 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
 
   const now = new Date();
-  const keptChapterIds: string[] = [];
+  let confirmedCount = 0;
 
-  await prisma.$transaction(async (tx) => {
-    for (let index = 0; index < incoming.length; index++) {
-      const chapter = incoming[index];
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const existing = await tx.bookChapter.findMany({
+      where: { bookId: id },
+      orderBy: { orderIndex: 'asc' },
+      select: { id: true, name: true, orderIndex: true },
+    });
+    const byId = new Map(existing.map((c) => [c.id, c]));
+    const byName = new Map(existing.map((c) => [normalize(c.name), c]));
+
+    // Resolve each incoming chapter to an existing row (reuse its id so linked
+    // questions stay linked): explicit id first, then name match.
+    const resolved = incoming.map((chapter) => {
+      const target = (chapter.id && byId.get(chapter.id)) || byName.get(normalize(chapter.name || ''));
+      return { chapter, targetId: target?.id ?? null };
+    });
+    const keptTargetIds = new Set(resolved.map((r) => r.targetId).filter(Boolean) as string[]);
+
+    // Park every existing chapter at a unique negative orderIndex so the
+    // rewrite below never collides on @@unique([bookId, orderIndex]).
+    for (let i = 0; i < existing.length; i++) {
+      await tx.bookChapter.update({ where: { id: existing[i].id }, data: { orderIndex: -1 - i } });
+    }
+
+    // Drop chapters that left the manifest AND are safe to remove.
+    await tx.bookChapter.deleteMany({
+      where: { bookId: id, id: { notIn: [...keptTargetIds, '__none__'] }, questions: { none: {} }, manifestConfirmedAt: null },
+    });
+
+    for (let index = 0; index < resolved.length; index++) {
+      const { chapter, targetId } = resolved[index];
+      const isConfirmed = chapter.confirmed === true;
+      if (isConfirmed) confirmedCount++;
       const data = {
         chapterNumber: str(chapter.chapterNumber, 30),
         name: str(chapter.name, 200)!,
         topic: str(chapter.topic, 200),
         startPage: intOrNull(chapter.startPage),
         endPage: intOrNull(chapter.endPage),
-        manifestConfirmedAt: now,
-        manifestConfirmedById: auth.user.id,
+        printedStartPage: intOrNull(chapter.printedStartPage),
+        printedEndPage: intOrNull(chapter.printedEndPage),
+        manifestConfirmedAt: isConfirmed ? now : null,
+        manifestConfirmedById: isConfirmed ? auth.user.id : null,
       };
-      const saved = await tx.bookChapter.upsert({
-        where: { bookId_orderIndex: { bookId: id, orderIndex: index } },
-        create: { bookId: id, orderIndex: index, ...data },
-        update: data,
-      });
-      keptChapterIds.push(saved.id);
+      const chapterId = targetId
+        ? (await tx.bookChapter.update({ where: { id: targetId }, data: { orderIndex: index, ...data } })).id
+        : (await tx.bookChapter.create({ data: { bookId: id, orderIndex: index, ...data } })).id;
 
+      // Sections: same park-then-write within this chapter.
+      const existingSections = await tx.bookExercise.findMany({ where: { chapterId }, orderBy: { orderIndex: 'asc' }, select: { id: true } });
+      for (let i = 0; i < existingSections.length; i++) {
+        await tx.bookExercise.update({ where: { id: existingSections[i].id }, data: { orderIndex: -1 - i } });
+      }
       const sections = chapter.sections ?? [];
-      const keptSectionIds: string[] = [];
       for (let sIndex = 0; sIndex < sections.length; sIndex++) {
         const section = sections[sIndex];
+        const hasKey = intOrNull(section.answerKeyStartPage) != null;
+        const hasSol = intOrNull(section.solutionsStartPage) != null;
         const sData = {
           code: str(section.code, 30),
           title: str(section.title, 200),
@@ -211,30 +280,35 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           noAnswers: section.noAnswers === true,
           answerKeyStartPage: intOrNull(section.answerKeyStartPage),
           answerKeyEndPage: intOrNull(section.answerKeyEndPage),
+          answerKeyCoverage: hasKey ? (coverage(section.answerKeyCoverage, ANSWER_KEY_COVERAGE) ?? 'ALL') : null,
           solutionsStartPage: intOrNull(section.solutionsStartPage),
           solutionsEndPage: intOrNull(section.solutionsEndPage),
+          solutionCoverage: hasSol ? (coverage(section.solutionCoverage, SOLUTION_COVERAGE) ?? 'ALL') : null,
         };
-        const savedSection = await tx.bookExercise.upsert({
-          where: { chapterId_orderIndex: { chapterId: saved.id, orderIndex: sIndex } },
-          create: { chapterId: saved.id, orderIndex: sIndex, ...sData },
-          update: sData,
-        });
-        keptSectionIds.push(savedSection.id);
+        const existingSection = existingSections[sIndex]?.id;
+        if (existingSection) await tx.bookExercise.update({ where: { id: existingSection }, data: { orderIndex: sIndex, ...sData } });
+        else await tx.bookExercise.create({ data: { chapterId, orderIndex: sIndex, ...sData } });
       }
-      await tx.bookExercise.deleteMany({ where: { chapterId: saved.id, id: { notIn: keptSectionIds.length ? keptSectionIds : ['__none__'] } } });
+      await tx.bookExercise.deleteMany({ where: { chapterId, orderIndex: { lt: 0 } } });
     }
-    await tx.bookChapter.deleteMany({ where: { bookId: id, id: { notIn: keptChapterIds.length ? keptChapterIds : ['__none__'] } } });
+
+    // Leftover existing chapters that couldn't be pruned (they own questions):
+    // move them out of the managed range rather than delete.
+    const leftover = await tx.bookChapter.findMany({ where: { bookId: id, orderIndex: { lt: 0 } }, select: { id: true } });
+    for (let i = 0; i < leftover.length; i++) {
+      await tx.bookChapter.update({ where: { id: leftover[i].id }, data: { orderIndex: UNMANAGED_ORDER_BASE + i } });
+    }
   });
 
   await recordAuditLog({
     actorId: auth.user.id,
     actorRole: 'ADMIN',
-    action: 'BOOK_MANIFEST_CONFIRMED',
+    action: 'BOOK_MANIFEST_SAVED',
     entityType: 'Book',
     entityId: id,
-    metadata: { bookId: id, chapterCount: incoming.length, sectionCount: incoming.reduce((sum, c) => sum + (c.sections?.length ?? 0), 0) },
+    metadata: { bookId: id, chapterCount: incoming.length, confirmedCount, sectionCount: incoming.reduce((sum, c) => sum + (c.sections?.length ?? 0), 0) },
     ...requestAuditContext(request),
   });
 
-  return NextResponse.json({ success: true, chapterCount: keptChapterIds.length });
+  return NextResponse.json({ success: true, chapterCount: incoming.length, confirmedCount });
 }

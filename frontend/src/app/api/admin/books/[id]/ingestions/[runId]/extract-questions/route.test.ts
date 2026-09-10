@@ -435,6 +435,38 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       expect(data.batch.distrustEmptyPages).toBe(1);
     });
 
+    it('bounds the page window and completion check to endPage (per-chapter extraction)', async () => {
+      loadConfirmedChapters.mockResolvedValue([]);
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-334', pageNumber: 334, nativeText: 'text', pageImagePath: '/p334.png', processedImagePath: null, layoutData: null },
+      ]);
+      getPageRawText.mockResolvedValueOnce({ provider: 'NATIVE_TEXT', rawText: 'chapter page', ocrConfidence: null });
+      structurePageQuestions.mockResolvedValueOnce([]);
+
+      const { POST } = await import('./route');
+      await POST(post({ startPage: 334, endPage: 363, batchSize: 5 }), { params });
+
+      // The page query is capped at endPage.
+      expect(documentPage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ pageNumber: { gte: 334, lte: 363 } }),
+      }));
+    });
+
+    it('reports complete once the last processed page reaches endPage', async () => {
+      loadConfirmedChapters.mockResolvedValue([]);
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-363', pageNumber: 363, nativeText: 'text', pageImagePath: '/p363.png', processedImagePath: null, layoutData: null },
+      ]);
+      getPageRawText.mockResolvedValueOnce({ provider: 'NATIVE_TEXT', rawText: 'last chapter page', ocrConfidence: null });
+      structurePageQuestions.mockResolvedValueOnce([]);
+      documentPage.count.mockResolvedValue(0);
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({ startPage: 360, endPage: 363, batchSize: 5 }), { params }) as Response).json();
+      expect(data.complete).toBe(true);
+      expect(data.nextStartPage).toBeNull();
+    });
+
     it('does not set distrustEmpty for a page outside every confirmed section', async () => {
       loadConfirmedChapters.mockResolvedValue([manifestChapter]);
       documentPage.findMany.mockResolvedValue([

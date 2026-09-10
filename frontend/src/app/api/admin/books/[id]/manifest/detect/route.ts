@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
-import { detectManifest } from '@/lib/book-manifest';
+import { detectManifest, parseTableOfContents } from '@/lib/book-manifest';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -41,7 +41,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'No page text is available yet. Render the pages first.' }, { status: 409 });
   }
 
-  const proposal = detectManifest(pages, book.className);
+  const toc = parseTableOfContents(pages);
+  const proposal = detectManifest(pages, book.className, {
+    tocEntries: toc.entries.length ? toc.entries : undefined,
+    partBPrintedPage: toc.partBPrintedPage,
+  });
 
   await recordAuditLog({
     actorId: auth.user.id,
@@ -49,7 +53,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     action: 'BOOK_MANIFEST_DETECTED',
     entityType: 'Book',
     entityId: id,
-    metadata: { bookId: id, pagesScanned: pages.length, chaptersProposed: proposal.chapters.length },
+    metadata: { bookId: id, pagesScanned: pages.length, chaptersProposed: proposal.chapters.length, tocFound: proposal.tocFound, pageOffset: proposal.pageOffset },
     ...requestAuditContext(request),
   });
 
@@ -57,6 +61,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     runId: run.id,
     totalPages: run.totalPages,
     pagesScanned: pages.length,
+    tocFound: proposal.tocFound,
+    pageOffset: proposal.pageOffset,
     proposal,
   });
 }
