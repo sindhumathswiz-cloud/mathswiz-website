@@ -467,6 +467,31 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       expect(data.nextStartPage).toBeNull();
     });
 
+    it('excludes a confirmed answer-key / solutions listing page from the page query', async () => {
+      loadConfirmedChapters.mockResolvedValue([{
+        ...manifestChapter,
+        exercises: [{
+          id: 'sec-mcq', sectionType: 'MCQ', startPage: 1, endPage: 5,
+          inlineAnswers: false, noAnswers: false,
+          answerKeyStartPage: 7, answerKeyEndPage: 7,
+          solutionsStartPage: 8, solutionsEndPage: 9,
+        }],
+      }]);
+      documentPage.findMany.mockResolvedValue([]);
+      documentPage.count.mockResolvedValue(0);
+
+      const { POST } = await import('./route');
+      await POST(post({ startPage: 1, endPage: 20, batchSize: 5 }), { params });
+
+      // Pages 7 (answer key) and 8-9 (solutions) are inside the chapter but in
+      // no question section -> pure listing pages, kept out of extraction.
+      expect(documentPage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({
+          pageNumber: expect.objectContaining({ notIn: [7, 8, 9] }),
+        }),
+      }));
+    });
+
     it('re-picks COMPLETED zero-question pages inside a confirmed section on a per-chapter extraction', async () => {
       loadConfirmedChapters.mockResolvedValue([manifestChapter]);
       documentPage.findMany.mockResolvedValue([]);

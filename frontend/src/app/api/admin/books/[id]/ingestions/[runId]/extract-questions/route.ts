@@ -10,7 +10,7 @@ import { cropPageRegion } from '@/lib/page-image-crop';
 import type { DiagramRegion } from '@/lib/diagram-regions';
 import { worstSeverity } from '@/lib/question-qa';
 import { snapToChapter } from '@/lib/chapter-classifier';
-import { loadConfirmedChapters, chapterForPage, sectionForPage } from '@/lib/book-manifest';
+import { loadConfirmedChapters, chapterForPage, sectionForPage, answerKeySectionForPage, solutionsSectionForPage } from '@/lib/book-manifest';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -233,14 +233,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // this, "Extract this chapter" skips every such page as already-COMPLETED
   // and the chapter stays permanently under-extracted unless the admin knows
   // to hit the heavier full "Re-extract (force)".
+  // Pages inside a confirmed chapter that are a pure answer-key or
+  // detailed-solutions listing (in a section's key/solutions range, and NOT
+  // in any question section) are NOT question pages. Running the LLM over one
+  // produces junk rows -- an "Answers 1.(a) 2.(c) ..." block, or worked
+  // solutions with the question restated, get mis-structured as optionless
+  // duplicate questions of the real ones a few pages back. The manifest knows
+  // exactly where those pages are, so skip them here; match-answer-keys /
+  // match-detailed-solutions consume them instead.
+  const manifestListingPages: number[] = [];
   const recoverableEmptyPages: number[] = [];
-  if (!force && endPage != null) {
-    for (let p = Math.max(1, requestedStart); p <= endPage; p++) {
-      if (sectionForPage(confirmedChapters, p)) recoverableEmptyPages.push(p);
+  for (let p = Math.max(1, requestedStart); p <= (endPage ?? run.totalPages); p++) {
+    if (!chapterForPage(confirmedChapters, p)) continue;
+    if (sectionForPage(confirmedChapters, p)) {
+      // A per-chapter re-run (endPage set, not force) also re-picks pages a
+      // confirmed question section covers that were left COMPLETED with zero
+      // questions -- almost always a silent miss from an earlier run (a
+      // provider returned parseable-empty under load, before any manifest
+      // existed to distrust it). Dedup + the distrustEmpty provider chain
+      // keep the re-pass safe and cheap.
+      if (!force && endPage != null) recoverableEmptyPages.push(p);
+    } else if (answerKeySectionForPage(confirmedChapters, p) || solutionsSectionForPage(confirmedChapters, p)) {
+      manifestListingPages.push(p);
     }
   }
 
-  const pageWindow = { gte: Math.max(1, requestedStart), ...(endPage != null ? { lte: endPage } : {}) };
+  const pageWindow = {
+    gte: Math.max(1, requestedStart),
+    ...(endPage != null ? { lte: endPage } : {}),
+    ...(manifestListingPages.length ? { notIn: manifestListingPages } : {}),
+  };
   const pages = await prisma.documentPage.findMany({
     where: {
       documentId: run.sourceDocumentId,
@@ -272,7 +294,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // page that fails deterministically every time can't spin forever.
     // When extracting a single chapter (endPage set), "done" and "retriable
     // failures" are judged within that window only.
-    const windowFilter = endPage != null ? { pageNumber: { gte: Math.max(1, requestedStart), lte: endPage } } : {};
+    const windowPageFilter = {
+      ...(endPage != null ? { gte: Math.max(1, requestedStart), lte: endPage } : {}),
+      ...(manifestListingPages.length ? { notIn: manifestListingPages } : {}),
+    };
+    const windowFilter = Object.keys(windowPageFilter).length ? { pageNumber: windowPageFilter } : {};
     // Pages in the window that are already COMPLETED -- so the UI can say
     // "already extracted, use force to redo" rather than a bare "0 saved".
     const alreadyExtracted = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'COMPLETED', ...windowFilter } });
@@ -546,7 +572,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  const completionWindow = endPage != null ? { pageNumber: { gte: Math.max(1, requestedStart), lte: endPage } } : {};
+  const completionPageFilter = {
+    ...(endPage != null ? { gte: Math.max(1, requestedStart), lte: endPage } : {}),
+    ...(manifestListingPages.length ? { notIn: manifestListingPages } : {}),
+  };
+  const completionWindow = Object.keys(completionPageFilter).length ? { pageNumber: completionPageFilter } : {};
   const notYetAttempted = await prisma.documentPage.count({
     where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: { notIn: ['COMPLETED', 'FAILED'] }, ...completionWindow },
   });
@@ -601,14 +631,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     action: 'BOOK_PAGE_BATCH_QUESTIONS_EXTRACTED',
     entityType: 'BookIngestionRun',
     entityId: run.id,
-    metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, manifestFiledCount, distrustEmptyPages, emptySectionPages, failures },
+    metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, manifestFiledCount, distrustEmptyPages, emptySectionPages, skippedListingPages: manifestListingPages, failures },
     ...requestAuditContext(request),
   });
 
   const lastPage = pages[pages.length - 1]?.pageNumber ?? requestedStart;
   const reachedWindowEnd = endPage != null && lastPage >= endPage;
   return NextResponse.json({
-    batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, manifestFiled: manifestFiledCount, distrustEmptyPages, emptySectionPages, failures },
+    batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, manifestFiled: manifestFiledCount, distrustEmptyPages, emptySectionPages, skippedListingPages: manifestListingPages, failures },
     extractedQuestions: updatedRun.extractedQuestions,
     reviewRequired: updatedRun.reviewRequired,
     stage: updatedRun.stage,
