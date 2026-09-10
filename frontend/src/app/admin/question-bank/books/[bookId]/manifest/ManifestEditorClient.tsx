@@ -225,33 +225,41 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
     }
   };
 
-  const extractChapter = async (index: number) => {
+  const extractChapter = async (index: number, force = false) => {
     const chapter = chapters[index];
     const start = toInt(chapter.startPage);
     const end = toInt(chapter.endPage);
     if (!runId || start == null || end == null) return;
+    if (force && !confirm(`Re-run OCR + extraction on every page of "${chapter.name}" (${start}–${end})? Already-extracted pages are reprocessed; duplicate questions are skipped.`)) return;
     setBusy(`extract-${index}`);
     setMessage(null);
     let cursor = start;
     let saved = 0;
     let failures = 0;
+    let alreadyExtracted = 0;
     try {
       for (;;) {
         setExtractProgress((p) => ({ ...p, [index]: `pages ${cursor}–${end}… ${saved} saved` }));
         const res = await fetch(`/api/admin/books/${bookId}/ingestions/${runId}/extract-questions`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ startPage: cursor, endPage: end, batchSize: 5 }),
+          body: JSON.stringify({ startPage: cursor, endPage: end, batchSize: 5, force }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Extraction failed');
         saved += data.batch?.saved ?? 0;
         failures += data.batch?.failures?.length ?? 0;
+        alreadyExtracted = data.alreadyExtracted ?? alreadyExtracted;
         if (data.complete || data.nextStartPage == null) break;
         cursor = data.nextStartPage;
         if (cursor > end) break;
       }
-      setExtractProgress((p) => ({ ...p, [index]: `done — ${saved} saved${failures ? `, ${failures} page failures` : ''}` }));
-      setMessage({ kind: 'success', text: `${chapter.name}: extracted ${saved} question${saved === 1 ? '' : 's'}${failures ? ` (${failures} page failures)` : ''}.` });
+      if (saved === 0 && failures === 0 && !force && alreadyExtracted > 0) {
+        setExtractProgress((p) => ({ ...p, [index]: `${alreadyExtracted} pages already extracted` }));
+        setMessage({ kind: 'info', text: `${chapter.name}: all ${alreadyExtracted} pages were already extracted earlier. Use "Re-extract" to reprocess them under the manifest, or "Re-file existing questions" to just move them into this chapter.` });
+      } else {
+        setExtractProgress((p) => ({ ...p, [index]: `done — ${saved} saved${failures ? `, ${failures} page failures` : ''}` }));
+        setMessage({ kind: 'success', text: `${chapter.name}: extracted ${saved} question${saved === 1 ? '' : 's'}${failures ? ` (${failures} page failures)` : ''}.` });
+      }
     } catch (e) {
       setExtractProgress((p) => ({ ...p, [index]: `stopped — ${saved} saved` }));
       setMessage({ kind: 'error', text: `${chapter.name}: ${e instanceof Error ? e.message : 'extraction failed'}. Completed pages were kept.` });
@@ -374,10 +382,16 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                   {chapter.confirmed ? 'Confirmed' : 'Confirm chapter'}
                 </button>
                 {chapter.confirmed && (
-                  <button onClick={() => void extractChapter(ci)} disabled={anyBusy}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 disabled:opacity-50">
-                    {busy === `extract-${ci}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} Extract this chapter
-                  </button>
+                  <>
+                    <button onClick={() => void extractChapter(ci)} disabled={anyBusy}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 disabled:opacity-50">
+                      {busy === `extract-${ci}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} Extract this chapter
+                    </button>
+                    <button onClick={() => void extractChapter(ci, true)} disabled={anyBusy}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                      Re-extract (force)
+                    </button>
+                  </>
                 )}
                 {extractProgress[ci] && <span className="text-xs font-bold text-slate-500">{extractProgress[ci]}</span>}
               </div>

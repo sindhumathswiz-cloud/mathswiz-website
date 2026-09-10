@@ -239,6 +239,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // When extracting a single chapter (endPage set), "done" and "retriable
     // failures" are judged within that window only.
     const windowFilter = endPage != null ? { pageNumber: { gte: Math.max(1, requestedStart), lte: endPage } } : {};
+    // Pages in the window that are already COMPLETED -- so the UI can say
+    // "already extracted, use force to redo" rather than a bare "0 saved".
+    const alreadyExtracted = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'COMPLETED', ...windowFilter } });
     const unrendered = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, pageImagePath: null, ...windowFilter } });
     const earliestFailed = await prisma.documentPage.findFirst({
       where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'FAILED', ...windowFilter },
@@ -263,6 +266,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         extractedQuestions: run.extractedQuestions,
         reviewRequired: run.reviewRequired,
         complete: true,
+        alreadyExtracted,
         nextStartPage: null,
       });
     }
