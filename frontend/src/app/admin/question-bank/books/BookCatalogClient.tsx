@@ -15,6 +15,7 @@ type CatalogBook = {
   board: string | null;
   className: string;
   _count: { chapters: number; questions: number; ingestionRuns: number };
+  confirmedChapters: number;
   ingestionRuns: Array<{ id: string; status: string; stage: string; progress: number; totalPages: number | null; processedPages: number; extractedQuestions: number; reviewRequired: number; providerConfig: { sourceProfile?: string } | null }>;
 };
 
@@ -268,15 +269,22 @@ export default function BookCatalogClient() {
                     <span className="text-xs text-slate-500">Private storage · PDF only · maximum 250 MB</span>
                   </div>
                   {book.ingestionRuns[0]?.totalPages && book.ingestionRuns[0].processedPages < book.ingestionRuns[0].totalPages && <button onClick={() => void renderBookPages(book)} disabled={anyBusy} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 disabled:opacity-60">{renderingBookId === book.id && <Loader2 className="h-4 w-4 animate-spin" />}{book.ingestionRuns[0].processedPages ? 'Resume page rendering' : 'Render and analyse pages'} · {book.ingestionRuns[0].processedPages}/{book.ingestionRuns[0].totalPages}</button>}
+                  {book.ingestionRuns[0]?.processedPages > 0 && book.confirmedChapters > 0 && (
+                    <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm">
+                      <span className="font-black text-indigo-800">Chapter manifest: {book.confirmedChapters} chapter{book.confirmedChapters === 1 ? '' : 's'} confirmed.</span>{' '}
+                      <span className="text-indigo-700">Extract chapter by chapter from the manifest so questions are filed and matched against confirmed page ranges.</span>{' '}
+                      <Link href={`/admin/question-bank/books/${book.id}/manifest`} className="font-black text-indigo-700 underline">Open manifest →</Link>
+                    </div>
+                  )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
                     <button onClick={() => void extractBookQuestions(book)} disabled={anyBusy} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-60 sm:ml-3">
                       {extractingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                      Extract questions
+                      {book.confirmedChapters > 0 ? 'Extract whole book (ignores manifest)' : 'Extract questions'}
                     </button>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
                     <Link href={`/admin/question-bank/books/${book.id}/manifest`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3">
-                      <ListTree className="h-4 w-4" /> Chapter manifest
+                      <ListTree className="h-4 w-4" /> Chapter manifest{book.confirmedChapters > 0 ? ` · ${book.confirmedChapters} confirmed` : book._count.chapters > 0 ? ` · ${book._count.chapters} draft` : ''}
                     </Link>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => void benchmarkBook(book, 'GEMINI_VISION')} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 disabled:opacity-60">{benchmarkingKey === `${book.id}:GEMINI_VISION` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Benchmark Gemini</button><button onClick={() => void benchmarkBook(book, 'MATHPIX_OCR')} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:opacity-60">{benchmarkingKey === `${book.id}:MATHPIX_OCR` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Benchmark Mathpix</button><span className="self-center text-xs text-slate-500">One selected page only; credits are never spent automatically.</span></div>}

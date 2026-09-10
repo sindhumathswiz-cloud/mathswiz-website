@@ -234,10 +234,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       continue;
     }
 
+    // In a SELECTED-coverage section the key only lists some questions, so a
+    // key number with no extracted question is expected, not a gap.
+    const partialCoverage = manifestSection?.section.answerKeyCoverage === 'SELECTED';
+
     for (const { number, letter, mcqCandidates } of lookups) {
       if (mcqCandidates.length === 0) {
         noCandidate++;
-        if (details.length < MAX_DETAILS) details.push({ page: page.pageNumber, printedNumber: number, letter, outcome: 'no_candidate' });
+        if (details.length < MAX_DETAILS) details.push({ page: page.pageNumber, printedNumber: number, letter, outcome: partialCoverage ? 'partial_coverage_expected' : 'no_candidate' });
         continue;
       }
       if (mcqCandidates.length > 1) {

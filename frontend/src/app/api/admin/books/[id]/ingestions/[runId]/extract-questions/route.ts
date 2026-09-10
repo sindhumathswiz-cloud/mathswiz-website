@@ -199,6 +199,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const requestedBatchSize = Number.isInteger(body.batchSize) ? body.batchSize : DEFAULT_BATCH_SIZE;
   const batchSize = Math.min(MAX_BATCH_SIZE, Math.max(1, requestedBatchSize));
   const force = body.force === true;
+  // Optional upper page bound -- lets the manifest UI extract one chapter at a
+  // time instead of the whole book.
+  const endPage: number | null = Number.isInteger(body.endPage) ? body.endPage : null;
 
   const run = await prisma.bookIngestionRun.findFirst({
     where: { id: runId, bookId: id },
@@ -212,10 +215,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const book = await prisma.book.findUnique({ where: { id }, select: { className: true, subject: true } });
   if (!book) return NextResponse.json({ error: 'Book not found' }, { status: 404 });
 
+  const pageWindow = { gte: Math.max(1, requestedStart), ...(endPage != null ? { lte: endPage } : {}) };
   const pages = await prisma.documentPage.findMany({
     where: {
       documentId: run.sourceDocumentId,
-      pageNumber: { gte: Math.max(1, requestedStart) },
+      pageNumber: pageWindow,
       pageImagePath: { not: null },
       ...(force ? {} : { status: { not: 'COMPLETED' } }),
     },
@@ -232,13 +236,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // success with pages missing (the bug this replaced). Bounded by
     // MAX_FAILED_RETRY_CYCLES via providerConfig.failureRetryCycles so a
     // page that fails deterministically every time can't spin forever.
-    const unrendered = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, pageImagePath: null } });
+    // When extracting a single chapter (endPage set), "done" and "retriable
+    // failures" are judged within that window only.
+    const windowFilter = endPage != null ? { pageNumber: { gte: Math.max(1, requestedStart), lte: endPage } } : {};
+    // Pages in the window that are already COMPLETED -- so the UI can say
+    // "already extracted, use force to redo" rather than a bare "0 saved".
+    const alreadyExtracted = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'COMPLETED', ...windowFilter } });
+    const unrendered = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, pageImagePath: null, ...windowFilter } });
     const earliestFailed = await prisma.documentPage.findFirst({
-      where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'FAILED' },
+      where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'FAILED', ...windowFilter },
       orderBy: { pageNumber: 'asc' },
       select: { pageNumber: true },
     });
-    const failedRemaining = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'FAILED' } });
+    const failedRemaining = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'FAILED', ...windowFilter } });
 
     const existingProviderConfig = run.providerConfig && typeof run.providerConfig === 'object' && !Array.isArray(run.providerConfig)
       ? (run.providerConfig as Record<string, unknown>)
@@ -256,6 +266,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         extractedQuestions: run.extractedQuestions,
         reviewRequired: run.reviewRequired,
         complete: true,
+        alreadyExtracted,
         nextStartPage: null,
       });
     }
@@ -500,11 +511,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
+  const completionWindow = endPage != null ? { pageNumber: { gte: Math.max(1, requestedStart), lte: endPage } } : {};
   const notYetAttempted = await prisma.documentPage.count({
-    where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: { notIn: ['COMPLETED', 'FAILED'] } },
+    where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: { notIn: ['COMPLETED', 'FAILED'] }, ...completionWindow },
   });
   const failedCount = await prisma.documentPage.count({
-    where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'FAILED' },
+    where: { documentId: run.sourceDocumentId, pageImagePath: { not: null }, status: 'FAILED', ...completionWindow },
   });
   const attempted = await prisma.documentPage.count({
     where: { documentId: run.sourceDocumentId, status: { in: ['COMPLETED', 'FAILED'] } },
@@ -559,12 +571,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
 
   const lastPage = pages[pages.length - 1]?.pageNumber ?? requestedStart;
+  const reachedWindowEnd = endPage != null && lastPage >= endPage;
   return NextResponse.json({
     batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, manifestFiled: manifestFiledCount, distrustEmptyPages, failures },
     extractedQuestions: updatedRun.extractedQuestions,
     reviewRequired: updatedRun.reviewRequired,
     stage: updatedRun.stage,
-    complete,
-    nextStartPage: complete ? null : lastPage + 1,
+    complete: complete || reachedWindowEnd,
+    nextStartPage: (complete || reachedWindowEnd) ? null : lastPage + 1,
   });
 }

@@ -1107,6 +1107,11 @@ model BookChapter {
   orderIndex            Int
   startPage             Int?
   endPage               Int?
+  // The book's OWN printed page numbers for this chapter, from the table of
+  // contents. PDF startPage/endPage = printed + the run's page offset; keeping
+  // the printed values lets "re-apply offset" recompute the PDF ranges.
+  printedStartPage      Int?
+  printedEndPage        Int?
   topic                 String?
   metadata              Json?
   // Set once an admin confirms this chapter's manifest (page ranges + the
@@ -1151,6 +1156,11 @@ model BookExercise {
   solutionsEndPage        Int?
   inlineAnswers           Boolean  @default(false)
   noAnswers               Boolean  @default(false)
+  // How much of the section a separate block covers. null == "ALL" when the
+  // matching range is set. match-* uses this so an unmatched printed number in
+  // a SELECTED / HINTS section is expected, not reported as a gap.
+  answerKeyCoverage       String? // ALL | SELECTED
+  solutionCoverage        String? // ALL | SELECTED | HINTS
   metadata                Json?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt

@@ -193,6 +193,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // can backfill any of them missing a topic (see doc comment above).
     const pageMatches: Array<{ candidate: Candidate; number: string; text: string }> = [];
 
+    // A SELECTED / HINTS section only carries solutions for some questions, so
+    // a solution number with no extracted question is expected, not a gap.
+    const partialCoverage = manifestSection != null
+      && (manifestSection.section.solutionCoverage === 'SELECTED' || manifestSection.section.solutionCoverage === 'HINTS');
+    const hintsOnly = manifestSection?.section.solutionCoverage === 'HINTS';
+
     for (const { number, text, eligible, hasAnyCandidate } of lookups) {
       if (eligible.length === 0) {
         // Distinguish "nothing with this number at all" from "found it, but
@@ -203,7 +209,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           if (details.length < MAX_DETAILS) details.push({ page: page.pageNumber, printedNumber: number, outcome: 'already_has_solution' });
         } else {
           noCandidate++;
-          if (details.length < MAX_DETAILS) details.push({ page: page.pageNumber, printedNumber: number, outcome: 'no_candidate' });
+          if (details.length < MAX_DETAILS) details.push({ page: page.pageNumber, printedNumber: number, outcome: partialCoverage ? 'partial_coverage_expected' : 'no_candidate' });
         }
         continue;
       }
@@ -241,8 +247,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       if (!apply) continue;
 
-      const note = `Detailed solution backfilled from a solutions section (page ${page.pageNumber})${sectionRange ? ' within the confirmed chapter manifest range' : ' printed away from the question'} -- NOT independently verified yet; confirm before approving.`;
-      const nextTags = candidate.tags.filter((t) => t !== TAG_NO_SOLUTION && t !== TAG_HINT_AVAILABLE);
+      const kind = hintsOnly ? 'Hint' : 'Detailed solution';
+      const note = `${kind} backfilled from a solutions section (page ${page.pageNumber})${sectionRange ? ' within the confirmed chapter manifest range' : ' printed away from the question'} -- NOT independently verified yet; confirm before approving.`;
+      // A HINTS-coverage section carries hints, not full solutions -- keep the
+      // "Hint Available" tag rather than clearing it.
+      const nextTags = hintsOnly
+        ? Array.from(new Set([...candidate.tags.filter((t) => t !== TAG_NO_SOLUTION), TAG_HINT_AVAILABLE]))
+        : candidate.tags.filter((t) => t !== TAG_NO_SOLUTION && t !== TAG_HINT_AVAILABLE);
       const bookChapterId = needsTopic ? await findOrCreateBookChapter(id, majorityTopic as string, chapterCache) : undefined;
 
       await prisma.question.update({
