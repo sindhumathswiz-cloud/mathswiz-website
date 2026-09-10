@@ -79,6 +79,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   });
   if (!book) return NextResponse.json({ error: 'Book not found' }, { status: 404 });
 
+  // How many of this book's questions currently sit in each chapter's PDF
+  // page range -- so the editor can show extraction progress per chapter.
+  const ranged = book.chapters.filter((c) => c.startPage != null && c.endPage != null);
+  const counts = await Promise.all(ranged.map((c) =>
+    prisma.question.count({ where: { bookId: id, sourcePageStart: { gte: c.startPage as number, lte: c.endPage as number } } }),
+  ));
+  const countByChapter = new Map(ranged.map((c, i) => [c.id, counts[i]]));
+
   return NextResponse.json({
     book: { id: book.id, title: book.title, className: book.className },
     run: book.ingestionRuns[0] ?? null,
@@ -87,6 +95,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       sections: chapter.exercises,
       exercises: undefined,
       confirmed: chapter.manifestConfirmedAt != null,
+      questionsInRange: countByChapter.get(chapter.id) ?? 0,
     })),
   });
 }

@@ -33,7 +33,21 @@ export async function GET(request: Request) {
     },
     orderBy: [{ className: 'asc' }, { title: 'asc' }, { edition: 'asc' }],
   });
-  return NextResponse.json({ books });
+
+  // How many chapters have a confirmed manifest, per book (drives the
+  // "extract by chapter from the manifest" prompt on each card).
+  const confirmed = books.length
+    ? await prisma.bookChapter.groupBy({
+        by: ['bookId'],
+        where: { bookId: { in: books.map((b) => b.id) }, manifestConfirmedAt: { not: null } },
+        _count: { _all: true },
+      })
+    : [];
+  const confirmedByBook = new Map(confirmed.map((c) => [c.bookId, c._count._all]));
+
+  return NextResponse.json({
+    books: books.map((b) => ({ ...b, confirmedChapters: confirmedByBook.get(b.id) ?? 0 })),
+  });
 }
 
 export async function POST(request: Request) {

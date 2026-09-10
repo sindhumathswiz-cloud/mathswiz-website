@@ -37,6 +37,7 @@ type ChapterRow = {
   printedStartPage: string;
   printedEndPage: string;
   confirmed: boolean;
+  questionsInRange: number;
   sections: SectionRow[];
 };
 
@@ -76,6 +77,7 @@ function toChapterRow(x: any): ChapterRow {
     printedStartPage: s(x.printedStartPage),
     printedEndPage: s(x.printedEndPage),
     confirmed: x.confirmed === true,
+    questionsInRange: typeof x.questionsInRange === 'number' ? x.questionsInRange : 0,
     sections: (x.sections ?? []).map(toSectionRow),
   };
 }
@@ -89,7 +91,7 @@ const blankSection = (): SectionRow => ({
 });
 const blankChapter = (): ChapterRow => ({
   chapterNumber: '', name: '', topic: '', startPage: '', endPage: '',
-  printedStartPage: '', printedEndPage: '', confirmed: false, sections: [],
+  printedStartPage: '', printedEndPage: '', confirmed: false, questionsInRange: 0, sections: [],
 });
 
 export default function ManifestEditorClient({ bookId }: { bookId: string }) {
@@ -122,6 +124,18 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
     }
   }, [bookId]);
   useEffect(() => { void load(); }, [load]);
+
+  // Merge fresh per-chapter question counts without disturbing unsaved edits.
+  const refreshCounts = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/books/${bookId}/manifest`);
+      const data = await res.json();
+      if (!res.ok) return;
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+      const byId = new Map((data.chapters ?? []).map((c: any) => [c.id, c.questionsInRange ?? 0]));
+      setChapters((prev) => prev.map((c) => (c.id && byId.has(c.id) ? { ...c, questionsInRange: byId.get(c.id) as number } : c)));
+    } catch { /* best effort */ }
+  }, [bookId]);
 
   const buildPayload = (rows: ChapterRow[]) => ({
     chapters: rows.map((c) => ({
@@ -218,6 +232,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Re-file failed');
       setMessage({ kind: 'success', text: `Re-filed ${data.total} questions: ${data.results.map((r: { chapter: string; refiled: number }) => `${r.chapter} ${r.refiled}`).join(', ')}` });
+      await refreshCounts();
     } catch (e) {
       setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'Re-file failed' });
     } finally {
@@ -254,8 +269,8 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         if (cursor > end) break;
       }
       if (saved === 0 && failures === 0 && !force && alreadyExtracted > 0) {
-        setExtractProgress((p) => ({ ...p, [index]: `${alreadyExtracted} pages already extracted` }));
-        setMessage({ kind: 'info', text: `${chapter.name}: all ${alreadyExtracted} pages were already extracted earlier. Use "Re-extract" to reprocess them under the manifest, or "Re-file existing questions" to just move them into this chapter.` });
+        setExtractProgress((p) => ({ ...p, [index]: `${alreadyExtracted} pages already extracted · ${chapter.questionsInRange} questions` }));
+        setMessage({ kind: 'info', text: `${chapter.name}: all ${alreadyExtracted} pages were already extracted earlier (${chapter.questionsInRange} questions in this range). Use "Re-extract" to reprocess them under the manifest, or "Re-file existing questions" to move them into this chapter.` });
       } else {
         setExtractProgress((p) => ({ ...p, [index]: `done — ${saved} saved${failures ? `, ${failures} page failures` : ''}` }));
         setMessage({ kind: 'success', text: `${chapter.name}: extracted ${saved} question${saved === 1 ? '' : 's'}${failures ? ` (${failures} page failures)` : ''}.` });
@@ -265,6 +280,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
       setMessage({ kind: 'error', text: `${chapter.name}: ${e instanceof Error ? e.message : 'extraction failed'}. Completed pages were kept.` });
     } finally {
       setBusy(null);
+      await refreshCounts();
     }
   };
 
@@ -381,6 +397,9 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                   {chapter.confirmed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
                   {chapter.confirmed ? 'Confirmed' : 'Confirm chapter'}
                 </button>
+                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600" title="Questions currently in this chapter's PDF page range">
+                  {chapter.questionsInRange} question{chapter.questionsInRange === 1 ? '' : 's'} in range
+                </span>
                 {chapter.confirmed && (
                   <>
                     <button onClick={() => void extractChapter(ci)} disabled={anyBusy}

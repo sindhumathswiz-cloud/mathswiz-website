@@ -9,11 +9,12 @@ const tx = {
   bookExercise: { findMany: vi.fn(), update: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
 };
 const book = { findUnique: vi.fn() };
+const question = { count: vi.fn() };
 const $transaction = vi.fn(async (cb: (client: typeof tx) => unknown) => cb(tx));
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
-vi.mock('@/lib/prisma', () => ({ default: { book, $transaction } }));
+vi.mock('@/lib/prisma', () => ({ default: { book, question, $transaction } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 
 const params = Promise.resolve({ id: 'book-1' });
@@ -25,7 +26,7 @@ describe('GET /api/admin/books/[id]/manifest', () => {
     getAuthenticatedUser.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
   });
 
-  it('returns managed chapters with a confirmed flag and printed pages', async () => {
+  it('returns managed chapters with a confirmed flag, printed pages and per-range question counts', async () => {
     book.findUnique.mockResolvedValue({
       id: 'book-1', title: 'Xam Idea', className: 'Class 12',
       chapters: [
@@ -34,12 +35,15 @@ describe('GET /api/admin/books/[id]/manifest', () => {
       ],
       ingestionRuns: [{ id: 'run-1', totalPages: 534 }],
     });
+    question.count.mockResolvedValue(24);
     const { GET } = await import('./route');
     const data = await (await GET(new Request('http://x'), { params }) as Response).json();
     expect(data.run.totalPages).toBe(534);
     expect(data.chapters[0].confirmed).toBe(true);
     expect(data.chapters[0].printedStartPage).toBe(329);
+    expect(data.chapters[0].questionsInRange).toBe(24); // ch1 has a page range
     expect(data.chapters[1].confirmed).toBe(false);
+    expect(data.chapters[1].questionsInRange).toBe(0);  // ch2 has no range
   });
 });
 
