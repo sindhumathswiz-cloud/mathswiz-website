@@ -222,33 +222,34 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const now = new Date();
   let confirmedCount = 0;
 
+  const existing = await prisma.bookChapter.findMany({
+    where: { bookId: id },
+    orderBy: { orderIndex: 'asc' },
+    select: { id: true, name: true, orderIndex: true, manifestConfirmedAt: true, _count: { select: { questions: true } } },
+  });
+  const byId = new Map(existing.map((c) => [c.id, c]));
+  const byName = new Map(existing.map((c) => [normalize(c.name), c]));
+
+  // Resolve each incoming chapter to an existing row (reuse its id so linked
+  // questions stay linked): explicit id first, then name match.
+  const resolved = incoming.map((chapter) => {
+    const target = (chapter.id && byId.get(chapter.id)) || byName.get(normalize(chapter.name || ''));
+    return { chapter, targetId: target?.id ?? null };
+  });
+  const keptTargetIds = new Set(resolved.map((r) => r.targetId).filter(Boolean) as string[]);
+  const prunableIds = existing
+    .filter((c) => !keptTargetIds.has(c.id) && c._count.questions === 0 && c.manifestConfirmedAt == null)
+    .map((c) => c.id);
+  const leftoverIds = existing
+    .filter((c) => !keptTargetIds.has(c.id) && !prunableIds.includes(c.id))
+    .map((c) => c.id);
+
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const existing = await tx.bookChapter.findMany({
-      where: { bookId: id },
-      orderBy: { orderIndex: 'asc' },
-      select: { id: true, name: true, orderIndex: true },
-    });
-    const byId = new Map(existing.map((c) => [c.id, c]));
-    const byName = new Map(existing.map((c) => [normalize(c.name), c]));
-
-    // Resolve each incoming chapter to an existing row (reuse its id so linked
-    // questions stay linked): explicit id first, then name match.
-    const resolved = incoming.map((chapter) => {
-      const target = (chapter.id && byId.get(chapter.id)) || byName.get(normalize(chapter.name || ''));
-      return { chapter, targetId: target?.id ?? null };
-    });
-    const keptTargetIds = new Set(resolved.map((r) => r.targetId).filter(Boolean) as string[]);
-
-    // Park every existing chapter at a unique negative orderIndex so the
-    // rewrite below never collides on @@unique([bookId, orderIndex]).
-    for (let i = 0; i < existing.length; i++) {
-      await tx.bookChapter.update({ where: { id: existing[i].id }, data: { orderIndex: -1 - i } });
-    }
-
-    // Drop chapters that left the manifest AND are safe to remove.
-    await tx.bookChapter.deleteMany({
-      where: { bookId: id, id: { notIn: [...keptTargetIds, '__none__'] }, questions: { none: {} }, manifestConfirmedAt: null },
-    });
+    // Park every surviving existing chapter at a unique negative orderIndex in
+    // ONE statement so the rewrite below can't collide on @@unique([bookId,
+    // orderIndex]); the whole PUT stays a handful of round-trips.
+    await tx.$executeRaw`UPDATE "BookChapter" SET "orderIndex" = -1 - "orderIndex" WHERE "bookId" = ${id} AND "orderIndex" >= 0`;
+    if (prunableIds.length) await tx.bookChapter.deleteMany({ where: { id: { in: prunableIds } } });
 
     for (let index = 0; index < resolved.length; index++) {
       const { chapter, targetId } = resolved[index];
@@ -269,45 +270,43 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         ? (await tx.bookChapter.update({ where: { id: targetId }, data: { orderIndex: index, ...data } })).id
         : (await tx.bookChapter.create({ data: { bookId: id, orderIndex: index, ...data } })).id;
 
-      // Sections: same park-then-write within this chapter.
-      const existingSections = await tx.bookExercise.findMany({ where: { chapterId }, orderBy: { orderIndex: 'asc' }, select: { id: true } });
-      for (let i = 0; i < existingSections.length; i++) {
-        await tx.bookExercise.update({ where: { id: existingSections[i].id }, data: { orderIndex: -1 - i } });
-      }
+      // Sections: wipe + recreate (createMany is one round-trip; no section id
+      // is referenced anywhere so nothing is lost).
+      await tx.bookExercise.deleteMany({ where: { chapterId } });
       const sections = chapter.sections ?? [];
-      for (let sIndex = 0; sIndex < sections.length; sIndex++) {
-        const section = sections[sIndex];
-        const hasKey = intOrNull(section.answerKeyStartPage) != null;
-        const hasSol = intOrNull(section.solutionsStartPage) != null;
-        const sData = {
-          code: str(section.code, 30),
-          title: str(section.title, 200),
-          sectionType: str(section.sectionType, 40),
-          startPage: intOrNull(section.startPage),
-          endPage: intOrNull(section.endPage),
-          inlineAnswers: section.inlineAnswers === true,
-          noAnswers: section.noAnswers === true,
-          answerKeyStartPage: intOrNull(section.answerKeyStartPage),
-          answerKeyEndPage: intOrNull(section.answerKeyEndPage),
-          answerKeyCoverage: hasKey ? (coverage(section.answerKeyCoverage, ANSWER_KEY_COVERAGE) ?? 'ALL') : null,
-          solutionsStartPage: intOrNull(section.solutionsStartPage),
-          solutionsEndPage: intOrNull(section.solutionsEndPage),
-          solutionCoverage: hasSol ? (coverage(section.solutionCoverage, SOLUTION_COVERAGE) ?? 'ALL') : null,
-        };
-        const existingSection = existingSections[sIndex]?.id;
-        if (existingSection) await tx.bookExercise.update({ where: { id: existingSection }, data: { orderIndex: sIndex, ...sData } });
-        else await tx.bookExercise.create({ data: { chapterId, orderIndex: sIndex, ...sData } });
+      if (sections.length) {
+        await tx.bookExercise.createMany({
+          data: sections.map((section, sIndex) => {
+            const hasKey = intOrNull(section.answerKeyStartPage) != null;
+            const hasSol = intOrNull(section.solutionsStartPage) != null;
+            return {
+              chapterId,
+              orderIndex: sIndex,
+              code: str(section.code, 30),
+              title: str(section.title, 200),
+              sectionType: str(section.sectionType, 40),
+              startPage: intOrNull(section.startPage),
+              endPage: intOrNull(section.endPage),
+              inlineAnswers: section.inlineAnswers === true,
+              noAnswers: section.noAnswers === true,
+              answerKeyStartPage: intOrNull(section.answerKeyStartPage),
+              answerKeyEndPage: intOrNull(section.answerKeyEndPage),
+              answerKeyCoverage: hasKey ? (coverage(section.answerKeyCoverage, ANSWER_KEY_COVERAGE) ?? 'ALL') : null,
+              solutionsStartPage: intOrNull(section.solutionsStartPage),
+              solutionsEndPage: intOrNull(section.solutionsEndPage),
+              solutionCoverage: hasSol ? (coverage(section.solutionCoverage, SOLUTION_COVERAGE) ?? 'ALL') : null,
+            };
+          }),
+        });
       }
-      await tx.bookExercise.deleteMany({ where: { chapterId, orderIndex: { lt: 0 } } });
     }
 
-    // Leftover existing chapters that couldn't be pruned (they own questions):
-    // move them out of the managed range rather than delete.
-    const leftover = await tx.bookChapter.findMany({ where: { bookId: id, orderIndex: { lt: 0 } }, select: { id: true } });
-    for (let i = 0; i < leftover.length; i++) {
-      await tx.bookChapter.update({ where: { id: leftover[i].id }, data: { orderIndex: UNMANAGED_ORDER_BASE + i } });
+    // Leftover chapters that own questions: shift them out of the managed
+    // range in one statement rather than deleting.
+    if (leftoverIds.length) {
+      await tx.$executeRaw`UPDATE "BookChapter" SET "orderIndex" = ${UNMANAGED_ORDER_BASE} - "orderIndex" WHERE "bookId" = ${id} AND "orderIndex" < 0`;
     }
-  });
+  }, { timeout: 20000 });
 
   await recordAuditLog({
     actorId: auth.user.id,
