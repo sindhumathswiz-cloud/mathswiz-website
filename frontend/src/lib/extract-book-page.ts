@@ -5,7 +5,7 @@ import { cleanMathpixMarkdown } from './mathpix-parser';
 import { structureQuestions } from './structure-questions';
 import { analyzeQuestion, type QAIssue } from './question-qa';
 import { computeContentHash } from './question-classifier';
-import { parseDiagramRegions, type DiagramRegion } from './diagram-regions';
+import { parseDiagramRegions, parseOcrTextLines, type DiagramRegion, type OcrTextLine } from './diagram-regions';
 import type { CanonicalQuestion } from './extract-normalizer';
 
 /**
@@ -52,6 +52,10 @@ export interface PageRawText {
   // page used the native text layer (no image was OCR'd, so there's nothing
   // to detect regions in) or when OCR found none.
   diagramRegions: DiagramRegion[];
+  // The OCR'd text lines with their vertical positions, same pixel space as
+  // diagramRegions — lets a caller attach each figure to the right question
+  // on a multi-question page (figure-question-match.ts). [] for NATIVE_TEXT.
+  textLines: OcrTextLine[];
   // The page image these diagramRegions' coordinates are relative to — the
   // same file a caller must pass to lib/page-image-crop.ts's
   // cropPageRegion to actually cut one out. null when provider is
@@ -81,7 +85,7 @@ function imageMime(filePath: string): string {
   return 'image/jpeg';
 }
 
-async function ocrPageWithMathpix(imagePath: string): Promise<{ text: string; confidence: number | null; diagramRegions: DiagramRegion[]; safeImagePath: string }> {
+async function ocrPageWithMathpix(imagePath: string): Promise<{ text: string; confidence: number | null; diagramRegions: DiagramRegion[]; textLines: OcrTextLine[]; safeImagePath: string }> {
   const safePath = assertPrivatePageImagePath(imagePath);
   if (!process.env.MATHPIX_APP_ID || !process.env.MATHPIX_APP_KEY) {
     throw new Error('Mathpix credentials are not configured (MATHPIX_APP_ID / MATHPIX_APP_KEY)');
@@ -121,6 +125,7 @@ async function ocrPageWithMathpix(imagePath: string): Promise<{ text: string; co
     text: cleanMathpixMarkdown(text),
     confidence: typeof output.confidence === 'number' ? output.confidence : null,
     diagramRegions: parseDiagramRegions(output.line_data),
+    textLines: parseOcrTextLines(output.line_data),
     safeImagePath: safePath,
   };
 }
@@ -143,13 +148,13 @@ export async function getPageRawText(page: PageForExtraction): Promise<PageRawTe
     // trade-off for now: re-running OCR on every text-trustworthy page
     // just to catch this would multiply Mathpix cost across the whole
     // book for a comparatively rare page shape.
-    return { provider: 'NATIVE_TEXT', rawText: nativeText, ocrConfidence: null, diagramRegions: [], ocrImagePath: null };
+    return { provider: 'NATIVE_TEXT', rawText: nativeText, ocrConfidence: null, diagramRegions: [], textLines: [], ocrImagePath: null };
   }
 
   const imagePath = page.processedImagePath || page.pageImagePath;
   if (!imagePath) {
     // Nothing usable on this page: no trustworthy text layer and no image to OCR.
-    return { provider: 'NATIVE_TEXT', rawText: '', ocrConfidence: null, diagramRegions: [], ocrImagePath: null };
+    return { provider: 'NATIVE_TEXT', rawText: '', ocrConfidence: null, diagramRegions: [], textLines: [], ocrImagePath: null };
   }
   const ocr = await ocrPageWithMathpix(imagePath);
   return {
@@ -157,6 +162,7 @@ export async function getPageRawText(page: PageForExtraction): Promise<PageRawTe
     rawText: ocr.text,
     ocrConfidence: ocr.confidence,
     diagramRegions: ocr.diagramRegions,
+    textLines: ocr.textLines,
     ocrImagePath: ocr.safeImagePath,
   };
 }

@@ -34,6 +34,17 @@ export interface DiagramRegion {
   type: string;
 }
 
+export interface OcrTextLine {
+  // Top / bottom (min-Y / max-Y) pixel coordinates of this line's bounding
+  // box, in the SAME OCR-image space as DiagramRegion above — so a figure
+  // region and a text line can be compared vertically directly.
+  top: number;
+  bottom: number;
+  // The OCR'd text of the line, trimmed. Used to anchor a structured
+  // question to its vertical position on the page (see figure-question-match.ts).
+  text: string;
+}
+
 // Mathpix's documented line "type" values include figure-ish kinds beyond
 // plain text/equations/tables; this allowlist is intentionally broad and
 // lower-cased for comparison. Tables are excluded on purpose — a table is
@@ -85,4 +96,37 @@ export function parseDiagramRegions(lineData: unknown): DiagramRegion[] {
     regions.push({ x: box.minX, y: box.minY, width, height, type });
   }
   return regions;
+}
+
+/**
+ * Parses the TEXT lines out of the same `line_data` response — every entry
+ * that carries readable text and a bounding contour, excluding the
+ * figure/table kinds parseDiagramRegions handles. Returned sorted
+ * top-to-bottom. Used to work out where on the page each structured question
+ * begins, so a figure region can be attached to the right question on a
+ * multi-question page (figure-question-match.ts).
+ *
+ * Same defensive contract as parseDiagramRegions: any unexpected shape is
+ * skipped, never thrown on — a parsing miss degrades to "couldn't place the
+ * figure" (no image attached), never a broken extraction.
+ */
+export function parseOcrTextLines(lineData: unknown): OcrTextLine[] {
+  if (!Array.isArray(lineData)) return [];
+
+  const lines: OcrTextLine[] = [];
+  for (const raw of lineData) {
+    if (!raw || typeof raw !== 'object') continue;
+    const datum = raw as MathpixLineDatum;
+    const type = typeof datum.type === 'string' ? datum.type.toLowerCase() : '';
+    if (DIAGRAM_TYPE_ALLOWLIST.has(type) || type === 'table') continue;
+
+    const text = typeof datum.text === 'string' ? datum.text.trim() : '';
+    if (!text) continue;
+
+    const box = boundingBoxFromContour(datum.cnt);
+    if (!box) continue;
+
+    lines.push({ top: box.minY, bottom: box.maxY, text });
+  }
+  return lines.sort((a, b) => a.top - b.top);
 }

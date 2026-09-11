@@ -326,7 +326,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       expect(data.batch.saved).toBe(1);
     });
 
-    it('does not attach a page-level region to any question when the page produced more than one question', async () => {
+    it('does not attach a figure on a multi-question page when OCR gave no text-line positions to place it by', async () => {
       documentPage.findMany.mockResolvedValue([
         { id: 'page-1', pageNumber: 1, nativeText: null, pageImagePath: '/p1.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
       ]);
@@ -335,6 +335,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
         rawText: 'Two questions on one page.',
         ocrConfidence: 0.9,
         diagramRegions: [{ x: 10, y: 10, width: 100, height: 100, type: 'diagram' }],
+        textLines: [],
         ocrImagePath: '/private/page-1.jpg',
       });
       structurePageQuestions.mockResolvedValueOnce([
@@ -348,6 +349,38 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       expect(question.create).toHaveBeenCalledTimes(2);
       expect(cropPageRegion).not.toHaveBeenCalled();
       expect(questionImage.create).not.toHaveBeenCalled();
+    });
+
+    it('attaches each figure on a multi-question page to the question directly above it', async () => {
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-1', pageNumber: 1, nativeText: null, pageImagePath: '/p1.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
+      ]);
+      getPageRawText.mockResolvedValueOnce({
+        provider: 'MATHPIX_OCR',
+        rawText: '1. Area under the parabola ... 2. Area of the ellipse ...',
+        ocrConfidence: 0.9,
+        diagramRegions: [
+          { x: 60, y: 90, width: 200, height: 160, type: 'graph' },  // under Q1
+          { x: 60, y: 520, width: 200, height: 160, type: 'graph' }, // under Q2
+        ],
+        textLines: [
+          { top: 40, bottom: 64, text: '1. Find the area under the parabola' },
+          { top: 400, bottom: 424, text: '2. Find the area of the ellipse region' },
+        ],
+        ocrImagePath: '/private/page-1.jpg',
+      });
+      structurePageQuestions.mockResolvedValueOnce([
+        { question: { questionContent: 'Find the area under the parabola $y^2=4x$', type: 'SUBJECTIVE', difficulty: 'MEDIUM', options: [], correctAnswer: '', explanation: 's1', tags: [], topic: '', method: '', printedNumber: '1', explanationType: 'FULL' }, contentHash: 'h-q1', qaIssues: [] },
+        { question: { questionContent: 'Find the area of the ellipse region', type: 'SUBJECTIVE', difficulty: 'MEDIUM', options: [], correctAnswer: '', explanation: 's2', tags: [], topic: '', method: '', printedNumber: '2', explanationType: 'FULL' }, contentHash: 'h-q2', qaIssues: [] },
+      ]);
+      question.create.mockResolvedValueOnce({ id: 'q-a1' }).mockResolvedValueOnce({ id: 'q-a2' });
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({ startPage: 1, batchSize: 5 }), { params }) as Response).json();
+
+      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'q-a1-0.jpg', { x: 60, y: 90, width: 200, height: 160, type: 'graph' });
+      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'q-a2-0.jpg', { x: 60, y: 520, width: 200, height: 160, type: 'graph' });
+      expect(data.batch.figuresMatchedToQuestion).toBe(2);
     });
 
     it('stitches diagram regions from the passage page onto the resolved case-study question', async () => {

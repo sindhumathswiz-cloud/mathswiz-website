@@ -8,6 +8,7 @@ import { isLikelyCaseStudyFragment } from '@/lib/case-study-fragment';
 import { isLikelyIncompletePage } from '@/lib/incomplete-page-fragment';
 import { cropPageRegion } from '@/lib/page-image-crop';
 import type { DiagramRegion } from '@/lib/diagram-regions';
+import { matchFiguresToQuestions } from '@/lib/figure-question-match';
 import { worstSeverity } from '@/lib/question-qa';
 import { snapToChapter } from '@/lib/chapter-classifier';
 import { loadConfirmedChapters, chapterForPage, sectionForPage, answerKeySectionForPage, solutionsSectionForPage } from '@/lib/book-manifest';
@@ -364,6 +365,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let detectedCount = 0;
   let manifestFiledCount = 0;
   let distrustEmptyPages = 0;
+  // Figure regions attached to a specific question by vertical position on a
+  // multi-question page (as opposed to the whole-page single-question case).
+  let figuresMatchedToQuestion = 0;
   // Pages inside a confirmed question section that STILL produced zero
   // questions after the full provider chain — surfaced in the response and
   // audit log so a silent under-extraction is visible (and re-checkable)
@@ -466,7 +470,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         for (const e of existing) if (e.contentHash) seenHashes.add(e.contentHash);
       }
 
-      for (const { question, contentHash, qaIssues } of structured) {
+      // Which accumulated figure regions belong to which question. For a
+      // single-question page/chain every region is that question's (below).
+      // For a multi-question SINGLE page, place each figure under the
+      // question nearest above it, by the OCR text-line positions — a page
+      // whose figures used to be dropped wholesale. A stitched fragment
+      // chain spans multiple page images whose coordinates aren't
+      // comparable, so it keeps the single-question whole-chain path only.
+      const regionsByQuestion = (!stitching && structured.length > 1 && accumulatedRegions.length > 0 && pageRaw.ocrImagePath)
+        ? matchFiguresToQuestions(
+            accumulatedRegions.map((r) => r.region),
+            pageRaw.textLines,
+            structured.map((s) => ({ printedNumber: s.question.printedNumber, content: s.question.questionContent })),
+          )
+        : new Map<number, DiagramRegion[]>();
+
+      for (const [index, { question, contentHash, qaIssues }] of structured.entries()) {
         if (seenHashes.has(contentHash)) {
           duplicateCount++;
           continue;
@@ -534,16 +553,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         });
         savedCount++;
 
-        // Diagram regions are page/chain-level (Mathpix's line_data has no
-        // notion of "which structured question does this belong to"), so
-        // they're only attributable when the page/chain resolved to exactly
-        // one question — the case-study bundling case this was built for.
-        // With more than one question on a page, attaching a shared region
-        // to all of them would misattribute it, so it's dropped instead;
-        // that's a known gap for a page with multiple ordinary questions
-        // that each contain their own separate figure.
-        if (structured.length === 1 && accumulatedRegions.length > 0) {
-          await attachDiagramImages(id, run.id, created.id, accumulatedRegions);
+        // Attach this question's figure regions. A single-question page or a
+        // resolved fragment chain: every accumulated region is this
+        // question's. A multi-question page: only the regions the vertical
+        // position match assigned to THIS question (figure-question-match.ts)
+        // — the rest go to their own questions, or are dropped if they can't
+        // be placed (e.g. a figure above the first question, belonging to
+        // one carried over from the previous page).
+        if (accumulatedRegions.length > 0) {
+          const regionsForThisQuestion = structured.length === 1
+            ? accumulatedRegions
+            : (regionsByQuestion.get(index) ?? []).map((region) => ({ ocrImagePath: pageRaw.ocrImagePath as string, region }));
+          if (regionsForThisQuestion.length > 0) {
+            if (structured.length > 1) figuresMatchedToQuestion += regionsForThisQuestion.length;
+            await attachDiagramImages(id, run.id, created.id, regionsForThisQuestion);
+          }
         }
       }
 
@@ -631,14 +655,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     action: 'BOOK_PAGE_BATCH_QUESTIONS_EXTRACTED',
     entityType: 'BookIngestionRun',
     entityId: run.id,
-    metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, manifestFiledCount, distrustEmptyPages, emptySectionPages, skippedListingPages: manifestListingPages, failures },
+    metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, manifestFiledCount, distrustEmptyPages, emptySectionPages, skippedListingPages: manifestListingPages, figuresMatchedToQuestion, failures },
     ...requestAuditContext(request),
   });
 
   const lastPage = pages[pages.length - 1]?.pageNumber ?? requestedStart;
   const reachedWindowEnd = endPage != null && lastPage >= endPage;
   return NextResponse.json({
-    batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, manifestFiled: manifestFiledCount, distrustEmptyPages, emptySectionPages, skippedListingPages: manifestListingPages, failures },
+    batch: { startPage: pages[0]?.pageNumber ?? requestedStart, endPage: lastPage, pagesProcessed: pages.length, detected: detectedCount, saved: savedCount, duplicates: duplicateCount, needsReview: reviewCount, manifestFiled: manifestFiledCount, distrustEmptyPages, emptySectionPages, skippedListingPages: manifestListingPages, figuresMatchedToQuestion, failures },
     extractedQuestions: updatedRun.extractedQuestions,
     reviewRequired: updatedRun.reviewRequired,
     stage: updatedRun.stage,
