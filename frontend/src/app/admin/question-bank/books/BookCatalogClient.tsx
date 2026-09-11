@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, BookOpen, CheckCircle2, ListTree, Loader2, Plus, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, BookOpen, CheckCircle2, Image as ImageIcon, ListTree, Loader2, Plus, Search, Sparkles } from 'lucide-react';
 
 type CatalogBook = {
   id: string;
@@ -285,6 +285,11 @@ export default function BookCatalogClient() {
                   {book.ingestionRuns[0]?.processedPages > 0 && (
                     <Link href={`/admin/question-bank/books/${book.id}/manifest`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3">
                       <ListTree className="h-4 w-4" /> Chapter manifest{book.confirmedChapters > 0 ? ` · ${book.confirmedChapters} confirmed` : book._count.chapters > 0 ? ` · ${book._count.chapters} draft` : ''}
+                    </Link>
+                  )}
+                  {book.ingestionRuns[0]?.processedPages > 0 && (
+                    <Link href={`/admin/question-bank/books/${book.id}/figures`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3">
+                      <ImageIcon className="h-4 w-4" /> Figures
                     </Link>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => void benchmarkBook(book, 'GEMINI_VISION')} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 disabled:opacity-60">{benchmarkingKey === `${book.id}:GEMINI_VISION` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Benchmark Gemini</button><button onClick={() => void benchmarkBook(book, 'MATHPIX_OCR')} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:opacity-60">{benchmarkingKey === `${book.id}:MATHPIX_OCR` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Benchmark Mathpix</button><span className="self-center text-xs text-slate-500">One selected page only; credits are never spent automatically.</span></div>}

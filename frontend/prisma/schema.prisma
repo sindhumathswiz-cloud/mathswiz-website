@@ -505,6 +505,7 @@ model Question {
   bookExercise   BookExercise?       @relation(fields: [bookExerciseId], references: [id], onDelete: SetNull)
   solution       Solution?
   images         QuestionImage[]
+  pageFigures    PageFigure[]
   versions       QuestionVersion[]
   questionTags   QuestionTag[]
   embeddings     QuestionEmbedding[]
@@ -1093,6 +1094,7 @@ model Book {
   sourceDocuments SourceDocument[]
   questions       Question[]
   ingestionRuns   BookIngestionRun[]
+  pageFigures     PageFigure[]
 
   @@index([className, subject, isActive])
   @@index([title, edition])
@@ -1283,8 +1285,9 @@ model DocumentPage {
   status       ExtractionStatus @default(PENDING)
   errorMessage String?
 
-  document   SourceDocument            @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  benchmarks PageExtractionBenchmark[]
+  document    SourceDocument            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  benchmarks  PageExtractionBenchmark[]
+  pageFigures PageFigure[]
 
   @@unique([documentId, pageNumber])
   @@index([documentId])
@@ -1444,6 +1447,51 @@ model QuestionImage {
 
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
+  @@index([questionId])
+}
+
+// Every figure/diagram/chart/graph Mathpix detected on a book page, captured
+// (cropped + saved) at OCR time regardless of whether it could be matched to
+// a question yet -- decoupling "detect and save" from "assign to a
+// question" (see figure-question-match.ts for the auto-match step, and the
+// /figures API + review UI for manual assignment). Previously a region was
+// only ever cropped once matched to exactly one question, so an unmatched
+// figure (a page the matcher couldn't place, or a genuine detection miss)
+// was gone forever with no record it had ever existed.
+//
+// x/y/width/height are the region's pixel coordinates in the OCR'd page
+// image (same space as DiagramRegion) -- nullable because a figure migrated
+// in from the old QuestionImage-only pipeline has no recorded coordinates,
+// only the already-cropped file.
+model PageFigure {
+  id             String  @id @default(cuid())
+  bookId         String
+  documentPageId String
+  pageNumber     Int
+  x              Int?
+  y              Int?
+  width          Int?
+  height         Int?
+  imageType      String  @default("diagram") // diagram, chart, picture, figure, graph, image
+  imageUrl       String
+  orderIndex     Int     @default(0)
+
+  // null = not yet assigned to any question (awaiting auto-match or manual
+  // review). matchedAutomatically distinguishes the vertical-position
+  // auto-match from a human's manual assignment in the review UI.
+  questionId           String?
+  matchedAutomatically Boolean   @default(false)
+  reviewedAt           DateTime?
+  reviewedById         String?
+
+  createdAt DateTime @default(now())
+
+  book         Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  documentPage DocumentPage @relation(fields: [documentPageId], references: [id], onDelete: Cascade)
+  question     Question?    @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([bookId, pageNumber])
+  @@index([documentPageId])
   @@index([questionId])
 }
 

@@ -81,14 +81,6 @@ function deriveExplanationTags(explanationType: 'FULL' | 'HINT' | 'NONE'): strin
   return [];
 }
 
-// One diagram/figure/chart region detected on a page that hasn't been
-// attached to a saved Question yet, plus the page image its coordinates are
-// relative to (needed later to actually crop it — see lib/page-image-crop.ts).
-interface PendingDiagramRegion {
-  ocrImagePath: string;
-  region: DiagramRegion;
-}
-
 /**
  * A page (or run of pages) still waiting to be joined with more text from a
  * following page before it's structured — either a CASE_STUDY passage
@@ -98,10 +90,10 @@ interface PendingDiagramRegion {
  * (incomplete-page-fragment.ts). Persisted on BookIngestionRun.providerConfig
  * (no schema migration needed) so it survives across separate batch calls,
  * not just within one loop iteration — a stitch can straddle a batch
- * boundary since batches are only 5-10 pages. Also carries any diagram
- * regions detected on the pages contributing to this fragment, so a figure
- * printed on an earlier page in the chain isn't dropped once the fragment
- * resolves into saved Question(s).
+ * boundary since batches are only 5-10 pages. Also carries the PageFigure
+ * ids already captured (see capturePageFigures below) for the pages
+ * contributing to this fragment, so a figure printed on an earlier page in
+ * the chain gets assigned once the fragment resolves into a saved Question.
  */
 interface PendingCaseStudyFragment {
   startPage: number;
@@ -109,22 +101,7 @@ interface PendingCaseStudyFragment {
   text: string;
   documentPageIds: string[];
   chainLength: number;
-  diagramRegions: PendingDiagramRegion[];
-}
-
-function readPendingDiagramRegions(raw: unknown): PendingDiagramRegion[] {
-  if (!Array.isArray(raw)) return [];
-  const regions: PendingDiagramRegion[] = [];
-  for (const entry of raw) {
-    if (!entry || typeof entry !== 'object') continue;
-    const e = entry as Record<string, unknown>;
-    const region = e.region;
-    if (typeof e.ocrImagePath !== 'string' || !region || typeof region !== 'object') continue;
-    const r = region as Record<string, unknown>;
-    if (typeof r.x !== 'number' || typeof r.y !== 'number' || typeof r.width !== 'number' || typeof r.height !== 'number' || typeof r.type !== 'string') continue;
-    regions.push({ ocrImagePath: e.ocrImagePath, region: { x: r.x, y: r.y, width: r.width, height: r.height, type: r.type } });
-  }
-  return regions;
+  pageFigureIds: string[];
 }
 
 function readPendingFragment(providerConfig: unknown): PendingCaseStudyFragment | null {
@@ -139,37 +116,67 @@ function readPendingFragment(providerConfig: unknown): PendingCaseStudyFragment 
     text: f.text,
     documentPageIds: Array.isArray(f.documentPageIds) ? f.documentPageIds.filter((x): x is string => typeof x === 'string') : [],
     chainLength: typeof f.chainLength === 'number' ? f.chainLength : 1,
-    diagramRegions: readPendingDiagramRegions(f.diagramRegions),
+    pageFigureIds: Array.isArray(f.pageFigureIds) ? f.pageFigureIds.filter((x): x is string => typeof x === 'string') : [],
   };
 }
 
 /**
- * Crops and attaches every accumulated diagram region to a just-saved
- * Question. Best-effort per region: a bad crop (a malformed path, a Python
- * failure, a region that clamps to nothing) is logged and skipped rather
- * than thrown — the Question itself is already committed by the time this
- * runs, and one missing image shouldn't cost the whole page's batch.
+ * Crops and saves EVERY figure region Mathpix detected on this page as its
+ * own PageFigure row -- unassigned (questionId: null) -- regardless of how
+ * many questions the page turns out to produce or whether it becomes part of
+ * a multi-page fragment. Runs once per page, right after OCR.
+ *
+ * This is the fix for the old "dropped wholesale" failure mode: previously a
+ * region was only ever cropped once matched to exactly one question, so an
+ * unmatched figure (a page the matcher couldn't place, or a genuine
+ * detection miss on a chapter with dense multi-question pages) was gone
+ * forever with no record it had ever existed. Now every detected figure is
+ * captured; matching (below) only decides which question's row it links to,
+ * and an unplaced one stays visible for manual review instead of vanishing.
+ *
+ * Best-effort per region, same reasoning as before: a bad crop (a malformed
+ * path, a Python failure, a region that clamps to nothing) is logged and
+ * skipped rather than thrown. Returns the created row ids in the SAME ORDER
+ * as `regions`, with `null` in a slot whose crop failed.
  */
-async function attachDiagramImages(bookId: string, runId: string, questionId: string, regions: PendingDiagramRegion[]) {
+async function capturePageFigures(
+  bookId: string,
+  runId: string,
+  documentPageId: string,
+  pageNumber: number,
+  ocrImagePath: string,
+  regions: DiagramRegion[],
+): Promise<Array<string | null>> {
+  const ids: Array<string | null> = [];
   let index = 0;
-  for (const { ocrImagePath, region } of regions) {
-    const fileName = `${questionId}-${index}.jpg`;
+  for (const region of regions) {
+    const fileName = `pf-${documentPageId}-${index}.jpg`;
     try {
       await cropPageRegion(bookId, runId, ocrImagePath, fileName, region);
-      await prisma.questionImage.create({
+      const created = await prisma.pageFigure.create({
         data: {
-          questionId,
-          imageUrl: `/api/admin/books/${bookId}/ingestions/${runId}/question-images/${fileName}`,
+          bookId,
+          documentPageId,
+          pageNumber,
+          x: region.x,
+          y: region.y,
+          width: region.width,
+          height: region.height,
           imageType: region.type,
+          imageUrl: `/api/admin/books/${bookId}/ingestions/${runId}/question-images/${fileName}`,
           orderIndex: index,
         },
+        select: { id: true },
       });
+      ids.push(created.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`Failed to attach diagram image ${index} for question ${questionId}: ${message}`);
+      console.error(`Failed to capture figure ${index} on page ${pageNumber}: ${message}`);
+      ids.push(null);
     }
     index++;
   }
+  return ids;
 }
 
 /**
@@ -410,9 +417,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       // pageRaw.diagramRegions/ocrImagePath are only populated when this
       // page was OCR'd (MATHPIX_OCR) — a NATIVE_TEXT page has neither, so
       // this is [] in that (common) case, same as an OCR'd page with no
-      // figures on it.
-      const pageRegions: PendingDiagramRegion[] = pageRaw.ocrImagePath
-        ? (pageRaw.diagramRegions ?? []).map((region) => ({ ocrImagePath: pageRaw.ocrImagePath as string, region }))
+      // figures on it. Captured (cropped + saved as unassigned PageFigure
+      // rows) immediately, before we know how many questions this page
+      // produces or whether it joins a fragment -- see capturePageFigures.
+      const pageRegions: DiagramRegion[] = pageRaw.diagramRegions ?? [];
+      const thisPageFigureIds: Array<string | null> = (pageRegions.length > 0 && pageRaw.ocrImagePath)
+        ? await capturePageFigures(id, run.id, page.id, page.pageNumber, pageRaw.ocrImagePath, pageRegions)
         : [];
 
       // If this page sits inside a confirmed manifest section (a known
@@ -436,7 +446,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           text: textForStructuring,
           documentPageIds: stitching ? [...pendingFragment!.documentPageIds, page.id] : [page.id],
           chainLength,
-          diagramRegions: stitching ? [...pendingFragment!.diagramRegions, ...pageRegions] : pageRegions,
+          pageFigureIds: [...(stitching ? pendingFragment!.pageFigureIds : []), ...thisPageFigureIds.filter((x): x is string => x != null)],
         };
         await prisma.documentPage.update({
           where: { id: page.id },
@@ -456,7 +466,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const sourcePageStart = stitching ? pendingFragment!.startPage : page.pageNumber;
       const sourcePageEnd = page.pageNumber;
       const sourceDocumentPageIds = stitching ? [...pendingFragment!.documentPageIds, page.id] : [page.id];
-      const accumulatedRegions = stitching ? [...pendingFragment!.diagramRegions, ...pageRegions] : pageRegions;
+      const accumulatedFigureIds = [
+        ...(stitching ? pendingFragment!.pageFigureIds : []),
+        ...thisPageFigureIds.filter((x): x is string => x != null),
+      ];
       pendingFragment = null;
 
       detectedCount += structured.length;
@@ -470,16 +483,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         for (const e of existing) if (e.contentHash) seenHashes.add(e.contentHash);
       }
 
-      // Which accumulated figure regions belong to which question. For a
-      // single-question page/chain every region is that question's (below).
-      // For a multi-question SINGLE page, place each figure under the
-      // question nearest above it, by the OCR text-line positions — a page
-      // whose figures used to be dropped wholesale. A stitched fragment
-      // chain spans multiple page images whose coordinates aren't
-      // comparable, so it keeps the single-question whole-chain path only.
-      const regionsByQuestion = (!stitching && structured.length > 1 && accumulatedRegions.length > 0 && pageRaw.ocrImagePath)
+      // Which of this page's captured figures belong to which question. For
+      // a single-question page/chain every accumulated figure is that
+      // question's (below). For a multi-question SINGLE page, place each
+      // figure under the question nearest above it, by the OCR text-line
+      // positions — pages whose figures used to be dropped wholesale. A
+      // stitched fragment chain spans multiple page images whose coordinates
+      // aren't comparable, so it keeps the single-question whole-chain path.
+      const regionsByQuestion = (!stitching && structured.length > 1 && pageRegions.length > 0)
         ? matchFiguresToQuestions(
-            accumulatedRegions.map((r) => r.region),
+            pageRegions,
             pageRaw.textLines,
             structured.map((s) => ({ printedNumber: s.question.printedNumber, content: s.question.questionContent })),
           )
@@ -553,21 +566,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         });
         savedCount++;
 
-        // Attach this question's figure regions. A single-question page or a
-        // resolved fragment chain: every accumulated region is this
-        // question's. A multi-question page: only the regions the vertical
-        // position match assigned to THIS question (figure-question-match.ts)
-        // — the rest go to their own questions, or are dropped if they can't
-        // be placed (e.g. a figure above the first question, belonging to
-        // one carried over from the previous page).
-        if (accumulatedRegions.length > 0) {
-          const regionsForThisQuestion = structured.length === 1
-            ? accumulatedRegions
-            : (regionsByQuestion.get(index) ?? []).map((region) => ({ ocrImagePath: pageRaw.ocrImagePath as string, region }));
-          if (regionsForThisQuestion.length > 0) {
-            if (structured.length > 1) figuresMatchedToQuestion += regionsForThisQuestion.length;
-            await attachDiagramImages(id, run.id, created.id, regionsForThisQuestion);
-          }
+        // Link this question to its already-captured PageFigure rows (every
+        // figure on the page was cropped and saved up front, unassigned --
+        // see capturePageFigures). A single-question page or a resolved
+        // fragment chain: every accumulated figure is this question's. A
+        // multi-question page: only the figures the vertical-position match
+        // assigned to THIS question (figure-question-match.ts) — the rest
+        // go to their own questions, or stay unassigned (still visible for
+        // manual review via the figures API) if they can't be placed, e.g. a
+        // figure above the first question, belonging to one carried over
+        // from the previous page.
+        let figureIdsForThisQuestion: string[];
+        if (structured.length === 1) {
+          figureIdsForThisQuestion = accumulatedFigureIds;
+        } else {
+          figureIdsForThisQuestion = (regionsByQuestion.get(index) ?? [])
+            .map((region) => {
+              const regionIndex = pageRegions.indexOf(region);
+              return regionIndex >= 0 ? thisPageFigureIds[regionIndex] : null;
+            })
+            .filter((x): x is string => x != null);
+          figuresMatchedToQuestion += figureIdsForThisQuestion.length;
+        }
+        if (figureIdsForThisQuestion.length > 0) {
+          await prisma.pageFigure.updateMany({
+            where: { id: { in: figureIdsForThisQuestion } },
+            data: { questionId: created.id, matchedAutomatically: true },
+          });
         }
       }
 
