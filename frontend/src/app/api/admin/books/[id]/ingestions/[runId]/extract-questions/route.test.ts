@@ -10,12 +10,12 @@ const bookIngestionRun = { findFirst: vi.fn(), update: vi.fn() };
 const book = { findUnique: vi.fn() };
 const documentPage = { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn() };
 const question = { findMany: vi.fn(), create: vi.fn() };
-const questionImage = { create: vi.fn() };
+const pageFigure = { create: vi.fn(), updateMany: vi.fn() };
 const bookChapter = { findFirst: vi.fn(), aggregate: vi.fn(), create: vi.fn() };
 const loadConfirmedChapters = vi.fn();
 
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
-vi.mock('@/lib/prisma', () => ({ default: { bookIngestionRun, book, documentPage, question, questionImage, bookChapter } }));
+vi.mock('@/lib/prisma', () => ({ default: { bookIngestionRun, book, documentPage, question, pageFigure, bookChapter } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 vi.mock('@/lib/extract-book-page', () => ({ getPageRawText, structurePageQuestions }));
 vi.mock('@/lib/page-image-crop', () => ({ cropPageRegion }));
@@ -55,7 +55,13 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
     bookChapter.aggregate.mockResolvedValue({ _max: { orderIndex: null } });
     bookChapter.create.mockResolvedValue({ id: 'chapter-1' });
     cropPageRegion.mockResolvedValue({ imagePath: '/private/crop.jpg', width: 200, height: 200 });
-    questionImage.create.mockResolvedValue({ id: 'qi-1' });
+    // Deterministic id derived from the file name embedded in imageUrl (e.g.
+    // ".../pf-page-1-0.jpg" -> "pf-page-1-0"), so a test can predict which
+    // PageFigure id a later updateMany assignment should reference.
+    pageFigure.create.mockImplementation(async ({ data }: { data: { imageUrl: string } }) => ({
+      id: data.imageUrl.split('/').pop()!.replace(/\.jpg$/, ''),
+    }));
+    pageFigure.updateMany.mockResolvedValue({ count: 0 });
     loadConfirmedChapters.mockResolvedValue([]);
   });
 
@@ -314,19 +320,28 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'q-diagram-1-0.jpg', { x: 50, y: 60, width: 300, height: 220, type: 'diagram' });
-      expect(questionImage.create).toHaveBeenCalledWith({
+      // Every detected figure is captured up front under a page-derived file
+      // name (not question-derived -- the question doesn't exist yet at
+      // capture time), then linked to the question via a PageFigure update.
+      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'pf-page-1-0.jpg', { x: 50, y: 60, width: 300, height: 220, type: 'diagram' });
+      expect(pageFigure.create).toHaveBeenCalledWith({
         data: {
-          questionId: 'q-diagram-1',
-          imageUrl: '/api/admin/books/book-1/ingestions/run-1/question-images/q-diagram-1-0.jpg',
+          bookId: 'book-1', documentPageId: 'page-1', pageNumber: 1,
+          x: 50, y: 60, width: 300, height: 220,
           imageType: 'diagram',
+          imageUrl: '/api/admin/books/book-1/ingestions/run-1/question-images/pf-page-1-0.jpg',
           orderIndex: 0,
         },
+        select: { id: true },
+      });
+      expect(pageFigure.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['pf-page-1-0'] } },
+        data: { questionId: 'q-diagram-1', matchedAutomatically: true },
       });
       expect(data.batch.saved).toBe(1);
     });
 
-    it('does not attach a figure on a multi-question page when OCR gave no text-line positions to place it by', async () => {
+    it('captures every figure on a multi-question page but leaves it unassigned when OCR gave no text-line positions to place it by', async () => {
       documentPage.findMany.mockResolvedValue([
         { id: 'page-1', pageNumber: 1, nativeText: null, pageImagePath: '/p1.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
       ]);
@@ -347,8 +362,14 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       await POST(post({ startPage: 1, batchSize: 5 }), { params });
 
       expect(question.create).toHaveBeenCalledTimes(2);
-      expect(cropPageRegion).not.toHaveBeenCalled();
-      expect(questionImage.create).not.toHaveBeenCalled();
+      // Captured regardless -- nothing about a multi-question page stops
+      // the eager capture step.
+      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'pf-page-1-0.jpg', { x: 10, y: 10, width: 100, height: 100, type: 'diagram' });
+      expect(pageFigure.create).toHaveBeenCalledTimes(1);
+      // But with no text-line positions to anchor either question, nothing
+      // can be placed -- it stays unassigned (questionId: null), visible for
+      // manual review rather than silently attached to the wrong question.
+      expect(pageFigure.updateMany).not.toHaveBeenCalled();
     });
 
     it('attaches each figure on a multi-question page to the question directly above it', async () => {
@@ -378,12 +399,14 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       const { POST } = await import('./route');
       const data = await (await POST(post({ startPage: 1, batchSize: 5 }), { params }) as Response).json();
 
-      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'q-a1-0.jpg', { x: 60, y: 90, width: 200, height: 160, type: 'graph' });
-      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'q-a2-0.jpg', { x: 60, y: 520, width: 200, height: 160, type: 'graph' });
+      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'pf-page-1-0.jpg', { x: 60, y: 90, width: 200, height: 160, type: 'graph' });
+      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-1.jpg', 'pf-page-1-1.jpg', { x: 60, y: 520, width: 200, height: 160, type: 'graph' });
+      expect(pageFigure.updateMany).toHaveBeenCalledWith({ where: { id: { in: ['pf-page-1-0'] } }, data: { questionId: 'q-a1', matchedAutomatically: true } });
+      expect(pageFigure.updateMany).toHaveBeenCalledWith({ where: { id: { in: ['pf-page-1-1'] } }, data: { questionId: 'q-a2', matchedAutomatically: true } });
       expect(data.batch.figuresMatchedToQuestion).toBe(2);
     });
 
-    it('stitches diagram regions from the passage page onto the resolved case-study question', async () => {
+    it('stitches a figure captured on the passage page onto the resolved case-study question', async () => {
       documentPage.findMany.mockResolvedValue([
         { id: 'page-24', pageNumber: 24, nativeText: null, pageImagePath: '/p24.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
         { id: 'page-25', pageNumber: 25, nativeText: null, pageImagePath: '/p25.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
@@ -399,9 +422,15 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       const { POST } = await import('./route');
       await POST(post({ startPage: 24, batchSize: 5 }), { params });
 
-      // The chart lives on page 24 (the passage page), but must still attach
-      // to the single Question row saved once the fragment resolves on page 25.
-      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-24.jpg', 'q-cs-1-0.jpg', { x: 20, y: 20, width: 150, height: 150, type: 'chart' });
+      // The chart is captured on page 24 (the passage page) the moment that
+      // page is processed -- before the fragment even resolves -- but must
+      // still end up linked to the single Question row saved once the
+      // fragment resolves on page 25.
+      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/page-24.jpg', 'pf-page-24-0.jpg', { x: 20, y: 20, width: 150, height: 150, type: 'chart' });
+      expect(pageFigure.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['pf-page-24-0'] } },
+        data: { questionId: 'q-cs-1', matchedAutomatically: true },
+      });
     });
 
     it('logs and continues when a crop fails, without failing the batch', async () => {
@@ -426,7 +455,10 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
 
       expect(response.status).toBe(200);
       expect(question.create).toHaveBeenCalledTimes(1);
-      expect(questionImage.create).not.toHaveBeenCalled();
+      // The crop failed, so no PageFigure row was ever created for it --
+      // nothing to link to the question, and the question itself still saves.
+      expect(pageFigure.create).not.toHaveBeenCalled();
+      expect(pageFigure.updateMany).not.toHaveBeenCalled();
       expect(data.batch.saved).toBe(1);
       expect(data.batch.failures).toEqual([]);
     });
