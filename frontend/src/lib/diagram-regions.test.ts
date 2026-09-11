@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDiagramRegions } from './diagram-regions';
+import { parseDiagramRegions, parseOcrTextLines } from './diagram-regions';
 
 function diagramLine(overrides: Record<string, unknown> = {}) {
   return {
@@ -63,5 +63,42 @@ describe('parseDiagramRegions', () => {
 
   it('skips non-object entries in the line data array', () => {
     expect(parseDiagramRegions([null, 42, 'x', diagramLine()])).toHaveLength(1);
+  });
+});
+
+function textLine(text: string, top: number, over: Record<string, unknown> = {}) {
+  return { type: 'text', text, cnt: [[50, top], [500, top], [500, top + 24], [50, top + 24]], ...over };
+}
+
+describe('parseOcrTextLines', () => {
+  it('returns [] for non-array input', () => {
+    expect(parseOcrTextLines(undefined)).toEqual([]);
+    expect(parseOcrTextLines({})).toEqual([]);
+  });
+
+  it('extracts text + vertical bounds for text-ish lines, sorted top to bottom', () => {
+    const lines = parseOcrTextLines([
+      textLine('2. Second question', 300),
+      textLine('1. First question', 100),
+    ]);
+    expect(lines).toEqual([
+      { top: 100, bottom: 124, text: '1. First question' },
+      { top: 300, bottom: 324, text: '2. Second question' },
+    ]);
+  });
+
+  it('keeps math lines but skips figure and table lines', () => {
+    const lines = parseOcrTextLines([
+      textLine('some prose', 10),
+      textLine('$x^2 + 1$', 40, { type: 'math' }),
+      textLine('', 70, { type: 'chart' }),
+      textLine('a | b | c', 100, { type: 'table' }),
+      diagramLine({ type: 'diagram' }),
+    ]);
+    expect(lines.map((l) => l.text)).toEqual(['some prose', '$x^2 + 1$']);
+  });
+
+  it('drops lines with no text or no usable contour', () => {
+    expect(parseOcrTextLines([textLine('   ', 10), textLine('real', 20, { cnt: [] })])).toEqual([]);
   });
 });
