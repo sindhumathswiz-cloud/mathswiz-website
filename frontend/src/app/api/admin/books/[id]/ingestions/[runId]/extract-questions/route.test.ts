@@ -9,7 +9,7 @@ const cropPageRegion = vi.fn();
 const bookIngestionRun = { findFirst: vi.fn(), update: vi.fn() };
 const book = { findUnique: vi.fn() };
 const documentPage = { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn() };
-const question = { findMany: vi.fn(), create: vi.fn() };
+const question = { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() };
 const pageFigure = { create: vi.fn(), updateMany: vi.fn() };
 const bookChapter = { findFirst: vi.fn(), aggregate: vi.fn(), create: vi.fn() };
 const loadConfirmedChapters = vi.fn();
@@ -431,6 +431,62 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
         where: { id: { in: ['pf-page-24-0'] } },
         data: { questionId: 'q-cs-1', matchedAutomatically: true },
       });
+    });
+
+    it('backfills a figure onto the pre-existing question it duplicates, instead of dropping it', async () => {
+      // Re-running extraction on a page whose question already exists (e.g.
+      // to pick up figures for the first time under this capture-all
+      // pipeline) must not drop the figure just because the question itself
+      // was a no-op duplicate.
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-1', pageNumber: 1, nativeText: null, pageImagePath: '/p1.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
+      ]);
+      getPageRawText.mockResolvedValueOnce({
+        provider: 'MATHPIX_OCR',
+        rawText: 'A triangle is shown below. Find its area.',
+        ocrConfidence: 0.91,
+        diagramRegions: [{ x: 50, y: 60, width: 300, height: 220, type: 'diagram' }],
+        ocrImagePath: '/private/page-1.jpg',
+      });
+      structurePageQuestions.mockResolvedValueOnce([
+        { question: { questionContent: 'Find the area of the triangle shown.', type: 'SUBJECTIVE', difficulty: 'MEDIUM', options: [], correctAnswer: '', explanation: 'Area = 1/2 * base * height', tags: [], topic: '', method: '', printedNumber: '', explanationType: 'FULL' }, contentHash: 'hash-dup', qaIssues: [] },
+      ]);
+      // This content already exists as a real Question row.
+      question.findMany.mockResolvedValueOnce([{ contentHash: 'hash-dup' }]);
+      question.findFirst.mockResolvedValueOnce({ id: 'q-existing', _count: { pageFigures: 0 } });
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({ startPage: 1, batchSize: 5 }), { params }) as Response).json();
+
+      expect(question.create).not.toHaveBeenCalled();
+      expect(data.batch.duplicates).toBe(1);
+      expect(pageFigure.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['pf-page-1-0'] } },
+        data: { questionId: 'q-existing', matchedAutomatically: true },
+      });
+    });
+
+    it('does not pile a figure onto a duplicate question that already has one', async () => {
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-1', pageNumber: 1, nativeText: null, pageImagePath: '/p1.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
+      ]);
+      getPageRawText.mockResolvedValueOnce({
+        provider: 'MATHPIX_OCR',
+        rawText: 'A triangle is shown below. Find its area.',
+        ocrConfidence: 0.91,
+        diagramRegions: [{ x: 50, y: 60, width: 300, height: 220, type: 'diagram' }],
+        ocrImagePath: '/private/page-1.jpg',
+      });
+      structurePageQuestions.mockResolvedValueOnce([
+        { question: { questionContent: 'Find the area of the triangle shown.', type: 'SUBJECTIVE', difficulty: 'MEDIUM', options: [], correctAnswer: '', explanation: 'Area = 1/2 * base * height', tags: [], topic: '', method: '', printedNumber: '', explanationType: 'FULL' }, contentHash: 'hash-dup2', qaIssues: [] },
+      ]);
+      question.findMany.mockResolvedValueOnce([{ contentHash: 'hash-dup2' }]);
+      question.findFirst.mockResolvedValueOnce({ id: 'q-existing-2', _count: { pageFigures: 1 } });
+
+      const { POST } = await import('./route');
+      await POST(post({ startPage: 1, batchSize: 5 }), { params });
+
+      expect(pageFigure.updateMany).not.toHaveBeenCalled();
     });
 
     it('logs and continues when a crop fails, without failing the batch', async () => {
