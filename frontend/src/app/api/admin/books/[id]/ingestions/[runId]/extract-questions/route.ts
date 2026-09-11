@@ -498,9 +498,45 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           )
         : new Map<number, DiagramRegion[]>();
 
+      // Resolved once per question, up front, so a duplicate-skipped question
+      // (below) can still backfill its figures onto the row it duplicates --
+      // otherwise re-running extraction on a chapter that already has its
+      // questions (e.g. to pick up figures under this capture-all pipeline
+      // for the first time) would silently drop every figure on a page whose
+      // questions all already exist.
+      const figureIdsPerQuestion: string[][] = structured.map((_, index) => (
+        structured.length === 1
+          ? accumulatedFigureIds
+          : (regionsByQuestion.get(index) ?? [])
+              .map((region) => {
+                const regionIndex = pageRegions.indexOf(region);
+                return regionIndex >= 0 ? thisPageFigureIds[regionIndex] : null;
+              })
+              .filter((x): x is string => x != null)
+      ));
+
       for (const [index, { question, contentHash, qaIssues }] of structured.entries()) {
+        const figureIdsForThisQuestion = figureIdsPerQuestion[index];
         if (seenHashes.has(contentHash)) {
           duplicateCount++;
+          // This question already exists (this page reproduced its exact
+          // content) -- if figures were placed on it, and the existing row
+          // has none yet, link them there instead of dropping them. Never
+          // re-add on top of images it already has (a repeat re-run
+          // shouldn't keep piling on duplicates).
+          if (figureIdsForThisQuestion.length > 0) {
+            const existing = await prisma.question.findFirst({
+              where: { contentHash, OR: [{ bookId: id }, { status: 'APPROVED' }] },
+              select: { id: true, _count: { select: { pageFigures: true } } },
+            });
+            if (existing && existing._count.pageFigures === 0) {
+              await prisma.pageFigure.updateMany({
+                where: { id: { in: figureIdsForThisQuestion } },
+                data: { questionId: existing.id, matchedAutomatically: true },
+              });
+              figuresMatchedToQuestion += figureIdsForThisQuestion.length;
+            }
+          }
           continue;
         }
         seenHashes.add(contentHash);
@@ -576,18 +612,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         // manual review via the figures API) if they can't be placed, e.g. a
         // figure above the first question, belonging to one carried over
         // from the previous page.
-        let figureIdsForThisQuestion: string[];
-        if (structured.length === 1) {
-          figureIdsForThisQuestion = accumulatedFigureIds;
-        } else {
-          figureIdsForThisQuestion = (regionsByQuestion.get(index) ?? [])
-            .map((region) => {
-              const regionIndex = pageRegions.indexOf(region);
-              return regionIndex >= 0 ? thisPageFigureIds[regionIndex] : null;
-            })
-            .filter((x): x is string => x != null);
-          figuresMatchedToQuestion += figureIdsForThisQuestion.length;
-        }
+        if (structured.length > 1) figuresMatchedToQuestion += figureIdsForThisQuestion.length;
         if (figureIdsForThisQuestion.length > 0) {
           await prisma.pageFigure.updateMany({
             where: { id: { in: figureIdsForThisQuestion } },
