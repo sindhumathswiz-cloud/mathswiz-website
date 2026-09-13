@@ -703,6 +703,55 @@ export function chapterForPage(chapters: ConfirmedChapter[], page: number): Conf
 }
 
 /**
+ * True when `page` falls inside ANY confirmed chapter's range. Used by the
+ * answer-key/solutions matching heuristic fallback: if the key/solutions page
+ * itself matched no confirmed chapter, a heuristic-window candidate that DOES
+ * belong to some other confirmed chapter is a cross-chapter false positive --
+ * that chapter's own admin never vouched for this page, so the candidate
+ * should be excluded rather than matched on printed-number proximity alone.
+ */
+export function inAnyConfirmedChapter(chapters: ConfirmedChapter[], page: number): boolean {
+  return chapterForPage(chapters, page) != null;
+}
+
+/**
+ * Distinct numeric literals (integers or decimals) in `text`, excluding
+ * `exclude` (typically the printed question number itself, which isn't
+ * independent content evidence -- it's the join key being verified).
+ */
+export function extractSalientNumbers(text: string, exclude?: string): Set<string> {
+  const matches = text.match(/\d+(?:\.\d+)?/g) ?? [];
+  return new Set(exclude ? matches.filter((n) => n !== exclude) : matches);
+}
+
+export interface ContentAgreement {
+  /** False when the question has no numbers of its own to compare -- content
+   *  agreement is inconclusive (not evidence either way), not a red flag. */
+  applicable: boolean;
+  /** Count of numeric literals shared between the question and the block. */
+  score: number;
+}
+
+/**
+ * How well a candidate question's own content numerically agrees with a
+ * solution/answer block's text, independent of the printed-number match that
+ * already selected this as a candidate. A subjective/long-answer question
+ * with real numbers in its statement should see at least some of them
+ * reappear in its own worked solution; zero overlap (when the question DOES
+ * have numbers to check) is a sign this block may actually belong to a
+ * different question that merely shares a printed number in the lookback
+ * window.
+ */
+export function contentAgreementScore(questionContent: string, blockText: string, printedNumber: string): ContentAgreement {
+  const qNums = extractSalientNumbers(questionContent, printedNumber);
+  if (qNums.size === 0) return { applicable: false, score: 0 };
+  const bNums = extractSalientNumbers(blockText, printedNumber);
+  let score = 0;
+  for (const n of qNums) if (bNums.has(n)) score++;
+  return { applicable: true, score };
+}
+
+/**
  * The confirmed QUESTION section whose page range contains `page`, if any.
  * Theory / formula sections are not question regions.
  */

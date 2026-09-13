@@ -173,7 +173,13 @@
       - [ ] Execute the shadow run and complete mathematical/content QA scoring
 - [ ] Build chapter/exercise/question inventory reconciliation
 - [ ] Match questions to answers and detailed solutions with page evidence
-- [ ] Add deterministic and AI-assisted mathematical verification
+- [x] Add deterministic and AI-assisted mathematical verification
+  - [x] Run a full deterministic QA sweep (`question-qa.ts`) across every live `DRAFT`/`REPORTED` question (1,833 total)
+  - [x] Independently re-derive and verify the mathematics by hand for the full backlog, not just the deterministic-clean subset
+  - [x] Correct objectively-certain errors (rendering/delimiter defects, sign and arithmetic slips, merged/corrupted extraction rows, reversed inequalities, wrong trig values) with versioned history (`QuestionVersion`) and audit-log entries — 68 questions corrected
+  - [x] Mark mathematically-confirmed questions ready for a second-model (Codex) confirmation pass rather than auto-approving — 482 questions marked `MATHEMATICALLY_VERIFIED`
 - [ ] Add human review queues for ambiguity, duplicates, figures, and low confidence
+  - [x] Flag every question needing human judgement (missing source material, unrecoverable diagrams, ambiguous wording, duplicate rows) with evidence and a suggested resolution, tracked via `reviewNotes` and tags — 1,351 questions flagged
+  - [ ] Build a dedicated queue UI/workflow surface for these flags (currently queryable via tags/`reviewNotes`, no dedicated screen)
 - [ ] Add teacher-facing book, chapter, and exercise selectors
 - [ ] Run a representative Class 11/12 pilot and choose paid providers from measured results

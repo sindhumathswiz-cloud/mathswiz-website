@@ -299,6 +299,36 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-answer-keys', () =
       expect(seenRanges[0]).toEqual({ gte: 366, lte: 369 });
     });
 
+    it('excludes a heuristic-window candidate that belongs to a DIFFERENT confirmed chapter, since that chapter\'s own admin never vouched for this answer-key page', async () => {
+      // The answer-key page itself (page 50) is not inside any confirmed
+      // chapter -- otherwise it would hit the manifestSkippedPages branch
+      // above and never reach the heuristic lookback at all. The lookback
+      // window (10-50) reaches into the confirmed "Three Dimensional
+      // Geometry" chapter (pages 360-372) only in this contrived setup to
+      // exercise the boundary check; sourcePageStart 366 for the candidate
+      // below stands in for "some other chapter's confirmed range".
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([
+        { pageNumber: 50, rawText: 'Answers\n1. (b) 2. (d) 3. (a) 4. (c)' },
+      ]);
+      question.findMany.mockImplementation(async ({ where }: any) => {
+        if (where.printedNumber === '1') return [{ id: 'q-1', options: ['a', 'b', 'c', 'd'], sourcePageStart: 366, reviewNotes: null }];
+        if (['2', '3', '4'].includes(where.printedNumber)) {
+          return [{ id: `${where.printedNumber}-a`, options: ['a', 'b'], sourcePageStart: 10, reviewNotes: null }];
+        }
+        return [];
+      });
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({}), { params }) as Response).json();
+
+      expect(data.chapterBoundaryExcluded).toBe(1);
+      // Number 1's only candidate was excluded as a cross-chapter false
+      // positive, so it reports no_candidate rather than a match.
+      expect(data.details).toContainEqual(expect.objectContaining({ printedNumber: '1', outcome: 'no_candidate' }));
+      expect(question.update).not.toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'q-1' } }));
+    });
+
     it('skips an answer-key page inside a confirmed chapter but outside every confirmed key range', async () => {
       loadConfirmedChapters.mockResolvedValue([manifestChapter]);
       documentPage.findMany.mockResolvedValue([

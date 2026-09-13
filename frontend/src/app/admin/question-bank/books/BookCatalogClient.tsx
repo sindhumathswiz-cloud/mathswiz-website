@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, BookOpen, CheckCircle2, Image as ImageIcon, ListTree, Loader2, Plus, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, BookOpen, CheckCircle2, ClipboardCheck, Image as ImageIcon, ListTree, Loader2, Plus, Search, Sparkles } from 'lucide-react';
 
 type CatalogBook = {
   id: string;
@@ -211,7 +211,12 @@ export default function BookCatalogClient() {
             <h1 className="text-4xl font-black">Book Ingestion Library</h1>
             <p className="mt-2 text-slate-600">Register each exact edition before uploading its PDF. This preserves question, answer and source-page lineage.</p>
           </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900">Pilot mode: no new paid subscription required yet.</div>
+          <div className="flex flex-col items-end gap-2">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900">Pilot mode: no new paid subscription required yet.</div>
+            <Link href="/admin/question-bank/review-queue" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50">
+              <ClipboardCheck className="h-4 w-4 text-indigo-600" /> Review queue
+            </Link>
+          </div>
         </header>
 
         {message && <div className={`rounded-xl border px-4 py-3 font-semibold ${message.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>{message.text}</div>}

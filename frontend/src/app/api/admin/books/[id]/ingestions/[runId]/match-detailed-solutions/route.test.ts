@@ -123,7 +123,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
     documentPage.findMany.mockResolvedValue([{ pageNumber: 30, rawText }]);
     question.findMany.mockImplementation(async ({ where }: any) => {
       if (['1', '2', '3'].includes(where.printedNumber)) {
-        return [{ id: `q-${where.printedNumber}`, explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null }];
+        return [{ id: `q-${where.printedNumber}`, content: '', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null }];
       }
       return [];
     });
@@ -154,8 +154,8 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
   it('detects a genuine detailed-solutions page and reports a dry-run match without writing', async () => {
     documentPage.findMany.mockResolvedValue([{ pageNumber: 30, rawText: solutionsPage([1, 2, 3, 4]) }]);
     question.findMany.mockImplementation(async ({ where }: any) => {
-      if (where.printedNumber === '1') return [{ id: 'q-1', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: null }];
-      if (where.printedNumber === '2') return [{ id: 'q-2', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: null }];
+      if (where.printedNumber === '1') return [{ id: 'q-1', content: '', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: null }];
+      if (where.printedNumber === '2') return [{ id: 'q-2', content: '', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: null }];
       return [];
     });
 
@@ -177,8 +177,8 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
   it('writes explanation, strips the no-solution tags, and audits only when apply:true', async () => {
     documentPage.findMany.mockResolvedValue([{ pageNumber: 30, rawText: solutionsPage([1, 2, 3, 4]) }]);
     question.findMany.mockImplementation(async ({ where }: any) => {
-      if (where.printedNumber === '1') return [{ id: 'q-1', explanation: null, tags: ['Questions without Solutions', 'Hint Available'], topic: 'Integrals', reviewNotes: null }];
-      if (where.printedNumber === '2') return [{ id: 'q-2', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: 'existing note' }];
+      if (where.printedNumber === '1') return [{ id: 'q-1', content: '', explanation: null, tags: ['Questions without Solutions', 'Hint Available'], topic: 'Integrals', reviewNotes: null }];
+      if (where.printedNumber === '2') return [{ id: 'q-2', content: '', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: 'existing note' }];
       return [];
     });
 
@@ -225,11 +225,11 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
     question.findMany.mockImplementation(async ({ where }: any) => {
       if (where.printedNumber === '1') {
         return [
-          { id: 'q-1a', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null },
-          { id: 'q-1b', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null },
+          { id: 'q-1a', content: 'unrelated content with no shared numbers', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null },
+          { id: 'q-1b', content: 'also unrelated content with no shared numbers', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null },
         ];
       }
-      if (where.printedNumber === '2') return [{ id: 'q-2', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null }];
+      if (where.printedNumber === '2') return [{ id: 'q-2', content: '', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null }];
       return [];
     });
 
@@ -261,9 +261,9 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
   it('backfills an empty topic from a clear majority among same-page matches, and links the BookChapter', async () => {
     documentPage.findMany.mockResolvedValue([{ pageNumber: 30, rawText: solutionsPage([1, 2, 3, 4]) }]);
     question.findMany.mockImplementation(async ({ where }: any) => {
-      if (where.printedNumber === '1') return [{ id: 'q-1', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: null }];
-      if (where.printedNumber === '2') return [{ id: 'q-2', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: null }];
-      if (where.printedNumber === '3') return [{ id: 'q-3', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null }];
+      if (where.printedNumber === '1') return [{ id: 'q-1', content: '', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: null }];
+      if (where.printedNumber === '2') return [{ id: 'q-2', content: '', explanation: null, tags: ['Questions without Solutions'], topic: 'Integrals', reviewNotes: null }];
+      if (where.printedNumber === '3') return [{ id: 'q-3', content: '', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null }];
       return [];
     });
 
@@ -281,6 +281,55 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
     expect(question.update).not.toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'q-1' },
       data: expect.objectContaining({ bookChapterId: expect.anything() }),
+    }));
+  });
+
+  it('content agreement resolves an otherwise-ambiguous pair to the candidate whose question shares numeric evidence with the block', async () => {
+    const rawText = 'Detailed Solutions\n\n'
+      + '1. A vector has magnitude 5 and makes an angle of 30 degrees with the x-axis; resolving into components confirms the stated result.\n'
+      + '2. We differentiate the given function with respect to x and simplify using standard identities to obtain the required derivative.';
+    documentPage.findMany.mockResolvedValue([{ pageNumber: 30, rawText }]);
+    question.findMany.mockImplementation(async ({ where }: any) => {
+      if (where.printedNumber === '1') {
+        return [
+          { id: 'q-agrees', content: 'A vector has magnitude 5 and makes an angle of 30 degrees with the x-axis.', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null },
+          { id: 'q-disagrees', content: 'Find the value for a triangle with sides 12 and 7.', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null },
+        ];
+      }
+      return [];
+    });
+
+    const { POST } = await import('./route');
+    const response = (await POST(post({}), { params })) as Response;
+    const data = await response.json();
+
+    expect(data.contentAgreementResolved).toBe(1);
+    expect(data.matched).toBe(1);
+    expect(data.ambiguous).toBe(0);
+    expect(data.details).toContainEqual(expect.objectContaining({ printedNumber: '1', questionId: 'q-agrees', outcome: 'would_update' }));
+  });
+
+  it('flags a single eligible match whose question shares no numeric evidence with the solution block, setting NEEDS_REVIEW', async () => {
+    const rawText = 'Detailed Solutions\n\n'
+      + '1. A vector has magnitude 5 and makes an angle of 30 degrees with the x-axis; resolving into components confirms the stated result.\n'
+      + '2. We differentiate the given function with respect to x and simplify using standard identities to obtain the required derivative.';
+    documentPage.findMany.mockResolvedValue([{ pageNumber: 30, rawText }]);
+    question.findMany.mockImplementation(async ({ where }: any) => {
+      if (where.printedNumber === '1') {
+        return [{ id: 'q-1', content: 'Find the value for a triangle with sides 12 and 7.', type: 'SUBJECTIVE', options: null, correctAnswer: null, explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null }];
+      }
+      return [];
+    });
+
+    const { POST } = await import('./route');
+    await POST(post({ apply: true }), { params });
+
+    expect(question.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'q-1' },
+      data: expect.objectContaining({
+        verificationStatus: 'NEEDS_REVIEW',
+        reviewNotes: expect.stringContaining('Content agreement: no shared numeric evidence'),
+      }),
     }));
   });
 
@@ -319,7 +368,7 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
       const seenRanges: unknown[] = [];
       question.findMany.mockImplementation(async ({ where }: any) => {
         seenRanges.push(where.sourcePageStart);
-        if (where.printedNumber === '1') return [{ id: 'q-1', explanation: null, tags: [], topic: 'Vector Algebra', reviewNotes: null }];
+        if (where.printedNumber === '1') return [{ id: 'q-1', content: '', explanation: null, tags: [], topic: 'Vector Algebra', reviewNotes: null }];
         return []; // 2 has no candidate -> coverage 1/2, but heuristic is skipped anyway
       });
 
@@ -331,6 +380,30 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/match-detailed-solutions
       expect(data.lowCoveragePagesSkipped).toBe(0);
       expect(data.matched).toBe(1);
       expect(seenRanges[0]).toEqual({ gte: 205, lte: 214 });
+    });
+
+    it('excludes a heuristic-window candidate that belongs to a DIFFERENT confirmed chapter\'s pages', async () => {
+      // The solutions page itself (page 50) is not inside any confirmed
+      // chapter -- otherwise it would hit manifestSkippedPages instead. The
+      // candidate for block 1 sits at sourcePageStart 205, inside the
+      // confirmed "Vector Algebra" chapter (200-240): that chapter's own
+      // admin never vouched for this unrelated page, so it must be excluded
+      // rather than trusted on proximity alone.
+      loadConfirmedChapters.mockResolvedValue([manifestChapter]);
+      documentPage.findMany.mockResolvedValue([{ pageNumber: 50, rawText: solutionsPage([1, 2]) }]);
+      question.findMany.mockImplementation(async ({ where }: any) => {
+        if (where.printedNumber === '1') return [{ id: 'q-1', content: '', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null, sourcePageStart: 205 }];
+        if (where.printedNumber === '2') return [{ id: 'q-2', content: '', explanation: null, tags: ['Questions without Solutions'], topic: '', reviewNotes: null, sourcePageStart: 10 }];
+        return [];
+      });
+
+      const { POST } = await import('./route');
+      const data = await (await POST(post({}), { params }) as Response).json();
+
+      expect(data.chapterBoundaryExcluded).toBe(1);
+      expect(data.matched).toBe(1);
+      expect(data.details).toContainEqual(expect.objectContaining({ printedNumber: '2', questionId: 'q-2' }));
+      expect(question.update).not.toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'q-1' } }));
     });
 
     it('skips a solutions page inside a confirmed chapter but outside every confirmed solutions range', async () => {

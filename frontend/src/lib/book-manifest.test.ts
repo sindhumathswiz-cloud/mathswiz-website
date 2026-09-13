@@ -11,6 +11,8 @@ import {
   sectionForPage,
   answerKeySectionForPage,
   solutionsSectionForPage,
+  inAnyConfirmedChapter,
+  contentAgreementScore,
   type ConfirmedChapter,
   type ConfirmedSection,
   type ManifestDetectPage,
@@ -189,5 +191,38 @@ describe('confirmed-manifest consumer helpers', () => {
     expect(answerKeySectionForPage(chapters, 120)?.section.id).toBe('s1');
     expect(solutionsSectionForPage(chapters, 126)?.section.solutionCoverage).toBe('HINTS');
     expect(answerKeySectionForPage(chapters, 117)).toBeNull();
+  });
+
+  it('inAnyConfirmedChapter mirrors chapterForPage as a boolean', () => {
+    expect(inAnyConfirmedChapter(chapters, 105)).toBe(true);
+    expect(inAnyConfirmedChapter(chapters, 140)).toBe(false);
+  });
+});
+
+describe('contentAgreementScore', () => {
+  it('is inconclusive when the question has no salient numbers to compare', () => {
+    const result = contentAgreementScore('Simplify the given expression.', 'The answer works out to 7.', '3');
+    expect(result.applicable).toBe(false);
+    expect(result.score).toBe(0);
+  });
+
+  it('scores shared numeric evidence between the question and the candidate block', () => {
+    const result = contentAgreementScore(
+      'A vector has magnitude 5 and makes an angle of 30 degrees with the x-axis.',
+      'We resolve the vector of magnitude 5 into components at 30 degrees, giving the required answer.',
+      '3', // printed number for this pair, excluded from the comparison
+    );
+    expect(result.applicable).toBe(true);
+    expect(result.score).toBe(2); // 5 and 30 both appear in the block
+  });
+
+  it('scores zero when nothing in the question content is corroborated by the block', () => {
+    const result = contentAgreementScore(
+      'A vector has magnitude 5 and makes an angle of 30 degrees with the x-axis.',
+      'Taking the dot product of the two given vectors, the required scalar is seven.',
+      '3',
+    );
+    expect(result.applicable).toBe(true);
+    expect(result.score).toBe(0);
   });
 });

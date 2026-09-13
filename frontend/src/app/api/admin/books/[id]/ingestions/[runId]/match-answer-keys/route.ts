@@ -8,7 +8,9 @@ import {
   answerKeySectionForPage,
   chapterForPage,
   loadConfirmedChapters,
+  inAnyConfirmedChapter,
 } from '@/lib/book-manifest';
+import { analyzeQuestion, worstSeverity } from '@/lib/question-qa';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -153,13 +155,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let lowCoveragePagesSkipped = 0;
   let manifestScopedPages = 0;
   let manifestSkippedPages = 0;
+  let chapterBoundaryExcluded = 0;
   const details: Array<{ page: number; printedNumber: string; letter: string; questionId?: string; outcome: string }> = [];
 
   interface CandidateLookup {
     number: string;
     letter: string;
     hasAnyCandidate: boolean;
-    mcqCandidates: Array<{ id: string; options: unknown; sourcePageStart: number | null; reviewNotes: string | null }>;
+    mcqCandidates: Array<{ id: string; content: string; options: unknown; explanation: string | null; type: string; sourcePageStart: number | null; reviewNotes: string | null }>;
   }
 
   for (const page of pages) {
@@ -204,14 +207,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           OR: [{ correctAnswer: null }, { correctAnswer: '' }],
           sourcePageStart: sectionRange ?? { gte: page.pageNumber - ANSWER_KEY_LOOKBACK_PAGES, lt: page.pageNumber },
         },
-        select: { id: true, options: true, sourcePageStart: true, reviewNotes: true },
+        select: { id: true, content: true, options: true, explanation: true, type: true, sourcePageStart: true, reviewNotes: true },
       });
+      // Chapter-boundary scoping (heuristic fallback only -- a confirmed
+      // section range already IS a chapter boundary). This answer-key page
+      // matched no confirmed chapter of its own (else sectionRange would be
+      // set or the page would have been skipped above), so a lookback
+      // candidate that DOES belong to some OTHER confirmed chapter is a
+      // cross-chapter false positive that chapter's own admin never vouched
+      // for this page against -- exclude it rather than trust proximity alone.
+      const boundaryFiltered = sectionRange
+        ? candidates
+        : candidates.filter((c) => {
+          if (c.sourcePageStart == null) return true;
+          const excluded = inAnyConfirmedChapter(confirmedChapters, c.sourcePageStart);
+          if (excluded) chapterBoundaryExcluded++;
+          return !excluded;
+        });
       // Only an MCQ-shaped question (a real option list for the letter to
       // select from) is eligible to actually receive the answer letter --
       // but ANY candidate (MCQ-shaped or not) still counts as evidence this
       // page's numbering lines up with our extracted questions, for the
       // coverage check below.
-      const mcqCandidates = candidates.filter((c) => Array.isArray(c.options) && c.options.length >= 2);
+      const mcqCandidates = boundaryFiltered.filter((c) => Array.isArray(c.options) && c.options.length >= 2);
       // Coverage evidence requires an MCQ-shaped candidate specifically --
       // see the coverage doc comment above for why a bare "some candidate
       // exists with this number" is not trustworthy evidence on its own.
@@ -256,11 +274,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       if (apply) {
         const note = `Answer "${letter}" backfilled from an answer-key page (page ${page.pageNumber})${sectionRange ? ' within the confirmed chapter manifest range' : ' printed away from the question'} -- NOT independently verified yet; confirm before approving.`;
+        // Re-run deterministic QA against the fields as they'll read AFTER
+        // this write (not the stale creation-time result) so verificationStatus
+        // never goes stale when this route backfills an answer -- the same
+        // severity-to-status mapping extract-questions/route.ts uses at
+        // creation, just re-applied at every pipeline write that touches
+        // content, options, correctAnswer, or explanation.
+        const qaIssues = analyzeQuestion({ content: target.content, options: target.options as string[] | undefined, correctAnswer: letter, explanation: target.explanation ?? undefined, type: target.type });
         await prisma.question.update({
           where: { id: target.id },
           data: {
             correctAnswer: letter,
             reviewNotes: target.reviewNotes ? `${target.reviewNotes}\n\n${note}` : note,
+            verificationStatus: worstSeverity(qaIssues) === 'error' ? 'NEEDS_REVIEW' : 'STRUCTURALLY_VALID',
           },
         });
         updated++;
@@ -275,7 +301,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       action: 'BOOK_ANSWER_KEYS_MATCHED',
       entityType: 'BookIngestionRun',
       entityId: run.id,
-      metadata: { bookId: id, answerKeyPagesFound, pairsFound, matched, updated, ambiguous, noCandidate, lowCoveragePagesSkipped, manifestScopedPages, manifestSkippedPages },
+      metadata: { bookId: id, answerKeyPagesFound, pairsFound, matched, updated, ambiguous, noCandidate, lowCoveragePagesSkipped, manifestScopedPages, manifestSkippedPages, chapterBoundaryExcluded },
       ...requestAuditContext(request),
     });
   }
@@ -293,6 +319,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     lowCoveragePagesSkipped,
     manifestScopedPages,
     manifestSkippedPages,
+    chapterBoundaryExcluded,
     detailsTruncated: details.length >= MAX_DETAILS,
     details,
   });

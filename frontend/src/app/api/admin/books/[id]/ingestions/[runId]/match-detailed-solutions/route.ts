@@ -9,7 +9,10 @@ import {
   solutionsSectionForPage,
   chapterForPage,
   loadConfirmedChapters,
+  inAnyConfirmedChapter,
+  contentAgreementScore,
 } from '@/lib/book-manifest';
+import { analyzeQuestion, worstSeverity } from '@/lib/question-qa';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -121,15 +124,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let topicsBackfilled = 0;
   let manifestScopedPages = 0;
   let manifestSkippedPages = 0;
+  let chapterBoundaryExcluded = 0;
+  let contentAgreementResolved = 0;
+  let contentAgreementFlagged = 0;
   const details: Array<{ page: number; printedNumber: string; questionId?: string; outcome: string }> = [];
   const chapterCache = new Map<string, string>();
 
   interface Candidate {
     id: string;
+    content: string;
+    type: string;
+    options: unknown;
+    correctAnswer: string | null;
     explanation: string | null;
     tags: string[];
     topic: string | null;
     reviewNotes: string | null;
+    sourcePageStart: number | null;
   }
   interface BlockLookup {
     number: string;
@@ -168,13 +179,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           printedNumber: number,
           sourcePageStart: sectionRange ?? { gte: page.pageNumber - DETAILED_SOLUTION_LOOKBACK_PAGES, lt: page.pageNumber },
         },
-        select: { id: true, explanation: true, tags: true, topic: true, reviewNotes: true },
+        select: { id: true, content: true, type: true, options: true, correctAnswer: true, explanation: true, tags: true, topic: true, reviewNotes: true, sourcePageStart: true },
       });
+      // Chapter-boundary scoping (heuristic fallback only -- see
+      // match-answer-keys/route.ts for the full rationale, identical here).
+      const boundaryFiltered = sectionRange
+        ? candidates
+        : candidates.filter((c) => {
+          if (c.sourcePageStart == null) return true;
+          const excluded = inAnyConfirmedChapter(confirmedChapters, c.sourcePageStart);
+          if (excluded) chapterBoundaryExcluded++;
+          return !excluded;
+        });
       // Eligible = doesn't already have a real captured solution. A row with
       // a non-empty explanation that ISN'T tagged "Questions without
       // Solutions" already has a FULL solution (captured inline at
       // extraction time) and must never be overwritten by this pass.
-      const eligible = candidates.filter((c) => !c.explanation || c.tags.includes(TAG_NO_SOLUTION));
+      let eligible = boundaryFiltered.filter((c) => !c.explanation || c.tags.includes(TAG_NO_SOLUTION));
+      // Content agreement: when printed-number proximity alone leaves more
+      // than one eligible candidate, numeric overlap between the candidate's
+      // own question content and this solution block's text can break the
+      // tie -- a real worked solution to a question with numbers in its
+      // statement should echo at least one of them. If exactly one candidate
+      // shows agreement and the rest show none, resolve to it instead of
+      // leaving the whole block ambiguous.
+      if (eligible.length > 1) {
+        const scored = eligible.map((c) => ({ c, agreement: contentAgreementScore(c.content, text, number) }));
+        const withEvidence = scored.filter((s) => s.agreement.applicable && s.agreement.score > 0);
+        if (withEvidence.length === 1) {
+          eligible = [withEvidence[0].c];
+          contentAgreementResolved++;
+        }
+      }
       lookups.push({ number, text, hasAnyCandidate: candidates.length > 0, eligible });
     }
 
@@ -241,14 +277,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
     }
 
-    for (const { candidate, text } of pageMatches) {
+    for (const { candidate, number, text } of pageMatches) {
       const needsTopic = majorityTopic && !(candidate.topic || '').trim();
       if (needsTopic) topicsBackfilled++;
 
       if (!apply) continue;
 
       const kind = hintsOnly ? 'Hint' : 'Detailed solution';
-      const note = `${kind} backfilled from a solutions section (page ${page.pageNumber})${sectionRange ? ' within the confirmed chapter manifest range' : ' printed away from the question'} -- NOT independently verified yet; confirm before approving.`;
+      // Content agreement, re-checked at write time against this specific
+      // candidate + block text (cheap; the ambiguous-resolution pass above
+      // only needed it when there was more than one eligible candidate).
+      const agreement = contentAgreementScore(candidate.content, text, number);
+      const disagrees = agreement.applicable && agreement.score === 0;
+      if (disagrees) contentAgreementFlagged++;
+      const note = `${kind} backfilled from a solutions section (page ${page.pageNumber})${sectionRange ? ' within the confirmed chapter manifest range' : ' printed away from the question'} -- NOT independently verified yet; confirm before approving.`
+        + (disagrees ? ' Content agreement: no shared numeric evidence found between the question and this solution block -- double-check.' : '');
       // A HINTS-coverage section carries hints, not full solutions -- keep the
       // "Hint Available" tag rather than clearing it.
       const nextTags = hintsOnly
@@ -256,12 +299,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         : candidate.tags.filter((t) => t !== TAG_NO_SOLUTION && t !== TAG_HINT_AVAILABLE);
       const bookChapterId = needsTopic ? await findOrCreateBookChapter(id, majorityTopic as string, chapterCache) : undefined;
 
+      // Re-run deterministic QA against the fields as they'll read AFTER this
+      // write so verificationStatus never goes stale when this route
+      // backfills an explanation -- same severity-to-status mapping
+      // extract-questions/route.ts uses at creation (see match-answer-keys
+      // for the identical pattern). A content-agreement disagreement forces
+      // NEEDS_REVIEW regardless of the deterministic result, since it's
+      // evidence this specific match may be wrong even if the text itself
+      // renders fine.
+      const qaIssues = analyzeQuestion({ content: candidate.content, options: candidate.options as string[] | undefined, correctAnswer: candidate.correctAnswer ?? undefined, explanation: text, type: candidate.type });
+      const verificationStatus = disagrees || worstSeverity(qaIssues) === 'error' ? 'NEEDS_REVIEW' : 'STRUCTURALLY_VALID';
+
       await prisma.question.update({
         where: { id: candidate.id },
         data: {
           explanation: text,
           tags: nextTags,
           reviewNotes: candidate.reviewNotes ? `${candidate.reviewNotes}\n\n${note}` : note,
+          verificationStatus,
           ...(needsTopic ? { topic: majorityTopic, bookChapterId } : {}),
         },
       });
@@ -276,7 +331,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       action: 'BOOK_DETAILED_SOLUTIONS_MATCHED',
       entityType: 'BookIngestionRun',
       entityId: run.id,
-      metadata: { bookId: id, solutionsPagesFound, blocksFound, matched, updated, ambiguous, noCandidate, alreadyHasSolution, lowCoveragePagesSkipped, topicsBackfilled, manifestScopedPages, manifestSkippedPages },
+      metadata: { bookId: id, solutionsPagesFound, blocksFound, matched, updated, ambiguous, noCandidate, alreadyHasSolution, lowCoveragePagesSkipped, topicsBackfilled, manifestScopedPages, manifestSkippedPages, chapterBoundaryExcluded, contentAgreementResolved, contentAgreementFlagged },
       ...requestAuditContext(request),
     });
   }
@@ -296,6 +351,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     alreadyHasSolution,
     lowCoveragePagesSkipped,
     topicsBackfilled,
+    chapterBoundaryExcluded,
+    contentAgreementResolved,
+    contentAgreementFlagged,
     detailsTruncated: details.length >= MAX_DETAILS,
     details,
   });
