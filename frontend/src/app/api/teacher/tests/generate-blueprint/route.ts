@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { selectQuestionsByFilters } from "@/lib/question-selection";
 
 const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) => {
     // ROBUST KEY EXTRACTION (Checks singular, indexed, and plural versions)
@@ -47,6 +49,14 @@ const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) =>
 
 export async function POST(req: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        const userId = session?.user?.id;
+        const role = session?.user?.role;
+        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (role !== "TEACHER" && role !== "ADMIN") {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         const { prompt } = await req.json();
         if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
 
@@ -65,18 +75,7 @@ export async function POST(req: Request) {
 
         if (!parsedData.filters || !Array.isArray(parsedData.filters)) throw new Error("Invalid AI JSON structure");
 
-        let finalQuestions: any[] = [];
-        for (const filter of parsedData.filters) {
-            const whereClause: any = { status: "APPROVED" };
-            if (filter.topic) whereClause.topic = { contains: filter.topic, mode: 'insensitive' };
-            if (filter.difficulty) whereClause.difficulty = filter.difficulty;
-            if (filter.type) whereClause.type = filter.type;
-
-            const matchedQuestions = await prisma.question.findMany({
-                where: whereClause, take: filter.count || 5,
-            });
-            finalQuestions = finalQuestions.concat(matchedQuestions);
-        }
+        const finalQuestions = await selectQuestionsByFilters(parsedData.filters);
 
         return NextResponse.json({ success: true, questions: finalQuestions });
     } catch (error: any) { return NextResponse.json({ error: error.message }, { status: 500 }); }

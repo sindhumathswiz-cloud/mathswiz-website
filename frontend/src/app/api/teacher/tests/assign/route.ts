@@ -88,3 +88,39 @@ export async function POST(req: Request) {
     }
 }
 
+export async function GET(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        const userId = session?.user?.id;
+        const role = session?.user?.role;
+        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (role !== "TEACHER" && role !== "ADMIN") {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const testId = searchParams.get("testId");
+        if (!testId) return NextResponse.json({ error: "Missing testId" }, { status: 400 });
+
+        const test = await prisma.test.findFirst({
+            where: { id: testId, ...(role === "ADMIN" ? {} : { createdById: userId }) },
+            select: { id: true },
+        });
+        if (!test) return NextResponse.json({ error: "Test not found or not owned by you" }, { status: 403 });
+
+        const assignments = await (prisma as any).testAssignment.findMany({
+            where: { testId },
+            orderBy: { createdAt: "desc" },
+            include: {
+                batch: { select: { id: true, name: true } },
+                student: { select: { id: true, firstName: true, lastName: true } },
+            },
+        });
+
+        return NextResponse.json({ assignments });
+    } catch (error: any) {
+        console.error("List Test Assignments Error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+

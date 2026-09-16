@@ -13,7 +13,8 @@ export async function POST(request: Request) {
 
     const userId = (session.user as any).id;
     const body = await request.json();
-    const { title, description, mode, duration, totalMarks, isPublished, sections } = body;
+    const { title, description, mode, duration, totalMarks, isPublished, sections, templateType } = body;
+    const allowedTemplateTypes = ['WORKSHEET', 'REVISION_PACK', 'MOCK_EXAM', 'HOMEWORK_TEMPLATE'];
 
     // @ts-ignore: Prisma client type cache may not reflect recent db push
     const test = await prisma.test.create({
@@ -24,7 +25,8 @@ export async function POST(request: Request) {
         duration: parseInt(duration) || 60,
         totalMarks: parseFloat(totalMarks) || 0,
         isPublished: isPublished || false,
-        createdById: userId, 
+        templateType: allowedTemplateTypes.includes(templateType) ? templateType : null,
+        createdById: userId,
         sections: {
           create: sections.map((sect: any) => ({
             title: sect.title,

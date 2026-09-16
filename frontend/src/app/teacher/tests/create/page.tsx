@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Plus, Trash2, Search, ArrowUp, ArrowDown, 
-  Printer, Save, Sparkles, X, Loader2
+import {
+  Plus, Trash2, Search, ArrowUp, ArrowDown,
+  Printer, Save, Sparkles, X, Loader2, Filter
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 
@@ -36,6 +36,8 @@ export default function TestCreatorStudio() {
   const [description, setDescription] = useState('');
   const [mode, setMode] = useState('STRICT');
   const [duration, setDuration] = useState('60');
+  // Empty string = a live test/homework (not saved as a template).
+  const [templateType, setTemplateType] = useState('');
   
   // Left Panel - Repository State
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
@@ -57,6 +59,12 @@ export default function TestCreatorStudio() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGeneratingBlueprint, setIsGeneratingBlueprint] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Structured (non-AI) filter-pick modal — same filters as the left panel,
+  // plus a count, posted straight to pick-questions.
+  const [isPickModalOpen, setIsPickModalOpen] = useState(false);
+  const [pickCount, setPickCount] = useState('10');
+  const [isPicking, setIsPicking] = useState(false);
 
   // Fetch Questions
   useEffect(() => {
@@ -153,6 +161,37 @@ export default function TestCreatorStudio() {
     }));
   };
 
+  // Shared by both auto-pick entry points (AI blueprint + structured filter
+  // pick): drops the returned questions into the first section (creating
+  // one if none exists yet), deduping against what's already in the cart.
+  const appendQuestionsToCart = (questions: Question[], sectionTitle: string) => {
+    let currentSections = [...sections];
+    if (currentSections.length === 0) {
+      const newSection: TestSection = {
+        id: crypto.randomUUID(),
+        title: sectionTitle,
+        instructions: '',
+        marksPerQuestion: 4.0,
+        negativeMarks: 1.0,
+        questions: []
+      };
+      currentSections = [newSection];
+    }
+
+    const targetSection = currentSections[0];
+    const combinedQuestions = [...targetSection.questions];
+
+    questions.forEach((q: Question) => {
+       if (!combinedQuestions.some(existing => existing.id === q.id)) {
+           combinedQuestions.push(q);
+       }
+    });
+
+    targetSection.questions = combinedQuestions;
+    setSections(currentSections);
+    setActiveSectionId(targetSection.id);
+  };
+
   // AI Blueprint
   const handleGenerateBlueprint = async () => {
     if (!aiPrompt.trim()) return;
@@ -164,34 +203,9 @@ export default function TestCreatorStudio() {
         body: JSON.stringify({ prompt: aiPrompt })
       });
       const data = await res.json();
-      
+
       if (res.ok && data.questions && data.questions.length > 0) {
-        // Auto create a section if none exists
-        let currentSections = [...sections];
-        if (currentSections.length === 0) {
-          const newSection: TestSection = {
-            id: crypto.randomUUID(),
-            title: 'Auto-Generated Section',
-            instructions: '',
-            marksPerQuestion: 4.0,
-            negativeMarks: 1.0,
-            questions: []
-          };
-          currentSections = [newSection];
-        }
-
-        const targetSection = currentSections[0];
-        const combinedQuestions = [...targetSection.questions];
-
-        data.questions.forEach((q: Question) => {
-           if (!combinedQuestions.some(existing => existing.id === q.id)) {
-               combinedQuestions.push(q);
-           }
-        });
-
-        targetSection.questions = combinedQuestions;
-        setSections(currentSections);
-        setActiveSectionId(targetSection.id);
+        appendQuestionsToCart(data.questions, 'Auto-Generated Section');
         setAiPrompt('');
         setIsAIModalOpen(false);
       } else {
@@ -202,6 +216,37 @@ export default function TestCreatorStudio() {
       alert('Failed to generate blueprint.');
     } finally {
       setIsGeneratingBlueprint(false);
+    }
+  };
+
+  // Structured (non-AI) filter-pick: same left-panel filters, no LLM call.
+  const handlePickByFilters = async () => {
+    const count = Math.max(1, Math.min(parseInt(pickCount, 10) || 10, 100));
+    setIsPicking(true);
+    try {
+      const filter: Record<string, unknown> = { count };
+      if (filterTopic !== 'All') filter.topic = filterTopic;
+      if (filterDifficulty !== 'All') filter.difficulty = filterDifficulty;
+      if (filterType !== 'All') filter.type = filterType;
+
+      const res = await fetch('/api/teacher/tests/pick-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filters: [filter] })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.questions && data.questions.length > 0) {
+        appendQuestionsToCart(data.questions, 'Filter-Picked Section');
+        setIsPickModalOpen(false);
+      } else {
+        alert(data.error || 'No questions found for the given filters.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to pick questions.');
+    } finally {
+      setIsPicking(false);
     }
   };
 
@@ -227,7 +272,8 @@ export default function TestCreatorStudio() {
           mode,
           duration,
           totalMarks: computedTotal,
-          sections
+          sections,
+          templateType: templateType || undefined,
         })
       });
 
@@ -354,6 +400,9 @@ export default function TestCreatorStudio() {
                <button onClick={() => setIsAIModalOpen(true)} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg flex items-center gap-2 transition-all">
                  <Sparkles className="w-4 h-4" /> Generate with AI
                </button>
+               <button onClick={() => setIsPickModalOpen(true)} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all">
+                 <Filter className="w-4 h-4" /> Auto-pick by Filters
+               </button>
                <button onClick={handlePrint} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow flex items-center gap-2 transition-all">
                  <Printer className="w-4 h-4" /> Export PDF
                </button>
@@ -379,6 +428,16 @@ export default function TestCreatorStudio() {
                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Duration (mins)</label>
                <input type="number" value={duration} onChange={e => setDuration(e.target.value)} className="w-full border-b-2 border-slate-300 focus:border-indigo-500 outline-none text-sm font-bold py-1.5 print:border-none" />
              </div>
+          </div>
+          <div className="mb-4 print:hidden">
+             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Save as</label>
+             <select value={templateType} onChange={e => setTemplateType(e.target.value)} className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500">
+                <option value="">Live test / homework</option>
+                <option value="WORKSHEET">Reusable template — Worksheet</option>
+                <option value="REVISION_PACK">Reusable template — Revision pack</option>
+                <option value="MOCK_EXAM">Reusable template — Mock exam</option>
+                <option value="HOMEWORK_TEMPLATE">Reusable template — Homework template</option>
+             </select>
           </div>
           <div className="print:hidden">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Description / General Instructions</label>
@@ -508,6 +567,42 @@ export default function TestCreatorStudio() {
                     <button onClick={handleGenerateBlueprint} disabled={isGeneratingBlueprint || !aiPrompt.trim()} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white px-6 py-2 rounded-xl text-sm font-black shadow-lg shadow-purple-900/20 flex items-center gap-2 transition-all">
                        {isGeneratingBlueprint ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} 
                        Generate Magic Blueprint
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* ─── STRUCTURED FILTER-PICK MODAL ─── */}
+      {isPickModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:hidden">
+           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                    <Filter className="w-5 h-5 text-indigo-600" /> Auto-pick by Filters
+                 </h2>
+                 <button onClick={() => setIsPickModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6">
+                 <p className="text-sm text-slate-500 font-medium mb-4">
+                     Uses the topic/difficulty/type filters from the left panel — no AI involved, just a
+                     direct pick from questions matching those filters.
+                 </p>
+                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">How many questions?</label>
+                 <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={pickCount}
+                    onChange={e => setPickCount(e.target.value)}
+                    className="w-full border-2 border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-400 transition-colors mb-6"
+                 />
+                 <div className="flex justify-end gap-3">
+                    <button onClick={() => setIsPickModalOpen(false)} className="px-5 py-2 hover:bg-slate-100 rounded-xl text-sm font-bold text-slate-600 transition-colors">Cancel</button>
+                    <button onClick={handlePickByFilters} disabled={isPicking} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-6 py-2 rounded-xl text-sm font-black shadow-lg flex items-center gap-2 transition-all">
+                       {isPicking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
+                       Pick Questions
                     </button>
                  </div>
               </div>

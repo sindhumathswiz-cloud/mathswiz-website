@@ -536,6 +536,9 @@ model Test {
   duration    Int      @default(60) // Duration in minutes
   totalMarks  Float    @default(0)
   isPublished Boolean  @default(false)
+  // Null = a live test/homework. Non-null = a reusable, unassigned template a
+  // teacher can duplicate rather than an assignment in its own right.
+  templateType TestTemplateType?
 
   sections    TestSection[]
   attempts    TestAttempt[]
@@ -643,12 +646,21 @@ model TestAssignment {
   batch   Batch? @relation(fields: [batchId], references: [id], onDelete: Cascade)
   student User?  @relation("StudentAssignments", fields: [studentId], references: [id], onDelete: Cascade)
 
+  interventions Intervention[]
+
   @@index([kind, deadline])
 }
 
 enum AssignmentKind {
   TEST
   HOMEWORK
+}
+
+enum TestTemplateType {
+  WORKSHEET
+  REVISION_PACK
+  MOCK_EXAM
+  HOMEWORK_TEMPLATE
 }
 
 model Course {
@@ -937,9 +949,15 @@ model Intervention {
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
-  teacher User   @relation("InterventionTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
-  student User   @relation("InterventionStudent", fields: [studentId], references: [id], onDelete: Cascade)
-  batch   Batch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  // Set only when a PRACTICE/HOMEWORK intervention successfully generated a
+  // question set -- null means description-only (no matching questions, or
+  // an intervention type that was never meant to carry a practice set).
+  testAssignmentId String?
+
+  teacher        User            @relation("InterventionTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  student        User            @relation("InterventionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  batch          Batch?          @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  testAssignment TestAssignment? @relation(fields: [testAssignmentId], references: [id], onDelete: SetNull)
 
   @@index([teacherId, status, dueDate])
   @@index([studentId, status, dueDate])

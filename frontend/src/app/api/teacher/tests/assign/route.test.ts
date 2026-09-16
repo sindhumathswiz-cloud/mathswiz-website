@@ -5,7 +5,7 @@ const recordAuditLog = vi.fn();
 const test = { findFirst: vi.fn() };
 const batch = { findFirst: vi.fn() };
 const batchEnrollment = { findFirst: vi.fn() };
-const testAssignment = { create: vi.fn() };
+const testAssignment = { create: vi.fn(), findMany: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
@@ -67,5 +67,57 @@ describe('teacher homework assignment', () => {
     });
     expect(invalidDates.status).toBe(400);
     expect(testAssignment.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/teacher/tests/assign', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    test.findFirst.mockResolvedValue({ id: 'test-1' });
+    testAssignment.findMany.mockResolvedValue([]);
+  });
+
+  function listAssignments(testId?: string) {
+    const url = testId
+      ? `http://localhost/api/teacher/tests/assign?testId=${testId}`
+      : 'http://localhost/api/teacher/tests/assign';
+    return import('./route').then(({ GET }) => GET(new Request(url)));
+  }
+
+  it('rejects non-teacher roles', async () => {
+    getServerSession.mockResolvedValue({ user: { id: 'student-1', role: 'STUDENT' } });
+    const response = await listAssignments('test-1');
+    expect(response.status).toBe(403);
+  });
+
+  it('rejects a missing testId', async () => {
+    const response = await listAssignments();
+    expect(response.status).toBe(400);
+  });
+
+  it('403s when the test is not owned by the caller', async () => {
+    test.findFirst.mockResolvedValue(null);
+    const response = await listAssignments('test-1');
+    expect(response.status).toBe(403);
+    expect(testAssignment.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty list for a test with no assignments', async () => {
+    const response = await listAssignments('test-1');
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.assignments).toEqual([]);
+  });
+
+  it('returns populated assignments with batch/student names', async () => {
+    testAssignment.findMany.mockResolvedValue([
+      { id: 'a-1', batch: { id: 'batch-1', name: 'Morning Batch' }, student: null },
+      { id: 'a-2', batch: null, student: { id: 'student-1', firstName: 'Asha', lastName: 'K' } },
+    ]);
+    const response = await listAssignments('test-1');
+    const body = await response.json();
+    expect(body.assignments).toHaveLength(2);
+    expect(body.assignments[0].batch.name).toBe('Morning Batch');
   });
 });

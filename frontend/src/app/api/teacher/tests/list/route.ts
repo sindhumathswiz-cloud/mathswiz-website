@@ -34,6 +34,7 @@ export async function GET() {
       duration: t.duration,
       totalMarks: t.totalMarks,
       isPublished: t.isPublished,
+      templateType: t.templateType ?? null,
       createdAt: t.createdAt,
       sectionCount: t._count.sections,
       questionCount: t.sections.reduce((sum: number, s: any) => sum + s._count.questions, 0),
