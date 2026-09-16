@@ -23,6 +23,9 @@ export async function GET(req: Request) {
     // student hasn't corrected yet, regardless of schedule — for when they
     // explicitly asked to review their mistakes right now.
     const scope = searchParams.get('scope') === 'all' ? 'all' : 'due';
+    // Optional topic scoping, used by the learning-path recovery stage to
+    // review only the misses from that path's own topic.
+    const topic = searchParams.get('topic');
 
     const events = await prisma.masteryEvent.findMany({
       where: { userId: studentId, questionId: { not: null } },
@@ -56,6 +59,7 @@ export async function GET(req: Request) {
       const correctIndex = resolveCorrectOptionIndex(candidate.correctAnswer, options);
       const claimedIndex = extractClaimedAnswerIndex(candidate.explanation);
       const explanationAgrees = claimedIndex === null || claimedIndex === correctIndex;
+      if (topic && candidate.topic !== topic) return [];
       return options.length >= 2 && correctIndex >= 0 && explanationAgrees
         ? [{ ...candidate, options, missCount: entry.missCount, lastMissedAt: entry.lastMissedAt }]
         : [];

@@ -63,6 +63,22 @@ describe('student practice mistakes queue', () => {
     expect(body.questions).toHaveLength(1);
   });
 
+  it('topic query param filters results to that topic only', async () => {
+    masteryEvent.findMany.mockResolvedValue([
+      { questionId: 'q-algebra', isCorrect: false, createdAt: hoursAgo(200) },
+      { questionId: 'q-geometry', isCorrect: false, createdAt: hoursAgo(200) },
+    ]);
+    question.findMany.mockResolvedValue([
+      { id: 'q-algebra', topic: 'Algebra', options: ['1', '2'], correctAnswer: 'A' },
+      { id: 'q-geometry', topic: 'Geometry', options: ['1', '2'], correctAnswer: 'A' },
+    ]);
+    const { GET } = await import('./route');
+    const response = await GET(new Request('http://localhost/api/student/practice/mistakes?scope=all&topic=Algebra'));
+    const body = await response.json();
+    expect(body.questions).toHaveLength(1);
+    expect(body.questions[0].id).toBe('q-algebra');
+  });
+
   it('excludes a question the student has since answered correctly', async () => {
     masteryEvent.findMany.mockResolvedValue([
       { questionId: 'q-fixed', isCorrect: false, createdAt: hoursAgo(200) },

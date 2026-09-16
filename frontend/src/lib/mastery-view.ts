@@ -1,4 +1,12 @@
-export type MasteryTopic = { topic: string; masteryScore: number; currentStreak?: number };
+export type MasteryTopic = {
+  topic: string;
+  masteryScore: number;
+  currentStreak?: number;
+  // Display-only, not part of the mastery scoring formula -- see
+  // /api/student/mastery's route.ts for how these are aggregated.
+  avgTimeSeconds?: number | null;
+  attemptsCount?: number;
+};
 
 export function masteryBand(score: number) {
   if (score < 40) return 'needs_support' as const;

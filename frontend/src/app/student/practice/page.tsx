@@ -21,7 +21,9 @@ import {
     Wand2,
     RotateCcw,
     Clock,
-    SkipForward
+    SkipForward,
+    Pin,
+    Bookmark
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 import QuestionTags from '@/components/QuestionTags';
@@ -53,6 +55,8 @@ function PracticeArenaInner() {
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [hint, setHint] = useState<string | null>(null);
     const [isHintLoading, setIsHintLoading] = useState(false);
+    const [isFlagging, setIsFlagging] = useState(false);
+    const [isBookmarking, setIsBookmarking] = useState(false);
     const [streak, setStreak] = useState(0);
     const [startTime, setStartTime] = useState(Date.now());
     const [stats, setStats] = useState({ correct: 0, total: 0 });
@@ -135,7 +139,9 @@ function PracticeArenaInner() {
     const handleReviewMistakes = async () => {
         setIsLoadingMistakes(true);
         try {
-            const res = await fetch('/api/student/practice/mistakes?scope=all');
+            const topic = searchParams?.get('topic');
+            const qs = topic ? `&topic=${encodeURIComponent(topic)}` : '';
+            const res = await fetch(`/api/student/practice/mistakes?scope=all${qs}`);
             const data = await readJsonResponse<{ questions?: any[] }>(res);
             if (!res.ok || !Array.isArray(data?.questions) || data.questions.length === 0) {
                 toast.error("No mistakes to review right now — nice work!");
@@ -289,6 +295,42 @@ function PracticeArenaInner() {
 
         toast("Skipped — moving on.", { icon: '⏭️' });
         fetchNextQuestion();
+    };
+
+    const flagQuestion = async () => {
+        if (!question || isFlagging) return;
+        setIsFlagging(true);
+        try {
+            const res = await fetch('/api/student/mistakes/notebook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ questionId: question.id }),
+            });
+            if (!res.ok) throw new Error('Flag failed');
+            toast.success('Pinned to My Mistakes notebook');
+        } catch (err) {
+            toast.error('Could not pin this question right now.');
+        } finally {
+            setIsFlagging(false);
+        }
+    };
+
+    const bookmarkQuestion = async () => {
+        if (!question || isBookmarking) return;
+        setIsBookmarking(true);
+        try {
+            const res = await fetch('/api/student/bookmarks/quick', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ questionId: question.id }),
+            });
+            if (!res.ok) throw new Error('Bookmark failed');
+            toast.success('Bookmarked!');
+        } catch (err) {
+            toast.error('Could not bookmark this question right now.');
+        } finally {
+            setIsBookmarking(false);
+        }
     };
 
     const getHint = async () => {
@@ -558,7 +600,8 @@ function PracticeArenaInner() {
                             )}
 
                             <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-center">
-                                <button 
+                                <div className="flex items-center gap-5">
+                                <button
                                     onClick={getHint}
                                     disabled={isHintLoading || isSubmitted}
                                     className="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-widest hover:text-indigo-700 disabled:opacity-30"
@@ -566,7 +609,26 @@ function PracticeArenaInner() {
                                     {isHintLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                                     Ask Doubt Buddy for a Hint 🤖
                                 </button>
-                                
+                                <button
+                                    onClick={flagQuestion}
+                                    disabled={isFlagging || !question}
+                                    title="Pin to My Mistakes notebook"
+                                    className="flex items-center gap-2 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-amber-600 disabled:opacity-30"
+                                >
+                                    {isFlagging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pin className="w-4 h-4" />}
+                                    Flag
+                                </button>
+                                <button
+                                    onClick={bookmarkQuestion}
+                                    disabled={isBookmarking || !question}
+                                    title="Save to bookmarks"
+                                    className="flex items-center gap-2 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-indigo-600 disabled:opacity-30"
+                                >
+                                    {isBookmarking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bookmark className="w-4 h-4" />}
+                                    Save
+                                </button>
+                                </div>
+
                                 {options.length === 0 ? (
                                     <button
                                         onClick={handleSkip}

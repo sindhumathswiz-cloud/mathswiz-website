@@ -4,18 +4,22 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-    LayoutDashboard, 
-    BookOpen, 
-    ClipboardList, 
-    FileText, 
-    BarChart3, 
-    Star, 
-    UserCircle, 
-    CreditCard, 
-    Sparkles, 
+    LayoutDashboard,
+    BookOpen,
+    ClipboardList,
+    FileText,
+    BarChart3,
+    Star,
+    UserCircle,
+    CreditCard,
+    Sparkles,
     Target,
     ChevronRight,
-    LogOut
+    LogOut,
+    Compass,
+    BookX,
+    Bookmark,
+    Layers
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -64,6 +68,14 @@ export default function StudentSidebar({ active }: { active?: string }) {
         { href: '/student/payments', icon: <CreditCard size={18} />, label: 'Fee & Payments' },
     ];
 
+    const learningItems = [
+        { href: '/student/learning-paths', icon: <Compass size={18} />, label: 'Learning Paths' },
+        { href: '/student/mastery', icon: <Target size={18} />, label: 'My Mastery' },
+        { href: '/student/mistakes', icon: <BookX size={18} />, label: 'My Mistakes' },
+        { href: '/student/bookmarks', icon: <Bookmark size={18} />, label: 'Bookmarks' },
+        { href: '/student/flashcards', icon: <Layers size={18} />, label: 'Flashcards' },
+    ];
+
     const handleLogout = async () => {
         await signOut({ redirect: false });
         // Use relative path to ensure we stay on the current host/port
@@ -89,6 +101,18 @@ export default function StudentSidebar({ active }: { active?: string }) {
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-4">Command Center</p>
                     {menuItems.map((item) => (
                         <SidebarItem 
+                            key={item.href}
+                            {...item}
+                            isActive={pathname === item.href}
+                        />
+                    ))}
+                </div>
+
+                {/* Learning Loop Section */}
+                <div className="mt-10 space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-4">Learning Loop</p>
+                    {learningItems.map((item) => (
+                        <SidebarItem
                             key={item.href}
                             {...item}
                             isActive={pathname === item.href}

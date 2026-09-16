@@ -110,6 +110,10 @@ model User {
   studentInterventions      Intervention[]      @relation("InterventionStudent")
   createdBooks              Book[]              @relation("BookCreator")
   bookIngestionRuns         BookIngestionRun[]
+  mistakeNotebookEntries    MistakeNotebookEntry[]
+  bookmarkLists             BookmarkList[]
+  flashcards                StudentFlashcard[]
+  learningPathProgress      LearningPathProgress[]
 }
 
 model AuditLog {
@@ -509,6 +513,8 @@ model Question {
   versions       QuestionVersion[]
   questionTags   QuestionTag[]
   embeddings     QuestionEmbedding[]
+  mistakeNotebookEntries MistakeNotebookEntry[]
+  bookmarkItems          BookmarkItem[]
 
   @@index([contentHash])
   @@index([bookId, bookChapterId, bookExerciseId])
@@ -809,6 +815,110 @@ enum MasterySource {
   PRACTICE
   TEST
   HOMEWORK
+}
+
+// Student-flagged questions for the "My Mistakes" notebook. Auto-captured
+// (currently-wrong) mistakes are NOT stored here -- those are a computed
+// view over MasteryEvent (see lib/mistake-queue.ts). This model only holds
+// questions a student explicitly pinned for review, independent of whether
+// they ever got it wrong.
+model MistakeNotebookEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId, createdAt])
+}
+
+model BookmarkList {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items BookmarkItem[]
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
+}
+
+model BookmarkItem {
+  id         String   @id @default(cuid())
+  listId     String
+  questionId String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  list     BookmarkList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  question Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, questionId])
+  @@index([listId, createdAt])
+}
+
+// Simple student-authored flashcards -- deliberately separate from the
+// admin/teacher-owned, KnowledgeFolder-scoped Flashcard model (that one is
+// curated content served read-only to students; this one is personal data
+// a student creates for themselves). No spaced-repetition fields in v1.
+model StudentFlashcard {
+  id        String   @id @default(cuid())
+  userId    String
+  front     String   @db.Text
+  back      String   @db.Text
+  topic     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([userId, topic])
+}
+
+enum LearningPathStage {
+  EXAMPLES
+  GUIDED_PRACTICE
+  TIMED_QUIZ
+  RECOVERY_PRACTICE
+  COMPLETED
+}
+
+// One row per (student, topic) -- a learning path has no separate authored
+// "curriculum" entity; it's a stateful sequencing wrapper around Questions
+// that already share a Question.topic string, reusing the existing
+// practice/quiz/mistake-queue infrastructure rather than serving content
+// itself. examplesViewedIds/recoveryQuestionIds are loose id arrays (not
+// FK relations), matching MasteryEvent.questionId's nullable/loose
+// precedent -- they're bookkeeping sets, not scoring-critical data.
+model LearningPathProgress {
+  id     String @id @default(cuid())
+  userId String
+  topic  String
+
+  stage               LearningPathStage @default(EXAMPLES)
+  examplesViewedCount Int               @default(0)
+  examplesViewedIds   String[]
+  guidedAttempted     Int               @default(0)
+  guidedCorrect       Int               @default(0)
+  quizScore           Float?
+  recoveryQuestionIds String[]
+  startedAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  completedAt         DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topic])
+  @@index([userId, stage])
 }
 
 model Intervention {
