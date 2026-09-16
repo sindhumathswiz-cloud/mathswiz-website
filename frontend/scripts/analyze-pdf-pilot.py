@@ -9,6 +9,19 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
+# Windows' console defaults stdout to the system codepage (cp1252), which
+# can't encode every character extract_text() pulls out of a real PDF --
+# legacy symbol-font glyphs (e.g. an "=" or Greek letter mapped into the
+# Unicode Private Use Area, U+E000-U+F8FF) are common in older scanned/
+# symbol-encoded math textbooks. print()'ing one crashed this script
+# mid-write with UnicodeEncodeError, losing the ENTIRE json.dumps output --
+# not just that one page's preview -- which surfaced as an opaque "PDF
+# inventory failed" with a Python traceback instead of a usable result.
+# Forcing UTF-8 (matching stdout.setEncoding('utf8') on the Node side that
+# reads this) makes every character printable.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 def page_profile(page) -> dict:
     try:

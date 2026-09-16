@@ -55,4 +55,45 @@ describe('POST /api/admin/books/[id]/manifest/detect', () => {
     const { POST } = await import('./route');
     expect((await POST(req(), { params }) as Response).status).toBe(409);
   });
+
+  it('falls back to nativeText when rawText is not yet populated (a DIGITAL_MATH book right after rendering, before any extraction has run)', async () => {
+    // rawText is only ever written by extract-questions -- gating detection
+    // on it alone would force a full extraction pass before the manifest
+    // could even be reviewed, defeating the point of confirming a manifest
+    // BEFORE extracting. render-pages already captures the PDF's own text
+    // layer as nativeText, which is enough for detection on its own.
+    book.findUnique.mockResolvedValue({
+      id: 'book-1', className: 'Class 12',
+      ingestionRuns: [{ id: 'run-1', sourceDocumentId: 'doc-1', totalPages: 40 }],
+    });
+    documentPage.findMany.mockResolvedValue([
+      { pageNumber: 10, rawText: '', nativeText: 'VECTOR ALGEBRA\nMULTIPLE CHOICE QUESTIONS\n1. ...', layoutData: null },
+      { pageNumber: 12, rawText: '', nativeText: 'Answers\n1. (a) 2. (b) 3. (c) 4. (d) 5. (a) 6. (c) 7. (d) 8. (b)', layoutData: null },
+    ]);
+
+    const { POST } = await import('./route');
+    const response = (await POST(req(), { params })) as Response;
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.pagesScanned).toBe(2);
+    expect(documentPage.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ OR: [{ rawText: { not: '' } }, { nativeText: { not: '' } }] }),
+    }));
+  });
+
+  it('409s with a distinct message when neither rawText nor nativeText exists for any page', async () => {
+    book.findUnique.mockResolvedValue({
+      id: 'book-1', className: 'Class 12',
+      ingestionRuns: [{ id: 'run-1', sourceDocumentId: 'doc-1', totalPages: 40 }],
+    });
+    documentPage.findMany.mockResolvedValue([]);
+
+    const { POST } = await import('./route');
+    const response = (await POST(req(), { params })) as Response;
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.error).toMatch(/No page text is available yet/);
+  });
 });

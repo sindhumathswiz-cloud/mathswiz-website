@@ -23,7 +23,11 @@ export function inspectPrivatePdf(filePath: string): Promise<PdfInventory> {
   const python = process.env.QB_PYTHON_EXECUTABLE || (existsSync(bundledPython) ? bundledPython : 'python');
   const script = path.join(process.cwd(), 'scripts', 'analyze-pdf-pilot.py');
   return new Promise((resolve, reject) => {
-    const child = spawn(python, [script, safePath], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    // PYTHONIOENCODING is a second, independent safety net for the same
+    // Windows cp1252-console encoding crash the script itself now guards
+    // against via sys.stdout.reconfigure -- belt and suspenders, since this
+    // script can also be run standalone outside this spawn call.
+    const child = spawn(python, [script, safePath], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => { child.kill(); reject(new Error('PDF inventory timed out')); }, 120_000);

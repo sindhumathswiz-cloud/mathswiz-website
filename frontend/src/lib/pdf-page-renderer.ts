@@ -31,7 +31,11 @@ export function renderPrivatePdfBatch(inputPath: string, bookId: string, runId: 
   const pdftoppm = process.env.QB_PDFTOPPM_EXECUTABLE || localTool(path.join('native', 'poppler', 'Library', 'bin', 'pdftoppm.exe'), 'pdftoppm');
   const script = path.join(process.cwd(), 'scripts', 'render-pdf-page-batch.py');
   return new Promise((resolve, reject) => {
-    const child = spawn(python, [script, safeInput, outputDirectory, String(start), String(end), '--dpi', '150', '--pdftoppm', pdftoppm, '--profile', profile], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    // PYTHONIOENCODING is a second, independent safety net for the same
+    // Windows cp1252-console encoding crash the script itself now guards
+    // against via sys.stdout.reconfigure (see pdf-inventory.ts for the same
+    // pattern, and analyze-pdf-pilot.py for where this was first found).
+    const child = spawn(python, [script, safeInput, outputDirectory, String(start), String(end), '--dpi', '150', '--pdftoppm', pdftoppm, '--profile', profile], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => { child.kill(); reject(new Error('Page rendering timed out')); }, 180_000);

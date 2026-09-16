@@ -191,50 +191,78 @@ const SECTION_PATTERNS: Array<{ re: RegExp; type: string }> = [
 
 const NON_QUESTION_SECTION_TYPES = new Set(['THEORY']);
 
-// A TOC row: an optional "\hline", a chapter number, the name, "&", the page.
-// Handles the Mathpix markdown-table shape ("\hline 10. Vector Algebra & 329 \\").
-const TOC_ROW_RE = /^(?:\\hline\s*)?(\d{1,2})\.\s+(.+?)\s*&\s*(\d{1,4})\s*\\{0,2}\s*$/;
+// A TOC row, two shapes:
+//  1. The Mathpix markdown-table shape from an OCR'd page ("\hline 10.
+//     Vector Algebra & 329 \\") -- requires the "&" column separator.
+//  2. A plain native-PDF-text list from a DIGITAL_MATH book with no OCR
+//     involved at all ("10. Binomial Theorem 350") -- number, dot, name,
+//     trailing printed page, whitespace-separated, no table markup.
+const TOC_ROW_TABLE_RE = /^(?:\\hline\s*)?(\d{1,2})\.\s+(.+?)\s*&\s*(\d{1,4})\s*\\{0,2}\s*$/;
+const TOC_ROW_PLAIN_RE = /^(\d{1,3})\.\s+(.+?)\s+(\d{1,4})\s*$/;
 const PART_B_RE = /\bPART[\s-]*B\b|\\multicolumn/i;
 const TOC_PAGE_RE = /\bcontents\b/i;
+
+function matchTocRow(line: string): { number: string; name: string; printedPage: number } | null {
+  const m = line.match(TOC_ROW_TABLE_RE) || line.match(TOC_ROW_PLAIN_RE);
+  if (!m) return null;
+  return { number: m[1], name: m[2].replace(/\s+/g, ' ').trim(), printedPage: Number(m[3]) };
+}
+
+// How many further pages a TOC is allowed to spread across -- a long chapter
+// list in plain native-text form (one row per line, no dense table) needs
+// more vertical space than the same list packed into a Mathpix markdown
+// table, so it commonly spills onto a second (or third) printed page.
+const MAX_TOC_PAGES = 4;
 
 /**
  * Find the table of contents and read the chapter list + printed start pages
  * from it. Returns empty entries when no TOC-shaped page is found in the first
- * ~15 pages.
+ * ~15 pages. The TOC itself may span several PHYSICALLY CONSECUTIVE pages
+ * (pageNumber N, N+1, ... -- never a jump elsewhere in the book) starting
+ * from the one containing the literal "Contents" heading.
  */
 export function parseTableOfContents(pages: ManifestDetectPage[]): ParsedToc {
-  const head = [...pages].sort((a, b) => a.pageNumber - b.pageNumber).slice(0, 15);
+  const sorted = [...pages].sort((a, b) => a.pageNumber - b.pageNumber);
+  const head = sorted.slice(0, 15);
   for (const page of head) {
     const text = page.rawText || '';
     if (!TOC_PAGE_RE.test(text)) continue;
-    const lines = text.split('\n');
+    const startIndex = sorted.indexOf(page);
+
     const entries: TocEntry[] = [];
     let partBPrintedPage: number | null = null;
     let hitPartB = false;
-    for (const raw of lines) {
-      const line = raw.trim();
-      if (PART_B_RE.test(line)) {
-        hitPartB = true;
-        const m = line.match(/&\s*(\d{1,4})/);
-        if (m && partBPrintedPage === null) partBPrintedPage = Number(m[1]);
-        continue;
-      }
-      if (hitPartB) {
-        // After PART-B, the first row with a "& page" number is where it starts.
-        if (partBPrintedPage === null) {
+    for (let j = startIndex; j < sorted.length && j < startIndex + MAX_TOC_PAGES; j++) {
+      if (j > startIndex && sorted[j].pageNumber !== sorted[j - 1].pageNumber + 1) break;
+      const lines = (sorted[j].rawText || '').split('\n');
+      const entriesBefore = entries.length;
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (PART_B_RE.test(line)) {
+          hitPartB = true;
           const m = line.match(/&\s*(\d{1,4})/);
-          if (m) partBPrintedPage = Number(m[1]);
+          if (m && partBPrintedPage === null) partBPrintedPage = Number(m[1]);
+          continue;
         }
-        continue;
+        if (hitPartB) {
+          // After PART-B, the first row with a "& page" number is where it starts.
+          if (partBPrintedPage === null) {
+            const m = line.match(/&\s*(\d{1,4})/);
+            if (m) partBPrintedPage = Number(m[1]);
+          }
+          continue;
+        }
+        const row = matchTocRow(line);
+        if (!row) continue;
+        // Numbers should ascend; a reset means we've left the chapter list.
+        if (entries.length && Number(row.number) <= Number(entries[entries.length - 1].number)) continue;
+        entries.push(row);
       }
-      const m = line.match(TOC_ROW_RE);
-      if (!m) continue;
-      const printedPage = Number(m[3]);
-      const number = m[1];
-      const name = m[2].replace(/\s+/g, ' ').trim();
-      // Numbers should ascend; a reset means we've left the chapter list.
-      if (entries.length && Number(number) <= Number(entries[entries.length - 1].number)) continue;
-      entries.push({ number, name, printedPage });
+      // A continuation page (j > startIndex) that added nothing means the
+      // chapter list ended on the previous page -- don't keep scanning
+      // unrelated later pages just because they're physically consecutive.
+      if (j > startIndex && entries.length === entriesBefore) break;
+      if (hitPartB) break;
     }
     if (entries.length >= 3) return { entries, partBPrintedPage };
   }

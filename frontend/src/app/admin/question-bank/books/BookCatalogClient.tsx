@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, BookOpen, CheckCircle2, ClipboardCheck, Image as ImageIcon, ListTree, Loader2, Plus, Search, Sparkles } from 'lucide-react';
 
@@ -16,12 +17,13 @@ type CatalogBook = {
   className: string;
   _count: { chapters: number; questions: number; ingestionRuns: number };
   confirmedChapters: number;
-  ingestionRuns: Array<{ id: string; status: string; stage: string; progress: number; totalPages: number | null; processedPages: number; extractedQuestions: number; reviewRequired: number; providerConfig: { sourceProfile?: string } | null }>;
+  ingestionRuns: Array<{ id: string; status: string; stage: string; progress: number; totalPages: number | null; processedPages: number; extractedQuestions: number; reviewRequired: number; providerConfig: { sourceProfile?: string } | null; errorMessage: string | null }>;
 };
 
 const emptyForm = { title: '', author: '', publisher: '', edition: '', publicationYear: '', isbn: '', board: '', className: 'Class 11' };
 
 export default function BookCatalogClient() {
+  const router = useRouter();
   const [books, setBooks] = useState<CatalogBook[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [query, setQuery] = useState('');
@@ -86,10 +88,35 @@ export default function BookCatalogClient() {
       const inventoryData = await inventoryResponse.json();
       if (!inventoryResponse.ok) throw new Error(inventoryData.error || 'PDF stored, but page inventory failed');
       setMessage({ kind: 'success', text: `PDF ready: ${inventoryData.inventory.totalPages} pages · ${inventoryData.inventory.sourceProfile.replaceAll('_', ' ').toLowerCase()} profile.` });
-      await loadBooks();
     } catch (error) {
       setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Could not upload PDF' });
     } finally {
+      // Refresh on BOTH outcomes -- the PDF upload itself can succeed and
+      // create a real ingestion run even when the very next step (page
+      // inventory) fails, and this list previously only reloaded on the
+      // full-success path. That silently left a FAILED run invisible: the
+      // card kept showing 0 imports, so re-uploading the same file looked
+      // like the only option -- which just hits the duplicate-PDF guard
+      // instead of surfacing the real, retriable failure.
+      await loadBooks();
+      setUploadingBookId(null);
+    }
+  }
+
+  async function retryInventory(book: CatalogBook) {
+    const run = book.ingestionRuns[0];
+    if (!run) return;
+    setUploadingBookId(book.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/admin/books/${book.id}/ingestions/${run.id}/inventory`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Page inventory failed');
+      setMessage({ kind: 'success', text: `PDF ready: ${data.inventory.totalPages} pages · ${data.inventory.sourceProfile.replaceAll('_', ' ').toLowerCase()} profile.` });
+    } catch (error) {
+      setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Page inventory failed' });
+    } finally {
+      await loadBooks();
       setUploadingBookId(null);
     }
   }
@@ -111,14 +138,45 @@ export default function BookCatalogClient() {
         if (data.complete || !data.nextStartPage) break;
         startPage = data.nextStartPage;
       }
-      setMessage({ kind: 'success', text: `${book.title}: all ${run.totalPages} pages were archived and structurally analysed. Ready to extract questions.` });
-      await loadBooks();
+      setMessage({ kind: 'success', text: `${book.title}: all ${run.totalPages} pages were archived and structurally analysed. Taking you to the chapter manifest…` });
+      // Confirming (or at least reviewing) the chapter manifest here -- not
+      // straight to "Extract questions" -- is what makes distrustEmpty work
+      // (see structure-questions.ts): extraction only knows a page is safe to
+      // retry on a confidently-empty result when a confirmed manifest section
+      // covers it. Skipping this step is exactly how a real 12-question page
+      // (Xam Idea Class 12, p.479) silently extracted as zero.
+      router.push(`/admin/question-bank/books/${book.id}/manifest`);
     } catch (error) {
       setMessage({ kind: 'error', text: `${error instanceof Error ? error.message : 'Page rendering failed'} Completed batches were preserved; use Resume page rendering to continue.` });
       await loadBooks();
     } finally {
       setRenderingBookId(null);
     }
+  }
+
+  // Runs right after extraction: for every freshly-saved DRAFT question that
+  // already passed deterministic QA (STRUCTURALLY_VALID), independently
+  // re-derives its answer and auto-approves it on a "verified" verdict --
+  // the user's explicit call that extraction should validate and approve
+  // correct questions automatically. An "issue" verdict (or an LLM error)
+  // never approves; it's flagged into the review queue instead. Looped
+  // (bounded) since one call only processes up to 50 candidates and a whole
+  // book can extract far more than that.
+  async function autoVerifyAndApprove(bookId: string): Promise<{ approved: number; flagged: number; errored: number }> {
+    let approved = 0, flagged = 0, errored = 0;
+    for (let i = 0; i < 20; i++) {
+      const res = await fetch(`/api/admin/books/${bookId}/verify-mathematics`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apply: true, limit: 50 }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) break;
+      approved += data.verified ?? 0;
+      flagged += data.flagged ?? 0;
+      errored += data.errored ?? 0;
+      if ((data.candidatesProcessed ?? 0) === 0) break;
+    }
+    return { approved, flagged, errored };
   }
 
   async function extractBookQuestions(book: CatalogBook) {
@@ -164,7 +222,15 @@ export default function BookCatalogClient() {
       } else if (allFailures.length > 0) {
         summaryParts.push(`(${allFailures.length} page failure${allFailures.length === 1 ? '' : 's'} recovered on retry)`);
       }
-      summaryParts.push('Review new drafts in the Question Bank before approving.');
+      if (totalSaved > 0) {
+        setMessage({ kind: 'success', text: `${summaryParts.join(' ')} Verifying and auto-approving the correct ones…` });
+        const { approved, flagged, errored } = await autoVerifyAndApprove(book.id);
+        summaryParts.push(approved || flagged || errored
+          ? `${approved} auto-approved (independently re-derived and confirmed correct), ${flagged} flagged for review${errored ? `, ${errored} pending retry (provider limit)` : ''}.`
+          : 'Review new drafts in the Question Bank before approving.');
+      } else {
+        summaryParts.push('Review new drafts in the Question Bank before approving.');
+      }
       setMessage({ kind: permanentFailures > 0 ? 'error' : 'success', text: summaryParts.join(' ') });
       await loadBooks();
     } catch (error) {
@@ -256,13 +322,22 @@ export default function BookCatalogClient() {
                       <div className="rounded-xl bg-slate-50 p-3"><strong className="block text-lg">{book._count.ingestionRuns}</strong>imports</div>
                     </div>
                   </div>
-                  {book.ingestionRuns[0] && (
+                  {book.ingestionRuns[0] && book.ingestionRuns[0].status !== 'FAILED' && (
                     <div className="mt-4 flex flex-wrap items-center gap-2 text-sm font-semibold text-emerald-700">
                       <CheckCircle2 className="h-4 w-4" /> Latest import: {book.ingestionRuns[0].stage.replaceAll('_', ' ')} ({book.ingestionRuns[0].progress}%)
                       {book.ingestionRuns[0].totalPages && <span>· {book.ingestionRuns[0].totalPages} pages</span>}
                       {book.ingestionRuns[0].extractedQuestions > 0 && <span>· {book.ingestionRuns[0].extractedQuestions} draft questions</span>}
                       {book.ingestionRuns[0].reviewRequired > 0 && <span className="text-amber-700">· {book.ingestionRuns[0].reviewRequired} need review</span>}
                       {book.ingestionRuns[0].providerConfig?.sourceProfile && <span>· {book.ingestionRuns[0].providerConfig.sourceProfile.replaceAll('_', ' ').toLowerCase()}</span>}
+                    </div>
+                  )}
+                  {book.ingestionRuns[0]?.status === 'FAILED' && !book.ingestionRuns[0].totalPages && (
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm">
+                      <p className="font-black text-red-800">Page inventory failed for the last uploaded PDF.</p>
+                      {book.ingestionRuns[0].errorMessage && <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono text-xs text-red-700">{book.ingestionRuns[0].errorMessage}</p>}
+                      <button onClick={() => void retryInventory(book)} disabled={anyBusy || uploadingBookId === book.id} className="mt-2 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-black text-white disabled:opacity-60">
+                        {uploadingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Retry page inventory
+                      </button>
                     </div>
                   )}
                   <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-4">
@@ -274,23 +349,21 @@ export default function BookCatalogClient() {
                     <span className="text-xs text-slate-500">Private storage · PDF only · maximum 250 MB</span>
                   </div>
                   {book.ingestionRuns[0]?.totalPages && book.ingestionRuns[0].processedPages < book.ingestionRuns[0].totalPages && <button onClick={() => void renderBookPages(book)} disabled={anyBusy} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 disabled:opacity-60">{renderingBookId === book.id && <Loader2 className="h-4 w-4 animate-spin" />}{book.ingestionRuns[0].processedPages ? 'Resume page rendering' : 'Render and analyse pages'} · {book.ingestionRuns[0].processedPages}/{book.ingestionRuns[0].totalPages}</button>}
+                  {book.ingestionRuns[0]?.processedPages > 0 && (
+                    <Link href={`/admin/question-bank/books/${book.id}/manifest`} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white hover:bg-indigo-700">
+                      <ListTree className="h-4 w-4" /> {book.confirmedChapters > 0 ? `Chapter manifest · ${book.confirmedChapters} confirmed` : book._count.chapters > 0 ? `Confirm chapter manifest · ${book._count.chapters} draft` : 'Confirm chapter manifest'}
+                    </Link>
+                  )}
                   {book.ingestionRuns[0]?.processedPages > 0 && book.confirmedChapters > 0 && (
                     <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm">
-                      <span className="font-black text-indigo-800">Chapter manifest: {book.confirmedChapters} chapter{book.confirmedChapters === 1 ? '' : 's'} confirmed.</span>{' '}
-                      <span className="text-indigo-700">Extract chapter by chapter from the manifest so questions are filed and matched against confirmed page ranges.</span>{' '}
-                      <Link href={`/admin/question-bank/books/${book.id}/manifest`} className="font-black text-indigo-700 underline">Open manifest →</Link>
+                      <span className="text-indigo-700">Extract chapter by chapter from the manifest above so questions are filed and matched against confirmed page ranges.</span>
                     </div>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
                     <button onClick={() => void extractBookQuestions(book)} disabled={anyBusy} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-60 sm:ml-3">
                       {extractingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                      {book.confirmedChapters > 0 ? 'Extract whole book (ignores manifest)' : 'Extract questions'}
+                      {book.confirmedChapters > 0 ? 'Extract whole book (ignores manifest)' : 'Extract questions (no manifest confirmed yet)'}
                     </button>
-                  )}
-                  {book.ingestionRuns[0]?.processedPages > 0 && (
-                    <Link href={`/admin/question-bank/books/${book.id}/manifest`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3">
-                      <ListTree className="h-4 w-4" /> Chapter manifest{book.confirmedChapters > 0 ? ` · ${book.confirmedChapters} confirmed` : book._count.chapters > 0 ? ` · ${book._count.chapters} draft` : ''}
-                    </Link>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
                     <Link href={`/admin/question-bank/books/${book.id}/figures`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3">

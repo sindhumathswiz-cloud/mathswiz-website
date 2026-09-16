@@ -79,7 +79,7 @@ describe('POST /api/admin/books/[id]/verify-mathematics', () => {
     expect(question.update).not.toHaveBeenCalled();
   });
 
-  it('applies a verified verdict: sets MATHEMATICALLY_VERIFIED, tags the row, and un-REPORTS it', async () => {
+  it('applies a verified verdict: auto-approves the row (status -> APPROVED), sets MATHEMATICALLY_VERIFIED, and tags it', async () => {
     question.findMany.mockResolvedValue([{ ...baseQuestion, status: 'REPORTED' }]);
     fetchFromLLM.mockResolvedValue('{"verdict":"verified"}');
 
@@ -89,7 +89,7 @@ describe('POST /api/admin/books/[id]/verify-mathematics', () => {
     expect(question.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'q-1' },
       data: expect.objectContaining({
-        status: 'DRAFT',
+        status: 'APPROVED',
         verificationStatus: 'MATHEMATICALLY_VERIFIED',
         tags: ['AI-Verified: Confirmed'],
       }),
@@ -115,6 +115,10 @@ describe('POST /api/admin/books/[id]/verify-mathematics', () => {
         reviewNotes: expect.stringContaining('Missing figure reference.'),
       }),
     }));
+    // An "issue" verdict must never touch status -- no auto-approval path
+    // for anything the independent re-derivation didn't confirm.
+    const call = question.update.mock.calls[0][0];
+    expect(call.data).not.toHaveProperty('status');
   });
 
   it('is tolerant of an LLM error or malformed response: counts it and leaves the question untouched for retry, without aborting the batch', async () => {

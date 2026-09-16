@@ -1,6 +1,16 @@
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-const GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+// Both llama-3.3-70b-versatile and llama-3.1-8b-instant were retired by Groq
+// (404 "model_not_found") -- found live when verify-mathematics's 100% error
+// rate turned out to be this, not rate-limiting. openai/gpt-oss-120b is the
+// model structure-questions.ts already uses successfully elsewhere in this
+// codebase (confirmed reaching the API -- real 429s, not 404s -- in this
+// same session), so it's reused here rather than guessed at.
+const GROQ_MODELS = ["openai/gpt-oss-120b"];
+// gemini-2.0-flash was retired too (404 "no longer available ... use
+// models/gemini-3.6-flash"). Mirrors GEMINI_MODELS in structure-questions.ts,
+// which is confirmed reaching the API successfully today.
+const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash"];
 
 interface ProviderEntry {
   key: string;
@@ -86,23 +96,26 @@ export async function fetchFromLLM(
         }
 
         if (provider === 'gemini') {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ parts: [{ text: userPrompt }] }],
-              generationConfig: {
-                ...(options.json === false ? {} : { responseMimeType: "application/json" }),
-                maxOutputTokens: options.maxTokens ?? 8192,
-              },
-            }),
-            signal: AbortSignal.timeout(30_000),
-          });
-          if (res.status === 429) { const b = await res.text().catch(() => ''); errors.push(`Gemini 429: ${b.substring(0, 200)}`); continue; }
-          if (!res.ok) { const b = await res.text().catch(() => ''); errors.push(`Gemini ${res.status}: ${b.substring(0, 200)}`); continue; }
-          const data = await res.json();
-          result = data.candidates[0].content.parts[0].text;
+          geminiModels: for (const model of GEMINI_MODELS) {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                contents: [{ parts: [{ text: userPrompt }] }],
+                generationConfig: {
+                  ...(options.json === false ? {} : { responseMimeType: "application/json" }),
+                  maxOutputTokens: options.maxTokens ?? 8192,
+                },
+              }),
+              signal: AbortSignal.timeout(30_000),
+            });
+            if (res.status === 429) { const b = await res.text().catch(() => ''); errors.push(`Gemini/${model} 429: ${b.substring(0, 200)}`); continue; }
+            if (!res.ok) { const b = await res.text().catch(() => ''); errors.push(`Gemini/${model} ${res.status}: ${b.substring(0, 200)}`); continue; }
+            const data = await res.json();
+            result = data.candidates[0].content.parts[0].text;
+            if (result) break geminiModels;
+          }
           if (result) return result;
         }
 

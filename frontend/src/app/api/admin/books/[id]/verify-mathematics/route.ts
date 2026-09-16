@@ -34,6 +34,18 @@ export const maxDuration = 240;
  * Never invents missing premises: the prompt explicitly instructs the model
  * to return an `insufficient_information` issue rather than guess when the
  * question's own content doesn't give it enough to work with.
+ *
+ * Auto-approves on a "verified" verdict (status -> APPROVED, alongside
+ * verificationStatus -> MATHEMATICALLY_VERIFIED): the user's explicit call,
+ * given this only fires once a question ALREADY passed deterministic QA
+ * (STRUCTURALLY_VALID) and this independent re-derivation both agree -- an
+ * "issue" verdict never touches status, leaving it DRAFT/REPORTED with
+ * NEEDS_REVIEW for the review queue exactly as before. Triggered
+ * automatically right after a chapter (or whole-book) extraction finishes
+ * (see extractChapter in ManifestEditorClient.tsx / extractBookQuestions in
+ * BookCatalogClient.tsx) as well as by the manual "Auto-Populate"-style
+ * button -- both paths share this one route, so the bar is identical either
+ * way.
  */
 
 const DEFAULT_LIMIT = 20;
@@ -105,14 +117,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ].filter(Boolean).join('\n');
 
     let verdict: Verdict | null = null;
+    let errorReason: string | null = null;
     try {
       const raw = await fetchFromLLM(SYSTEM_PROMPT, userPrompt, { json: true });
       verdict = parseVerdict(raw);
-    } catch {
+      if (!verdict) errorReason = `unparseable response: ${raw.slice(0, 300)}`;
+    } catch (e) {
       verdict = null;
+      errorReason = e instanceof Error ? e.message : String(e);
     }
 
     if (!verdict) {
+      console.error(`[verify-mathematics] question ${q.id} errored: ${errorReason}`);
       errored++;
       details.push({ questionId: q.id, outcome: 'llm_error_will_retry' });
       continue; // left STRUCTURALLY_VALID, untagged -- picked up again next batch
@@ -122,12 +138,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       verified++;
       details.push({ questionId: q.id, outcome: apply ? 'verified' : 'would_verify' });
       if (apply) {
-        const note = `[AI-Verified -- ${new Date().toISOString().slice(0, 10)}]\nIndependently re-derived by an automated verification pass and confirmed correct.`;
-        const wasReported = q.status === 'REPORTED';
+        const note = `[AI-Verified -- ${new Date().toISOString().slice(0, 10)}]\nIndependently re-derived by an automated verification pass and confirmed correct. Auto-approved: passed deterministic QA and independent mathematical re-derivation.`;
         await prisma.question.update({
           where: { id: q.id },
           data: {
-            status: wasReported ? 'DRAFT' : q.status,
+            status: 'APPROVED',
             verificationStatus: 'MATHEMATICALLY_VERIFIED',
             tags: Array.from(new Set([...q.tags, 'AI-Verified: Confirmed'])),
             reviewNotes: q.reviewNotes ? `${q.reviewNotes}\n\n${note}` : note,

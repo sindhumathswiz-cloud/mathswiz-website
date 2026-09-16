@@ -67,6 +67,71 @@ describe('parseTableOfContents', () => {
   it('returns nothing when no contents page exists', () => {
     expect(parseTableOfContents([page(1, 'just a normal page 1. some question')]).entries).toHaveLength(0);
   });
+
+  // A DIGITAL_MATH book's own native PDF text layer has no Mathpix OCR
+  // markup at all -- its Contents page is a plain "N. Name page" list per
+  // line, not a table. Modeled directly on RS Aggarwal's real Senior
+  // Secondary School Mathematics for Class 11 (pages 10-11), which also
+  // spreads its 31-chapter list across two consecutive printed pages --
+  // the exact real-world case that first exposed both gaps this covers.
+  const PLAIN_TOC_PAGE_10 = [
+    'Contents',
+    'Set and Functions',
+    '1. Sets 1',
+    '2. Relations 50',
+    '3. Functions 78',
+    'Algebra',
+    '4. Principle of Mathematical Induction 131',
+    '5. Complex Numbers and Quadratic Equations 150',
+  ].join('\n');
+  const PLAIN_TOC_PAGE_11 = [
+    '6. Binomial Theorem 350',
+    '7. Arithmetic Progression 383',
+    'Trigonometry',
+    '8. Measurement of Angles 509',
+    'Statistics and Probability',
+    '9. Statistics 918',
+    '10. Probability 946',
+    'Objective Questions',
+    'Complex Numbers 988',
+  ].join('\n');
+
+  it('reads a plain native-text chapter list (no Mathpix table markup)', () => {
+    const toc = parseTableOfContents([page(9, 'front matter'), page(10, PLAIN_TOC_PAGE_10)]);
+    expect(toc.entries.map((e) => e.name)).toEqual([
+      'Sets', 'Relations', 'Functions', 'Principle of Mathematical Induction', 'Complex Numbers and Quadratic Equations',
+    ]);
+    expect(toc.entries[0].printedPage).toBe(1);
+    expect(toc.entries[4].printedPage).toBe(150);
+  });
+
+  it('follows a plain-text TOC across physically consecutive pages, stopping at the unnumbered "Objective Questions" list', () => {
+    const toc = parseTableOfContents([page(9, 'front matter'), page(10, PLAIN_TOC_PAGE_10), page(11, PLAIN_TOC_PAGE_11)]);
+    expect(toc.entries.map((e) => e.name)).toEqual([
+      'Sets', 'Relations', 'Functions', 'Principle of Mathematical Induction', 'Complex Numbers and Quadratic Equations',
+      'Binomial Theorem', 'Arithmetic Progression', 'Measurement of Angles', 'Statistics', 'Probability',
+    ]);
+    expect(toc.entries[9].name).toBe('Probability');
+    expect(toc.entries[9].printedPage).toBe(946);
+    // "Complex Numbers 988" under Objective Questions has no leading number
+    // and must never be read as chapter 11.
+    expect(toc.entries.some((e) => e.printedPage === 988)).toBe(false);
+  });
+
+  it('does not extend a TOC onto a later page that is not physically consecutive, even if it has a decoy row-shaped line', () => {
+    // Page 12 stands in for content reached after a gap (e.g. a blank or
+    // unrendered page 11) -- must never be swept into the TOC just because
+    // it's later in the book, even when a line there happens to match the
+    // row shape (ascending number, trailing digits) that a real
+    // continuation page would have.
+    const toc = parseTableOfContents([
+      page(10, PLAIN_TOC_PAGE_10),
+      page(12, '11. This looks like a TOC row but is not 200'),
+    ]);
+    expect(toc.entries.map((e) => e.name)).toEqual([
+      'Sets', 'Relations', 'Functions', 'Principle of Mathematical Induction', 'Complex Numbers and Quadratic Equations',
+    ]);
+  });
 });
 
 describe('estimatePageOffset', () => {

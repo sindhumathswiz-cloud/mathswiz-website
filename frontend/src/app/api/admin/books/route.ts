@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     },
     include: {
       _count: { select: { chapters: true, questions: true, ingestionRuns: true } },
-      ingestionRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, status: true, stage: true, progress: true, totalPages: true, processedPages: true, extractedQuestions: true, reviewRequired: true, providerConfig: true, updatedAt: true } },
+      ingestionRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, status: true, stage: true, progress: true, totalPages: true, processedPages: true, extractedQuestions: true, reviewRequired: true, providerConfig: true, updatedAt: true, errorMessage: true } },
     },
     orderBy: [{ className: 'asc' }, { title: 'asc' }, { edition: 'asc' }],
   });

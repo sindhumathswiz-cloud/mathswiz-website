@@ -1101,7 +1101,12 @@ export default function BulkImportStudio() {
                     <ArrowLeft className="w-4 h-4 mr-2"/> Back to Admin Dashboard
                 </Link>
                 {/* Primary tabs */}
-                <div className="flex gap-2 mb-10 bg-slate-800 p-1.5 rounded-2xl w-fit mx-auto">
+                <div className="flex flex-wrap justify-center gap-2 mb-10 bg-slate-800 p-1.5 rounded-2xl w-fit mx-auto">
+                    <Link href="/admin/question-bank/books"
+                        className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-cyan-600/40"
+                        title="Register a book edition, upload its PDF, and confirm its chapter manifest before extracting questions">
+                        <BookOpen className="w-4 h-4" /> Book Ingestion
+                    </Link>
                     {([
                         { key: 'pdf' as const, label: 'PDF / Image', icon: <UploadCloud className="w-4 h-4" />, color: 'bg-indigo-600', badge: undefined },
                         { key: 'word' as const, label: 'Word Document', icon: <FileUp className="w-4 h-4" />, color: 'bg-violet-600', badge: undefined },

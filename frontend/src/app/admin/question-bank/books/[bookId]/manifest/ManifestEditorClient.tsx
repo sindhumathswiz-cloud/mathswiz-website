@@ -240,6 +240,33 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
     }
   };
 
+  // Runs right after extraction: for every freshly-saved DRAFT question that
+  // already passed deterministic QA (STRUCTURALLY_VALID), independently
+  // re-derives its answer and auto-approves it on a "verified" verdict --
+  // the user's explicit call that extraction should validate and approve
+  // correct questions automatically, not leave them sitting for manual
+  // review. An "issue" verdict (or an LLM error) never approves; it's
+  // flagged into the review queue exactly as a manual verify-mathematics
+  // run would. Looped (bounded) since one call only processes up to 50
+  // candidates and a large chapter can extract more than that; harmless to
+  // call even when nothing new was saved -- it just processes 0 candidates.
+  const autoVerifyAndApprove = async (): Promise<{ approved: number; flagged: number; errored: number }> => {
+    let approved = 0, flagged = 0, errored = 0;
+    for (let i = 0; i < 10; i++) {
+      const res = await fetch(`/api/admin/books/${bookId}/verify-mathematics`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apply: true, limit: 50 }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) break;
+      approved += data.verified ?? 0;
+      flagged += data.flagged ?? 0;
+      errored += data.errored ?? 0;
+      if ((data.candidatesProcessed ?? 0) === 0) break;
+    }
+    return { approved, flagged, errored };
+  };
+
   const extractChapter = async (index: number, force = false) => {
     const chapter = chapters[index];
     const start = toInt(chapter.startPage);
@@ -275,10 +302,19 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         setMessage({ kind: 'info', text: `${chapter.name}: all ${alreadyExtracted} pages were already extracted earlier (${chapter.questionsInRange} questions in this range). Use "Re-extract" to reprocess them under the manifest, or "Re-file existing questions" to move them into this chapter.` });
       } else {
         const emptyList = [...emptySectionPages].sort((a, b) => a - b);
+        let verifyText = '';
+        if (saved > 0) {
+          setExtractProgress((p) => ({ ...p, [index]: `extracted ${saved} — verifying…` }));
+          const { approved, flagged, errored } = await autoVerifyAndApprove();
+          verifyText = approved || flagged || errored
+            ? ` ${approved} auto-approved (independently re-derived and confirmed correct), ${flagged} flagged for review${errored ? `, ${errored} pending retry (provider limit)` : ''}.`
+            : '';
+        }
         setExtractProgress((p) => ({ ...p, [index]: `done — ${saved} saved${failures ? `, ${failures} page failures` : ''}` }));
         setMessage({
           kind: emptyList.length ? 'info' : 'success',
           text: `${chapter.name}: extracted ${saved} question${saved === 1 ? '' : 's'}${failures ? ` (${failures} page failures)` : ''}.`
+            + verifyText
             + (emptyList.length ? ` ${emptyList.length} page${emptyList.length === 1 ? '' : 's'} inside a question section produced no questions — check ${emptyList.slice(0, 12).join(', ')}${emptyList.length > 12 ? '…' : ''} (OCR gap, or the section range needs trimming).` : ''),
         });
       }

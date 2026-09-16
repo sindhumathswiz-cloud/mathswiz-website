@@ -6,12 +6,23 @@ import argparse
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pdfplumber
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 from pypdf import PdfReader
+
+# Windows' console defaults stdout to the system codepage (cp1252), which
+# can't encode every character extracted from a real PDF -- legacy
+# symbol-font glyphs (mapped into the Unicode Private Use Area,
+# U+E000-U+F8FF) are common in older scanned/symbol-encoded math textbooks.
+# print()'ing one crashed this script mid-write with UnicodeEncodeError,
+# losing the ENTIRE json.dumps output for the whole batch (see the identical
+# fix + rationale in analyze-pdf-pilot.py, where this was first found).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 QUESTION_RE = re.compile(r"^\s*(?:q(?:uestion)?\s*)?\d{1,4}\s*[.)]", re.I | re.M)

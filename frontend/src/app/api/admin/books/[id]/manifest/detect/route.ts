@@ -29,17 +29,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const run = book.ingestionRuns[0];
   if (!run?.sourceDocumentId) {
-    return NextResponse.json({ error: 'Render and extract this book before detecting a manifest.' }, { status: 409 });
+    return NextResponse.json({ error: 'Upload and render this book before detecting a manifest.' }, { status: 409 });
   }
 
-  const pages = await prisma.documentPage.findMany({
-    where: { documentId: run.sourceDocumentId, rawText: { not: '' } },
+  // rawText is only ever written by extract-questions/route.ts, once the LLM
+  // structuring pass runs. For a DIGITAL_MATH book, render-pages already
+  // captures the PDF's own embedded text layer as nativeText -- plenty for
+  // manifest detection (chapter openers, TOC, section headings), so gating
+  // this on rawText alone forced running the (slow, provider-rate-limited)
+  // extraction pass BEFORE the manifest could even be reviewed, defeating
+  // the point of confirming a manifest before extracting. Falls back to
+  // nativeText per page when rawText isn't there yet.
+  const rows = await prisma.documentPage.findMany({
+    where: { documentId: run.sourceDocumentId, OR: [{ rawText: { not: '' } }, { nativeText: { not: '' } }] },
     orderBy: { pageNumber: 'asc' },
-    select: { pageNumber: true, rawText: true, layoutData: true },
+    select: { pageNumber: true, rawText: true, nativeText: true, layoutData: true },
   });
-  if (pages.length === 0) {
-    return NextResponse.json({ error: 'No page text is available yet. Render the pages first.' }, { status: 409 });
+  if (rows.length === 0) {
+    return NextResponse.json({ error: 'No page text is available yet. Render the pages first -- a scanned/photographed book only gets usable text after its first OCR pass (Extract questions).' }, { status: 409 });
   }
+  const pages = rows.map((row) => ({ pageNumber: row.pageNumber, rawText: row.rawText || row.nativeText || '', layoutData: row.layoutData }));
 
   const toc = parseTableOfContents(pages);
   const proposal = detectManifest(pages, book.className, {
