@@ -27,11 +27,20 @@ export function sanitizeLatex(text: string): string {
     result = result.replace(/\\begin\{([lcr|]+)\}/g, '\\begin{array}{$1}');
     result = result.replace(/\\end\{([lcr|]+)\}/g, '\\end{array}');
 
-    // Step 2b: Wrap bare aligned/gathered environments in display math
-    result = result.replace(/(?<!\$\$)\s*\\begin{aligned}([\s\S]*?)\\end{aligned}(?!\s*\$\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
-    result = result.replace(/(?<!\$\$)\s*\\begin{gathered}([\s\S]*?)\\end{gathered}(?!\s*\$\$)/g, '\n$$\\begin{gathered}$1\\end{gathered}$$\n');
-    result = result.replace(/(?<!\$\$)\s*\\begin{align}([\s\S]*?)\\end{align}(?!\s*\$\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
-    result = result.replace(/(?<!\$\$)\s*\\begin{align\*}([\s\S]*?)\\end{align\*}(?!\s*\$\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
+    // Step 2b: Wrap bare aligned/gathered environments in display math.
+    // Guard against ANY enclosing $ (single or double), not just $$ --
+    // Mathpix snip OCR (PageSnipTool's extraction) commonly wraps each
+    // \begin{aligned}...\end{aligned} block in single-$ inline delimiters
+    // (e.g. "(i)$\begin{aligned}...\end{aligned}$(ii)$..."), which is
+    // already valid (KaTeX supports aligned inline). The old $$-only
+    // lookbehind/lookahead didn't recognize that as "already wrapped" and
+    // injected a redundant $$...$$ around it, corrupting the delimiter
+    // nesting ("(i)$\n$$\begin{aligned}...\end{aligned}$$\n$(ii)$...") and
+    // producing a KaTeX parse error / red error text.
+    result = result.replace(/(?<!\$)\s*\\begin{aligned}([\s\S]*?)\\end{aligned}(?!\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
+    result = result.replace(/(?<!\$)\s*\\begin{gathered}([\s\S]*?)\\end{gathered}(?!\$)/g, '\n$$\\begin{gathered}$1\\end{gathered}$$\n');
+    result = result.replace(/(?<!\$)\s*\\begin{align}([\s\S]*?)\\end{align}(?!\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
+    result = result.replace(/(?<!\$)\s*\\begin{align\*}([\s\S]*?)\\end{align\*}(?!\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
 
     // Step 2c: Normalize display math. remark-math only treats $$...$$ as a
     // display block when the $$ are on their OWN lines — inline
