@@ -120,19 +120,52 @@
   - [x] Apply and verify the additive production migration
   - [x] Add intervention ownership and progression regression tests
 
-## Later phases
+## Product roadmap — trusted, teacher-guided mathematics practice
 
-- [x] Phase 1 — Unified design system and role-based Today dashboards
+Mathswiz's core experience is a continuous **study → practice → mock test → analyse → revise** loop, supported by a structured content library. Its differentiator is not question-bank size alone: students receive dependable solutions, teachers guide learning and flag errors, and administrators retain the full content-review history.
+
+### Phase 1 — Student learning loop
+
+- [x] Establish the shared design system and role-based Today dashboards
   - [x] Establish shared color, spacing, radius, shadow, and focus tokens
   - [x] Build a reusable Today dashboard hierarchy
   - [x] Add role-specific summaries, priorities, and quick actions for all four roles
   - [x] Consolidate duplicate legacy dashboard cards and headers
   - [x] Standardize navigation, empty states, loading states, and responsive behavior
   - [x] Add accessibility and visual regression coverage
-- [x] Phase 2 — Courses, homework, mastery, and intervention workflows
-- [ ] Phase 3 — Parent engagement and communication
-- [ ] Phase 4 — Healthy gamification and community
-- [ ] Phase 5 — Grounded AI, advanced analytics, accessibility, and scale
+- [x] Establish courses, homework, mastery, and intervention foundations
+- [ ] Build topic learning paths that sequence concepts, worked examples, guided practice, timed quizzes, and recovery practice
+- [ ] Create a “My Mistakes” notebook that automatically captures wrong or flagged questions and schedules retries
+- [ ] Add student bookmarks, personal revision lists, and flashcards/formula cards
+- [ ] Show per-topic mastery based on accuracy, question difficulty, and time taken
+
+### Phase 2 — Teacher-led practice and assessment
+
+- [ ] Build a teacher test builder with chapter, skill, difficulty, question-count, and time filters
+- [ ] Let teachers assign targeted remedial practice to individual students and groups
+- [ ] Add class heatmaps for weak concepts, common wrong answers, and students needing support
+- [ ] Support reusable teacher collections for worksheets, revision packs, mock exams, and homework
+
+### Phase 3 — Feedback, revision, and analytics
+
+- [ ] Deliver rich post-test reports with solutions, time spent, confidence, error type, and a recommended next action
+- [ ] Add adaptive Smart Practice that selects questions from each student's weak skills
+- [ ] Create a weekly revision planner with spaced repetition and pending tasks
+- [ ] Provide exam-mode mock tests with an exam-style timer and performance trends
+
+### Phase 4 — Parent and school insight
+
+- [ ] Build a parent dashboard for weekly learning time, completed work, strengths, risks, and teacher comments
+- [ ] Provide parent action cards answering “What can I do this week?” rather than reporting raw marks alone
+- [ ] Add administrator reporting for curriculum coverage, class performance, content quality, and teacher activity
+- [ ] Send actionable alerts for prolonged inactivity, repeated concept difficulty, and upcoming assessments
+
+### Phase 5 — Motivation and content trust
+
+- [ ] Add opt-in, teacher-moderated class leaderboards that reward improvement and consistency rather than marks alone
+- [ ] Add streaks, milestone badges, and moderated class challenges
+- [ ] Implement the question-quality workflow: draft, AI-generated candidate solution, external verification, approval, and audit history
+- [ ] Display a verified-solution badge so students and teachers can distinguish reviewed content from pending AI suggestions
 
 ## Phase QB — Whole-book Mathematics ingestion
 
