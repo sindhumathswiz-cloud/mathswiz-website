@@ -23,7 +23,7 @@ const AUTH_PATHS = [
   "/api/register",
 ];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || process.env.NEXT_AUTH_SECRET });
 

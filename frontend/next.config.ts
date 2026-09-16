@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     // the request body in memory when proxying to the route handler and
     // silently truncates it at 10MB by default — raise that ceiling above
     // the app's own limit so large book PDFs aren't cut off mid-upload.
-    middlewareClientMaxBodySize: "260mb",
+    proxyClientMaxBodySize: "260mb",
   },
   async headers() {
     return [
