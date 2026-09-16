@@ -85,7 +85,11 @@ function imageMime(filePath: string): string {
   return 'image/jpeg';
 }
 
-async function ocrPageWithMathpix(imagePath: string): Promise<{ text: string; confidence: number | null; diagramRegions: DiagramRegion[]; textLines: OcrTextLine[]; safeImagePath: string }> {
+// Exported for reuse beyond whole-page OCR -- the PDF snip-and-paste tool
+// (PageSnipTool.tsx / .../pages/[pageNumber]/snip/route.ts) OCRs a small
+// cropped region the exact same way; this function doesn't care whether the
+// image it's given is a whole page or a crop of one.
+export async function ocrPageWithMathpix(imagePath: string): Promise<{ text: string; confidence: number | null; diagramRegions: DiagramRegion[]; textLines: OcrTextLine[]; safeImagePath: string }> {
   const safePath = assertPrivatePageImagePath(imagePath);
   if (!process.env.MATHPIX_APP_ID || !process.env.MATHPIX_APP_KEY) {
     throw new Error('Mathpix credentials are not configured (MATHPIX_APP_ID / MATHPIX_APP_KEY)');

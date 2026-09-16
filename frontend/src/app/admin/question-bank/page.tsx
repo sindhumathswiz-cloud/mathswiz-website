@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { Database, UploadCloud, CheckCircle, XCircle, AlertCircle, FileText, Search, Loader2, SplitSquareHorizontal, Edit3, Save, Clock, X, Clipboard, ChevronLeft } from 'lucide-react';
+import { Database, UploadCloud, CheckCircle, XCircle, AlertCircle, FileText, Search, Loader2, SplitSquareHorizontal, Edit3, Save, Clock, X, Clipboard, ChevronLeft, Crop } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
 import MathRenderer from '@/components/MathRenderer';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
+import PageSnipTool from './PageSnipTool';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 
@@ -82,7 +83,42 @@ export default function AdminQuestionBank() {
         examType: '',
     });
     const [showOriginal, setShowOriginal] = useState(false);
+    const [sourceTab, setSourceTab] = useState<'text' | 'image'>('text');
     const [selectedTaxonomyIds, setSelectedTaxonomyIds] = useState<string[]>([]);
+
+    // Cursor position of content/explanation at the moment focus last left
+    // them -- by the time "Insert into Question/Solution" is clicked in
+    // PageSnipTool, focus has moved away from the textarea, so the browser's
+    // own selectionStart/selectionEnd would already read as collapsed at 0.
+    const contentRef = useRef<HTMLTextAreaElement | null>(null);
+    const explanationRef = useRef<HTMLTextAreaElement | null>(null);
+    const lastCursor = useRef<{ content: [number, number]; explanation: [number, number] }>({ content: [0, 0], explanation: [0, 0] });
+
+    const trackCursor = (field: 'content' | 'explanation') => (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+        const el = e.currentTarget;
+        lastCursor.current[field] = [el.selectionStart, el.selectionEnd];
+    };
+
+    // Standard paste semantics: replace the tracked selection (or insert at
+    // the tracked cursor if nothing was selected), then restore focus/cursor
+    // just past the inserted text.
+    const insertAtCursor = (text: string, target: 'content' | 'explanation') => {
+        const ref = target === 'content' ? contentRef : explanationRef;
+        const [start, end] = lastCursor.current[target];
+        setEditForm((prev: any) => {
+            const value: string = prev[target] || '';
+            const safeStart = Math.min(start, value.length);
+            const safeEnd = Math.min(Math.max(end, safeStart), value.length);
+            const nextValue = value.slice(0, safeStart) + text + value.slice(safeEnd);
+            const nextCursor = safeStart + text.length;
+            lastCursor.current[target] = [nextCursor, nextCursor];
+            requestAnimationFrame(() => {
+                const el = ref.current;
+                if (el) { el.focus(); el.setSelectionRange(nextCursor, nextCursor); }
+            });
+            return { ...prev, [target]: nextValue };
+        });
+    };
 
     useEffect(() => {
         if (selectedQuestion) {
@@ -395,14 +431,18 @@ export default function AdminQuestionBank() {
                                         </div>
 
                                         {isEditing ? (
-                                            <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
+                                            <div className="flex-1 flex flex-col gap-4 overflow-y-auto min-h-0">
+                                            <div className="flex gap-6">
                                                 {/* Edit Form (Left) */}
                                                 <div className="w-1/2 overflow-y-auto pr-2 space-y-6 pb-20 custom-scrollbar">
                                                     <div>
                                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Problem Statement (LaTeX)</label>
-                                                        <textarea 
+                                                        <textarea
+                                                            ref={contentRef}
                                                             value={editForm.content}
                                                             onChange={e => setEditForm({...editForm, content: e.target.value})}
+                                                            onSelect={trackCursor('content')}
+                                                            onBlur={trackCursor('content')}
                                                             className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                                             rows={6}
                                                         />
@@ -555,9 +595,12 @@ export default function AdminQuestionBank() {
                                                                 <Clipboard className="w-3 h-3" /> Quick Paste
                                                             </button>
                                                         </div>
-                                                        <textarea 
+                                                        <textarea
+                                                            ref={explanationRef}
                                                             value={editForm.explanation}
                                                             onChange={e => setEditForm({...editForm, explanation: e.target.value})}
+                                                            onSelect={trackCursor('explanation')}
+                                                            onBlur={trackCursor('explanation')}
                                                             className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                                             rows={4}
                                                         />
@@ -588,6 +631,33 @@ export default function AdminQuestionBank() {
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {showOriginal && (
+                                                <div className="border-t pt-4">
+                                                    <div className="mb-3 flex gap-2">
+                                                        <button type="button" onClick={() => setSourceTab('text')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${sourceTab === 'text' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                                            Text
+                                                        </button>
+                                                        <button type="button" onClick={() => setSourceTab('image')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${sourceTab === 'image' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                                            <Crop className="w-3.5 h-3.5" /> Page image (snip)
+                                                        </button>
+                                                    </div>
+                                                    {sourceTab === 'text' ? (
+                                                        <div className="rounded-xl bg-slate-900 p-4 text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+                                                            {selectedQuestion.originalRawText || 'No raw source text available for this question.'}
+                                                        </div>
+                                                    ) : selectedQuestion.bookId ? (
+                                                        <PageSnipTool
+                                                            bookId={selectedQuestion.bookId}
+                                                            initialPage={selectedQuestion.sourcePageStart}
+                                                            onInsert={insertAtCursor}
+                                                        />
+                                                    ) : (
+                                                        <p className="text-xs text-gray-400">This question has no source book page to snip from.</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                         ) : (
                                             <div className={`flex-1 flex gap-6 overflow-hidden min-h-0 ${showOriginal ? 'flex-row' : 'flex-col'}`}>
                                                 {showOriginal && (
