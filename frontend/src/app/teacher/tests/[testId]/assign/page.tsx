@@ -171,7 +171,7 @@ export default function TestAssignPage() {
           </div>
 
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Batch</label>
-          <select value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm mb-4 outline-none focus:border-indigo-400">
+          <select data-testid="assign-batch-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm mb-4 outline-none focus:border-indigo-400">
             <option value="">Select a batch…</option>
             {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>

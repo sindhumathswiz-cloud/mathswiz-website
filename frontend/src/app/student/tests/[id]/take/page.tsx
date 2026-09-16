@@ -341,18 +341,13 @@ export default function TestTakingUI() {
         }
     };
 
-    if (!testData || allQuestions.length === 0) {
-        return (
-            <div className="h-screen w-full flex flex-col items-center justify-center bg-white">
-                <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mb-4" />
-                <p className="text-gray-500 font-bold animate-pulse uppercase tracking-[0.2em]">Synchronizing Secure Environment</p>
-            </div>
-        );
-    }
-
     const currentQ = allQuestions[currentIndex];
-    
-    // Use clear naming to avoid confusion
+
+    // Use clear naming to avoid confusion. Kept above the loading-state
+    // early return below (rather than after it, as before) -- these hooks
+    // must run on every render regardless of whether testData has loaded
+    // yet, or the hook count changes between the "still loading" render
+    // and the first "loaded" render, which React rejects outright.
     const rawOptions = useMemo(() => {
         if (!currentQ?.options) return [];
         const parsed = typeof currentQ.options === 'string' ? JSON.parse(currentQ.options) : currentQ.options;
@@ -373,6 +368,15 @@ export default function TestTakingUI() {
         }
         setStableOptions(array);
     }, [currentQ?.id, rawOptions]);
+
+    if (!testData || allQuestions.length === 0) {
+        return (
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-white">
+                <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mb-4" />
+                <p className="text-gray-500 font-bold animate-pulse uppercase tracking-[0.2em]">Synchronizing Secure Environment</p>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-screen bg-[#F8FAFC] font-sans select-none overflow-hidden text-gray-900">
@@ -513,8 +517,9 @@ export default function TestTakingUI() {
                                         const displayLetter = String.fromCharCode(65 + idx);
                                         const isSelected = responses[currentQ.id]?.selectedOption === optObj.originalLetter;
                                         return (
-                                            <motion.div 
+                                            <motion.div
                                                 key={idx}
+                                                data-testid={`option-original-${optObj.originalLetter}`}
                                                 whileHover={{ scale: 1.01 }}
                                                 whileTap={{ scale: 0.99 }}
                                                 onClick={() => handleOptionSelect(currentQ.id, optObj.originalLetter)}

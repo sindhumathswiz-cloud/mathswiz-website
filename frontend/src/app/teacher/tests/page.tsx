@@ -137,7 +137,7 @@ export default function TeacherTestsLedger() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {visibleTests.map(test => (
-              <div key={test.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all p-6 flex flex-col">
+              <div key={test.id} data-testid={`test-card-${test.id}`} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all p-6 flex flex-col">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg mr-2 ${test.mode === 'STRICT' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>

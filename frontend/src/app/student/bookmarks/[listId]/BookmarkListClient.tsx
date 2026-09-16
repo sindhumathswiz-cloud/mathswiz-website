@@ -68,7 +68,7 @@ export default function BookmarkListClient({ listId }: { listId: string }) {
         ) : (
           <div className="space-y-4">
             {items.map((item) => (
-              <div key={item.id} className="rounded-2xl border bg-white p-5">
+              <div key={item.id} data-testid={`bookmark-item-${item.question.id}`} className="rounded-2xl border bg-white p-5">
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide">
                   {item.question.topic && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-500">{item.question.topic}</span>}
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-500">{item.question.difficulty}</span>

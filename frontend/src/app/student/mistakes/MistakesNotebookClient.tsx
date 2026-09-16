@@ -95,7 +95,7 @@ export default function MistakesNotebookClient() {
         ) : (
           <div className="space-y-4">
             {entries.map((entry) => (
-              <div key={entry.questionId} className="rounded-2xl border bg-white p-5">
+              <div key={entry.questionId} data-testid={`mistake-${entry.questionId}`} className="rounded-2xl border bg-white p-5">
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide">
                   {(entry.source === 'auto' || entry.source === 'both') && (
                     <span className={`rounded-full px-2.5 py-1 ${entry.dueAt && new Date(entry.dueAt).getTime() <= Date.now() ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>

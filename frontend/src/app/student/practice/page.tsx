@@ -567,8 +567,9 @@ function PracticeArenaInner() {
                                     const isWrong = isSubmitted && isSelected && letter !== question.correctAnswer;
 
                                     return (
-                                        <div 
+                                        <div
                                             key={idx}
+                                            data-testid={`option-${letter}`}
                                             onClick={() => handleOptionSelect(letter)}
                                             className={`flex items-center gap-6 p-5 rounded-2xl border-2 transition-all cursor-pointer group ${
                                                 isCorrect ? 'border-emerald-500 bg-emerald-50/50' :
@@ -610,6 +611,7 @@ function PracticeArenaInner() {
                                     Ask Doubt Buddy for a Hint 🤖
                                 </button>
                                 <button
+                                    data-testid="flag-question"
                                     onClick={flagQuestion}
                                     disabled={isFlagging || !question}
                                     title="Pin to My Mistakes notebook"
@@ -619,6 +621,7 @@ function PracticeArenaInner() {
                                     Flag
                                 </button>
                                 <button
+                                    data-testid="bookmark-question"
                                     onClick={bookmarkQuestion}
                                     disabled={isBookmarking || !question}
                                     title="Save to bookmarks"
@@ -645,6 +648,7 @@ function PracticeArenaInner() {
                                             <SkipForward className="w-4 h-4" /> Skip
                                         </button>
                                         <button
+                                            data-testid="submit-answer"
                                             onClick={handleSubmit}
                                             disabled={!selectedOption}
                                             className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 disabled:opacity-30 transition-all shadow-xl shadow-slate-200"

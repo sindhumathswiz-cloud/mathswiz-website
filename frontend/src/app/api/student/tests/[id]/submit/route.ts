@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { awardPoints, POINTS_RULES } from '@/lib/gamification';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { applyMasteryUpdate } from '@/lib/mastery';
+import { withSerializableRetry } from '@/lib/prisma-retry';
 
 export const dynamic = 'force-dynamic';
 
@@ -131,7 +132,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const submittedAt = new Date();
-    const updatedAttempt = await prisma.$transaction(async (tx) => {
+    const updatedAttempt = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
       const claimed = await tx.testAttempt.updateMany({
         where: { id: attemptId, userId: studentId, status: 'IN_PROGRESS' },
         data: { status: 'SUBMITTED', endTime: submittedAt, totalScore, totalCorrect, totalIncorrect, totalSkipped },
@@ -151,7 +152,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         });
       }
       return tx.testAttempt.findUniqueOrThrow({ where: { id: attemptId } });
-    }, { isolationLevel: 'Serializable' });
+    }, { isolationLevel: 'Serializable' }));
 
     // Award points for test completion
     await awardPoints(studentId, POINTS_RULES.TEST_COMPLETED, 'Test completed', { testId: id, score: totalScore });

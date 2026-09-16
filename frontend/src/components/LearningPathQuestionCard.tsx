@@ -75,6 +75,7 @@ export default function LearningPathQuestionCard({
           return (
             <div
               key={letter}
+              data-testid={`option-${letter}`}
               onClick={() => !isSubmitted && setSelectedOption(letter)}
               className={`flex cursor-pointer items-center gap-4 rounded-2xl border-2 p-4 transition-all ${
                 correct ? 'border-emerald-400 bg-emerald-50' : wrong ? 'border-rose-400 bg-rose-50' : selected ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'
@@ -99,6 +100,7 @@ export default function LearningPathQuestionCard({
       ) : !isSubmitted ? (
         <button
           type="button"
+          data-testid="submit-answer"
           onClick={submit}
           disabled={!selectedOption || submitting}
           className="mt-6 w-full rounded-2xl bg-indigo-600 py-4 text-sm font-black uppercase tracking-widest text-white disabled:opacity-40"

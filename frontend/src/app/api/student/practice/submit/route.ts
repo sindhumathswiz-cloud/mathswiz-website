@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { awardPoints, POINTS_RULES } from '@/lib/gamification';
 import { applyMasteryUpdate } from '@/lib/mastery';
+import { withSerializableRetry } from '@/lib/prisma-retry';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
     const now = new Date();
     const recentThreshold = new Date(now.getTime() - IDEMPOTENCY_WINDOW_MS);
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
       // The schema has no request-id unique key. This bounded replay check makes
       // ordinary browser/network retries idempotent, though a unique key would
       // be required for a strict guarantee under concurrent requests.
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
       }
 
       return { attempt, created: true };
-    }, { isolationLevel: 'Serializable' });
+    }, { isolationLevel: 'Serializable' }));
 
     if (result.created && !skipped) {
       await awardPoints(studentId, POINTS_RULES.PRACTICE_QUESTION, 'Practice question completed', { questionId, isCorrect });

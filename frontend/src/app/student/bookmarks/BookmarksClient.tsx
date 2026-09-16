@@ -105,6 +105,7 @@ export default function BookmarksClient() {
             {lists.map((list) => (
               <Link
                 key={list.id}
+                data-testid={`bookmark-list-${list.id}`}
                 href={`/student/bookmarks/${list.id}`}
                 className="rounded-2xl border bg-white p-5 hover:border-indigo-300 hover:shadow-md transition-all"
               >

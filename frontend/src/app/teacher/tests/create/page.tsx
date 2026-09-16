@@ -312,7 +312,7 @@ export default function TestCreatorStudio() {
               <option value="Physics">Physics</option>
               <option value="Chemistry">Chemistry</option>
             </select>
-            <select value={filterTopic} onChange={e => setFilterTopic(e.target.value)} className="bg-white border rounded p-2 text-sm outline-none focus:border-indigo-500">
+            <select data-testid="filter-topic-select" value={filterTopic} onChange={e => setFilterTopic(e.target.value)} className="bg-white border rounded p-2 text-sm outline-none focus:border-indigo-500">
               <option value="All">All Topics</option>
               <option value="Calculus">Calculus</option>
               <option value="Algebra">Algebra</option>
@@ -324,7 +324,7 @@ export default function TestCreatorStudio() {
               <option value="MEDIUM">Medium</option>
               <option value="HARD">Hard</option>
             </select>
-            <select value={filterType} onChange={e => setFilterType(e.target.value)} className="bg-white border rounded p-2 text-sm outline-none focus:border-indigo-500">
+            <select data-testid="filter-type-select" value={filterType} onChange={e => setFilterType(e.target.value)} className="bg-white border rounded p-2 text-sm outline-none focus:border-indigo-500">
               <option value="All">All Types</option>
               <option value="SINGLE_CHOICE">Single MCQ</option>
               <option value="MULTIPLE_CHOICE">Multi MCQ</option>
@@ -431,7 +431,7 @@ export default function TestCreatorStudio() {
           </div>
           <div className="mb-4 print:hidden">
              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Save as</label>
-             <select value={templateType} onChange={e => setTemplateType(e.target.value)} className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500">
+             <select data-testid="save-as-select" value={templateType} onChange={e => setTemplateType(e.target.value)} className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500">
                 <option value="">Live test / homework</option>
                 <option value="WORKSHEET">Reusable template — Worksheet</option>
                 <option value="REVISION_PACK">Reusable template — Revision pack</option>
@@ -594,6 +594,7 @@ export default function TestCreatorStudio() {
                     type="number"
                     min={1}
                     max={100}
+                    data-testid="pick-count-input"
                     value={pickCount}
                     onChange={e => setPickCount(e.target.value)}
                     className="w-full border-2 border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-400 transition-colors mb-6"
