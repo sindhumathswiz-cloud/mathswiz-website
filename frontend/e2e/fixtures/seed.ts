@@ -36,6 +36,12 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter: adapter as any });
 
+/** Closes this module's own db connections -- callers that import runSeed() directly (rather than running this file as a subprocess) are responsible for calling this once done, or the pg Pool keeps the process alive. */
+export async function closeSeedConnections() {
+  await prisma.$disconnect();
+  await pool.end();
+}
+
 async function upsertUser(fixture: { mobileNumber: string; password: string; firstName: string; lastName: string }, role: "TEACHER" | "STUDENT") {
   const hashed = await hash(fixture.password, 12);
   return prisma.user.upsert({
@@ -87,7 +93,7 @@ async function upsertQuestions(questions: FixtureQuestion[], createdById: string
   }
 }
 
-async function main() {
+export async function runSeed() {
   const teacher = await upsertUser(E2E_TEACHER, "TEACHER");
   const student = await upsertUser(E2E_STUDENT, "STUDENT");
 
@@ -165,12 +171,19 @@ async function main() {
   });
 }
 
-main()
-  .catch((e) => {
-    console.error("e2e fixture seeding failed:", e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-    await pool.end();
-  });
+/**
+ * Only a subprocess (`npx tsx seed.ts`) needs this entry point --
+ * e2e/global-setup.ts imports and calls runSeed() directly in-process
+ * instead, specifically because spawning a child process for this from
+ * Playwright's globalSetup has failed in at least one real environment
+ * (a Windows libuv bug, `uv_os_get_passwd returned ENOMEM`, unrelated to
+ * actual available memory) that in-process execution sidesteps entirely.
+ */
+if (require.main === module) {
+  runSeed()
+    .catch((e) => {
+      console.error("e2e fixture seeding failed:", e);
+      process.exitCode = 1;
+    })
+    .finally(closeSeedConnections);
+}
