@@ -51,6 +51,12 @@ function PracticeArenaInner() {
     const searchParams = useSearchParams();
     const [question, setQuestion] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    // Distinct from "no question yet" (question === null): set only when
+    // the fetch itself failed (network error, 429, 500, ...) rather than
+    // succeeding with zero matching candidates, so the UI can tell a
+    // student "something's wrong, retry" instead of silently rendering
+    // the same empty-state copy as a genuinely empty arena.
+    const [fetchError, setFetchError] = useState<string | null>(null);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [hint, setHint] = useState<string | null>(null);
@@ -161,6 +167,7 @@ function PracticeArenaInner() {
 
     const fetchNextQuestion = async (overrides?: { topic?: string; difficulty?: string }) => {
         setLoading(true);
+        setFetchError(null);
         setSelectedOption(null);
         setIsSubmitted(false);
         setHint(null);
@@ -190,11 +197,30 @@ function PracticeArenaInner() {
             if (difficulty) params.set('difficulty', difficulty);
             const qs = params.toString();
             const res = await fetch(`/api/student/practice/next${qs ? `?${qs}` : ''}`);
-            if (!res.ok) throw new Error('No questions available');
+            // A 404 here means the server checked and genuinely found no
+            // matching question — that's the real "Arena Empty" case.
+            // Anything else non-ok (429 rate-limited, 5xx, ...) means the
+            // check itself failed, which is a different, actionable state.
+            if (res.status === 404) {
+                setQuestion(null);
+                return;
+            }
+            if (!res.ok) {
+                const retryAfter = res.headers.get('Retry-After');
+                const body = await readJsonResponse<{ error?: string }>(res).catch(() => null);
+                throw new Error(
+                    body?.error ||
+                    (res.status === 429
+                        ? `Too many requests${retryAfter ? ` — try again in ${retryAfter}s` : ' — please wait a moment and try again'}.`
+                        : `The server returned an error (${res.status}).`)
+                );
+            }
             const data = await readJsonResponse<{ question?: unknown }>(res);
-            if (!data?.question) throw new Error('Question response was empty or invalid');
+            if (!data?.question) throw new Error('The server response was empty or invalid.');
             setQuestion(data.question);
         } catch (err) {
+            setQuestion(null);
+            setFetchError(err instanceof Error ? err.message : 'Could not fetch a question. Please try again.');
             toast.error("Could not fetch question");
         } finally {
             setLoading(false);
@@ -355,6 +381,26 @@ function PracticeArenaInner() {
     if (loading) return (
         <div className="h-screen flex items-center justify-center bg-slate-50">
             <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+        </div>
+    );
+
+    if (fetchError) return (
+        <div className="h-screen flex items-center justify-center bg-slate-50" data-testid="practice-arena-error">
+            <div className="text-center max-w-sm">
+                <XCircle className="w-16 h-16 text-rose-300 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-slate-900">Couldn't load a question</h2>
+                <p className="text-slate-500 mb-6">{fetchError}</p>
+                <div className="flex flex-col gap-3 items-center">
+                    <button
+                        onClick={() => fetchNextQuestion()}
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                        Try Again
+                    </button>
+                    <button onClick={() => router.back()} className="text-slate-400 font-bold text-sm">Return to Dashboard</button>
+                </div>
+            </div>
         </div>
     );
 

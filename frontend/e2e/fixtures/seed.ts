@@ -123,6 +123,25 @@ export async function runSeed() {
   // many local re-runs. They'll legitimately reappear once those specs
   // run again later in the same pass.
   await prisma.studentProgress.deleteMany({ where: { userId: student.id, topic: { in: [LEARNING_PATH_TOPIC, MISTAKES_TOPIC] } } });
+  // Same reasoning for the raw MasteryEvent history behind those
+  // submissions: the mistakes spec asserts an exact "missed 1x" count on
+  // a wrong answer, computed from the *unbroken run* of misses on that
+  // exact question id (see lib/mistake-queue.ts) -- without this, a
+  // second local run would inherit the miss from the first and assert a
+  // now-false "missed 1x".
+  await prisma.masteryEvent.deleteMany({
+    where: { userId: student.id, questionId: { in: [...LEARNING_PATH_QUESTIONS, ...MISTAKES_QUESTIONS].map((q) => q.id) } },
+  });
+  // Real submissions also each create their own practice-arena TestAttempt
+  // (+ TestResponse, cascaded). Left alone, these accumulate across every
+  // local re-run and eventually crowd this student's *other* topics out of
+  // the heatmap's own wrong-answers table -- it's batch-wide and the UI
+  // caps its display at the top 10 by wrong-count, ties broken arbitrarily.
+  // Excludes the one fixed-id attempt seeded below, which this same
+  // deleteMany would otherwise remove every run.
+  await prisma.testAttempt.deleteMany({
+    where: { userId: student.id, isPracticeArena: true, id: { not: "e2e-hm-attempt-1" } },
+  });
 
   await upsertQuestions(LEARNING_PATH_QUESTIONS, teacher.id);
   await upsertQuestions(WEAK_TOPIC_QUESTIONS, teacher.id);
