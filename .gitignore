@@ -18,3 +18,12 @@ frontend/playwright-report/
 .pnpm-store/
 .codex-temp/
 .codex_tmp/
+
+# Claude Code local session config (launch.json, settings.local.json,
+# scheduled_tasks.lock) -- per-machine, not project config.
+.claude/
+
+# Working exports from the question-bank second-review pass (per-question
+# QA notes/decisions) -- a local review artifact regenerable from the DB,
+# same treatment as qa-backups/ below.
+frontend/_second_review_export/
