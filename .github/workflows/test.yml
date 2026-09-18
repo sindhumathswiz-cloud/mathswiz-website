@@ -24,6 +24,17 @@ jobs:
 
       - run: npm ci
 
+      # npm ci alone doesn't generate the Prisma client -- there's no
+      # postinstall hook for it in package.json, so without this step
+      # @prisma/client's types are the empty pre-generate stub and every
+      # model access fails to typecheck (e.g. "Property 'type' does not
+      # exist on type '{}'"). Locally this goes unnoticed because
+      # node_modules/.prisma/client persists from a prior manual `prisma
+      # generate` and npm ci doesn't touch it unless package-lock changes
+      # prisma's own version -- a fresh CI checkout has no such carry-over.
+      - name: Generate Prisma client
+        run: npx prisma generate
+
       - name: Typecheck
         run: npx tsc --noEmit -p tsconfig.json
 
