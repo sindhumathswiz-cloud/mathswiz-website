@@ -1,0 +1,41 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Test
+        # SUPABASE_PROJECT_REF / SUPABASE_SERVICE_ROLE_KEY / QB_SUPABASE_E2E_BUCKET
+        # must point at a dedicated, disposable Supabase test project+bucket --
+        # never the production one -- and are configured as repository secrets
+        # (Settings > Secrets and variables > Actions), not committed here. Until
+        # they're set, book-storage.supabase-e2e.test.ts reports skipped rather
+        # than failing, exactly like a local run with no Supabase test env.
+        run: npm run test:run
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.QB_TEST_SUPABASE_PROJECT_REF }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.QB_TEST_SUPABASE_SERVICE_ROLE_KEY }}
+          QB_SUPABASE_E2E_BUCKET: ${{ secrets.QB_SUPABASE_E2E_BUCKET }}

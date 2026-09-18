@@ -8,7 +8,6 @@ env.download
 chapters/
 .env.local
 .env*.local
-.github/
 
 # Browser-test output
 frontend/test-results/
