@@ -23,6 +23,13 @@ import { afterAll, describe, expect, it } from 'vitest';
  * under one throwaway bookId/runId pair and is removed in `afterAll`, pass
  * or fail, but pointing this at anything other than a disposable test
  * bucket is still the caller's responsibility, not this file's.
+ *
+ * This file's own gate stays a graceful skip on purpose, for a LOCAL `npm
+ * test` run with no Supabase test env configured. The CI workflow enforces
+ * the opposite of that for itself: its "Require Supabase integration
+ * secrets" step fails the job outright if these secrets are missing, so the
+ * required check can't quietly stop validating Storage if a secret is ever
+ * rotated or removed -- see .github/workflows/test.yml.
  */
 
 const testBucket = process.env.QB_SUPABASE_E2E_BUCKET;

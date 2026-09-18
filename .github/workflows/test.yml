@@ -24,6 +24,29 @@ jobs:
 
       - run: npm ci
 
+      # This job is meant to be a required check, so it must not be able to
+      # go green without actually exercising real Supabase Storage -- a
+      # silent skip (e.g. a secret gets rotated, renamed, or accidentally
+      # removed) would otherwise keep reporting success while the storage
+      # integration test quietly stopped running. Fail loudly and early
+      # instead. (book-storage.supabase-e2e.test.ts still skips gracefully
+      # for a LOCAL `npm test` run with no Supabase test env -- this check
+      # only applies here, where "required" is supposed to mean something.)
+      - name: Require Supabase integration secrets
+        run: |
+          missing=()
+          [ -z "$QB_TEST_SUPABASE_PROJECT_REF" ] && missing+=("QB_TEST_SUPABASE_PROJECT_REF")
+          [ -z "$QB_TEST_SUPABASE_SERVICE_ROLE_KEY" ] && missing+=("QB_TEST_SUPABASE_SERVICE_ROLE_KEY")
+          [ -z "$QB_SUPABASE_E2E_BUCKET" ] && missing+=("QB_SUPABASE_E2E_BUCKET")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Required Supabase test-bucket secrets are missing: ${missing[*]}. This job fails on purpose rather than letting book-storage.supabase-e2e.test.ts silently skip -- add them at Settings > Secrets and variables > Actions, pointing at a dedicated, disposable test bucket."
+            exit 1
+          fi
+        env:
+          QB_TEST_SUPABASE_PROJECT_REF: ${{ secrets.QB_TEST_SUPABASE_PROJECT_REF }}
+          QB_TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.QB_TEST_SUPABASE_SERVICE_ROLE_KEY }}
+          QB_SUPABASE_E2E_BUCKET: ${{ secrets.QB_SUPABASE_E2E_BUCKET }}
+
       # npm ci alone doesn't generate the Prisma client -- there's no
       # postinstall hook for it in package.json, so without this step
       # @prisma/client's types are the empty pre-generate stub and every
@@ -41,10 +64,16 @@ jobs:
       - name: Test
         # SUPABASE_PROJECT_REF / SUPABASE_SERVICE_ROLE_KEY / QB_SUPABASE_E2E_BUCKET
         # must point at a dedicated, disposable Supabase test project+bucket --
-        # never the production one -- and are configured as repository secrets
-        # (Settings > Secrets and variables > Actions), not committed here. Until
-        # they're set, book-storage.supabase-e2e.test.ts reports skipped rather
-        # than failing, exactly like a local run with no Supabase test env.
+        # never the production one -- confirmed present by the step above.
+        #
+        # QB_SUPABASE_E2E_BUCKET is intentionally NOT the same name the app's
+        # runtime reads (QB_STORAGE_BUCKET) -- book-storage.supabase-e2e.test.ts
+        # itself remaps QB_SUPABASE_E2E_BUCKET onto process.env.QB_STORAGE_BUCKET
+        # before it touches Storage, but only inside its own gated describe
+        # block. Setting QB_STORAGE_BUCKET directly here instead would defeat
+        # that: any OTHER test that happened to read SUPABASE_PROJECT_REF /
+        # SUPABASE_SERVICE_ROLE_KEY / QB_STORAGE_BUCKET (the app's own runtime
+        # names) could pick up the test bucket without ever opting in.
         run: npm run test:run
         env:
           SUPABASE_PROJECT_REF: ${{ secrets.QB_TEST_SUPABASE_PROJECT_REF }}
