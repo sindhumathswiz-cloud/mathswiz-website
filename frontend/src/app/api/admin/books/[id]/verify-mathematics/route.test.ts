@@ -24,6 +24,10 @@ const params = Promise.resolve({ id: 'book-1' });
 const baseQuestion = {
   id: 'q-1', content: 'What is 2 + 2?', options: null, correctAnswer: '4', explanation: null,
   type: 'SUBJECTIVE', tags: [] as string[], reviewNotes: null, status: 'DRAFT',
+  // Every real candidate here is bookId-scoped by the query itself, so it's
+  // BOOK_SOURCED with a full source page + printed number by default -- the
+  // "missing provenance" gate test below overrides these to prove the block.
+  provenance: 'BOOK_SOURCED', bookId: 'book-1', sourcePageStart: 42, sourcePageEnd: 42, printedNumber: '7',
 };
 
 describe('POST /api/admin/books/[id]/verify-mathematics', () => {
@@ -95,6 +99,29 @@ describe('POST /api/admin/books/[id]/verify-mathematics', () => {
       }),
     }));
     expect(recordAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: 'BOOK_MATHEMATICS_VERIFIED' }));
+  });
+
+  it('applies a verified verdict but withholds approval when the question is missing its printed number: still records MATHEMATICALLY_VERIFIED, never touches status', async () => {
+    question.findMany.mockResolvedValue([{ ...baseQuestion, status: 'REPORTED', printedNumber: null }]);
+    fetchFromLLM.mockResolvedValue('{"verdict":"verified"}');
+
+    const { POST } = await import('./route');
+    const response = (await POST(post({ apply: true }), { params })) as Response;
+    const data = await response.json();
+
+    expect(data.details).toContainEqual(expect.objectContaining({ questionId: 'q-1', outcome: 'verified_pending_provenance' }));
+    expect(question.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'q-1' },
+      data: expect.objectContaining({
+        verificationStatus: 'MATHEMATICALLY_VERIFIED',
+        reviewNotes: expect.stringContaining('printedNumber'),
+      }),
+    }));
+    // The acceptance gate: verified math is not enough on its own -- a
+    // BOOK_SOURCED question missing its printed number must not reach
+    // APPROVED, even on a confirmed verdict.
+    const call = question.update.mock.calls[0][0];
+    expect(call.data).not.toHaveProperty('status');
   });
 
   it('applies an issue verdict: sets NEEDS_REVIEW, flags the row, and records category/evidence in reviewNotes', async () => {

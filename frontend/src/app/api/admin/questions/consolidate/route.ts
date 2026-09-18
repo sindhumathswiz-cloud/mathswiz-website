@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { computeContentHash } from '@/lib/question-classifier';
+import { provenanceApprovalError } from '@/lib/question-provenance';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     bookChapterId,
     sourcePageStart,
     sourcePageEnd,
+    printedNumber,
     subject,
     class: classLevel,
     topic,
@@ -83,6 +85,26 @@ export async function POST(request: Request) {
   }
 
   const contentStr = content.trim();
+  const resolvedSourcePageStart = typeof sourcePageStart === 'number' ? sourcePageStart : null;
+  const resolvedSourcePageEnd = typeof sourcePageEnd === 'number' ? sourcePageEnd : null;
+  const resolvedPrintedNumber = typeof printedNumber === 'string' && printedNumber ? printedNumber : null;
+
+  // A consolidated question is always BOOK_SOURCED (bookId is required above)
+  // and subject to the same acceptance gate as any other book-derived row --
+  // see lib/question-provenance.ts. Folding several sub-questions into one
+  // doesn't exempt it from needing a source page and printed identifier.
+  let resolvedStatus = typeof status === 'string' ? status : 'APPROVED';
+  let downgradeReason: string | null = null;
+  if (resolvedStatus === 'APPROVED') {
+    downgradeReason = provenanceApprovalError({
+      provenance: 'BOOK_SOURCED',
+      bookId,
+      sourcePageStart: resolvedSourcePageStart,
+      sourcePageEnd: resolvedSourcePageEnd,
+      printedNumber: resolvedPrintedNumber,
+    });
+    if (downgradeReason) resolvedStatus = 'PENDING_REVIEW';
+  }
 
   try {
     const [created, ...retired] = await prisma.$transaction([
@@ -99,14 +121,16 @@ export async function POST(request: Request) {
           class: typeof classLevel === 'string' ? classLevel : null,
           topic: typeof topic === 'string' ? topic : null,
           tags: Array.isArray(tags) ? (tags as string[]) : [],
-          status: (typeof status === 'string' ? status : 'APPROVED') as never,
+          status: resolvedStatus as never,
           scope: 'PUBLIC',
-          reviewNotes: typeof reviewNotes === 'string' ? reviewNotes : null,
+          provenance: 'BOOK_SOURCED',
+          reviewNotes: (typeof reviewNotes === 'string' ? reviewNotes : null) ?? (downgradeReason ? `Held for review, not auto-approved: ${downgradeReason}` : null),
           createdById: auth.user.id,
           bookId,
           bookChapterId: typeof bookChapterId === 'string' ? bookChapterId : null,
-          sourcePageStart: typeof sourcePageStart === 'number' ? sourcePageStart : null,
-          sourcePageEnd: typeof sourcePageEnd === 'number' ? sourcePageEnd : null,
+          printedNumber: resolvedPrintedNumber,
+          sourcePageStart: resolvedSourcePageStart,
+          sourcePageEnd: resolvedSourcePageEnd,
           sourceLocator: { consolidatedFrom: retireIds } as Prisma.InputJsonValue,
           verificationStatus: 'MATHEMATICALLY_VERIFIED',
           verifiedAt: new Date(),
@@ -133,7 +157,7 @@ export async function POST(request: Request) {
       ...requestAuditContext(request),
     });
 
-    return NextResponse.json({ question: created, retired: retired.map((q) => q.id) });
+    return NextResponse.json({ question: created, retired: retired.map((q) => q.id), downgradeReason });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Consolidation failed';
     console.error('Question consolidation failed:', error);

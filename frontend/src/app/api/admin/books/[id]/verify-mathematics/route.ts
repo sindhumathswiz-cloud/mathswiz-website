@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { fetchFromLLM } from '@/lib/llm';
+import { provenanceApprovalError } from '@/lib/question-provenance';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -99,7 +100,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
     orderBy: [{ sourcePageStart: 'asc' }, { createdAt: 'asc' }],
     take: limit,
-    select: { id: true, content: true, options: true, correctAnswer: true, explanation: true, type: true, tags: true, reviewNotes: true, status: true },
+    select: { id: true, content: true, options: true, correctAnswer: true, explanation: true, type: true, tags: true, reviewNotes: true, status: true, provenance: true, bookId: true, sourcePageStart: true, sourcePageEnd: true, printedNumber: true },
   });
 
   let verified = 0;
@@ -136,13 +137,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     if (verdict.verdict === 'verified') {
       verified++;
-      details.push({ questionId: q.id, outcome: apply ? 'verified' : 'would_verify' });
+      // The Question Bank acceptance gate: mathematical verification alone
+      // doesn't satisfy it -- a BOOK_SOURCED question also needs its source
+      // page and printed number before it can reach APPROVED (see
+      // lib/question-provenance.ts). Every candidate here already has a
+      // bookId (query-scoped above), so the only way this fires is a
+      // book-sourced question missing sourcePage/printedNumber -- verify the
+      // math and record it, but leave status for a human to approve once
+      // provenance is filled in, rather than silently skipping the check
+      // because "it came from a book route."
+      const provenanceReason = provenanceApprovalError(q);
+      details.push({ questionId: q.id, outcome: apply ? (provenanceReason ? 'verified_pending_provenance' : 'verified') : 'would_verify' });
       if (apply) {
-        const note = `[AI-Verified -- ${new Date().toISOString().slice(0, 10)}]\nIndependently re-derived by an automated verification pass and confirmed correct. Auto-approved: passed deterministic QA and independent mathematical re-derivation.`;
+        const note = provenanceReason
+          ? `[AI-Verified -- ${new Date().toISOString().slice(0, 10)}]\nIndependently re-derived by an automated verification pass and confirmed correct. NOT auto-approved: ${provenanceReason}`
+          : `[AI-Verified -- ${new Date().toISOString().slice(0, 10)}]\nIndependently re-derived by an automated verification pass and confirmed correct. Auto-approved: passed deterministic QA and independent mathematical re-derivation.`;
         await prisma.question.update({
           where: { id: q.id },
           data: {
-            status: 'APPROVED',
+            ...(provenanceReason ? {} : { status: 'APPROVED' }),
             verificationStatus: 'MATHEMATICALLY_VERIFIED',
             tags: Array.from(new Set([...q.tags, 'AI-Verified: Confirmed'])),
             reviewNotes: q.reviewNotes ? `${q.reviewNotes}\n\n${note}` : note,

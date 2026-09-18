@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { deriveProvenance, provenanceApprovalError } from "@/lib/question-provenance";
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,12 +47,38 @@ export async function POST(request: NextRequest) {
     };
 
     const allTopicIds = topicIds || (topicId ? [topicId] : []);
+    const downgraded: Array<{ index: number; reason: string }> = [];
 
     const created = await prisma.$transaction(async (tx) => {
       const results: any[] = [];
-      for (const q of questions) {
+      for (const [index, q] of questions.entries()) {
         const mappedType = typeMap[q.type] || "SINGLE_CHOICE";
         const mappedDifficulty = difficultyMap[q.difficulty] || "MEDIUM";
+
+        const bookId = q.bookId || null;
+        const sourcePageStart = Number.isInteger(q.sourcePageStart) ? q.sourcePageStart : null;
+        const sourcePageEnd = Number.isInteger(q.sourcePageEnd) ? q.sourcePageEnd : null;
+        const printedNumber = q.printedNumber || null;
+        // An explicit q.provenance always wins (lets a caller flag a
+        // manually-curated question as MANUALLY_AUTHORED even if it happens
+        // to carry a bookId, e.g. "based on chapter 4" without a real page
+        // reference); otherwise derive it from whether a book is linked.
+        const provenance = q.provenance === 'MANUALLY_AUTHORED' || q.provenance === 'BOOK_SOURCED'
+          ? q.provenance
+          : deriveProvenance(bookId);
+
+        let status: string = q.status === "PENDING_REVIEW" ? "PENDING_REVIEW" : "APPROVED";
+        if (status === 'APPROVED') {
+          // The Question Bank acceptance gate: no source-derived question may
+          // be approved without its source page and printed identifier -- see
+          // lib/question-provenance.ts. Hold just this one back for review
+          // rather than failing the whole batch or silently approving it.
+          const reason = provenanceApprovalError({ provenance, bookId, sourcePageStart, sourcePageEnd, printedNumber });
+          if (reason) {
+            status = 'PENDING_REVIEW';
+            downgraded.push({ index, reason });
+          }
+        }
 
         const question = await tx.question.create({
           data: {
@@ -66,7 +93,12 @@ export async function POST(request: NextRequest) {
             class: className || "Class 12",
             topic: topicName || null,
             scope: role === "ADMIN" ? "PUBLIC" : "TEACHER_PRIVATE",
-            status: q.status === "PENDING_REVIEW" ? "PENDING_REVIEW" : "APPROVED",
+            status: status as any,
+            provenance,
+            bookId,
+            sourcePageStart,
+            sourcePageEnd,
+            printedNumber,
             createdById: userId,
             sourceDocumentId: q.sourceDocumentId || null,
             confidence: 100,
@@ -92,6 +124,7 @@ export async function POST(request: NextRequest) {
       success: true,
       count: created.length,
       ids: created.map((q) => q.id),
+      downgraded,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to approve questions";

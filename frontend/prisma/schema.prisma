@@ -438,6 +438,18 @@ enum QuestionStatus {
   ARCHIVED
 }
 
+// The Question Bank acceptance gate (PHASE_QB_PILOT.md, quality gate #3):
+// "No question may be approved without its source page and printed
+// identifier." BOOK_SOURCED questions are held to that bar before they can
+// reach APPROVED (see lib/question-provenance.ts). MANUALLY_AUTHORED is the
+// one explicit, auditable exemption -- a question with no book to point to
+// by definition -- so a missing source page reads as "this was never
+// claimed to come from a book," not as a silently skipped check.
+enum QuestionProvenance {
+  BOOK_SOURCED
+  MANUALLY_AUTHORED
+}
+
 model Question {
   id String @id @default(cuid())
 
@@ -472,6 +484,7 @@ model Question {
   reviewNotes String? // Admin/teacher review comments
 
   // Source tracking
+  provenance           QuestionProvenance @default(MANUALLY_AUTHORED) // BOOK_SOURCED gates approval on source page + printed number; see enum doc
   sourceDocumentId     String? // Link to book chapter ingestion
   samplePaperId        String? // Link to sample paper ingestion
   bookId               String?

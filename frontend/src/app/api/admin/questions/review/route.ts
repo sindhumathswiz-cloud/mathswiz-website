@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
+import { provenanceApprovalError } from '@/lib/question-provenance';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +42,12 @@ export async function POST(req: Request) {
         };
 
         if (action === 'APPROVE') {
+            // The Question Bank acceptance gate: a BOOK_SOURCED question needs
+            // its source page and printed number before it can be approved --
+            // see lib/question-provenance.ts. MANUALLY_AUTHORED is exempt.
+            const reason = provenanceApprovalError(question);
+            if (reason) return NextResponse.json({ error: reason }, { status: 400 });
+
             updateData.status = 'APPROVED';
             updateData.scope = 'PUBLIC';
             if (subject) updateData.subject = subject;

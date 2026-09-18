@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
+import { provenanceApprovalError } from "@/lib/question-provenance";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         // Check ownership/permission
         const existing = await prisma.question.findUnique({
             where: { id: questionId },
-            select: { createdById: true, scope: true }
+            select: { createdById: true, scope: true, provenance: true, bookId: true, sourcePageStart: true, sourcePageEnd: true, printedNumber: true }
         });
 
         if (!existing) {
@@ -37,11 +38,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             status, reportedIssues,
             content, options, correctAnswer, explanation,
             type, difficulty, subject, class: classLevel, examType, tags,
-            confidence, reviewNotes, taxonomyTagIds
+            confidence, reviewNotes, taxonomyTagIds, provenance
         } = body;
+
+        // The Question Bank acceptance gate: a BOOK_SOURCED question needs its
+        // source page and printed number before it can be approved -- see
+        // lib/question-provenance.ts. MANUALLY_AUTHORED (settable here, for a
+        // question that genuinely has no book source) is exempt.
+        if (status === 'APPROVED') {
+            const reason = provenanceApprovalError({
+                provenance: provenance ?? existing.provenance,
+                bookId: existing.bookId,
+                sourcePageStart: existing.sourcePageStart,
+                sourcePageEnd: existing.sourcePageEnd,
+                printedNumber: existing.printedNumber,
+            });
+            if (reason) return NextResponse.json({ error: reason }, { status: 400 });
+        }
 
         const updateData: any = {};
         if (status) updateData.status = status;
+        if (provenance !== undefined) updateData.provenance = provenance;
         if (reportedIssues !== undefined) updateData.reportedIssues = reportedIssues;
         if (content !== undefined) updateData.content = content;
         if (options !== undefined) updateData.options = options;

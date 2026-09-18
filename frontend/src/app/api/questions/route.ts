@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { deriveProvenance, provenanceApprovalError } from "@/lib/question-provenance";
 
 export const dynamic = 'force-dynamic';
 
@@ -190,9 +191,32 @@ export async function POST(req: Request) {
 
         const scope = role === 'ADMIN' ? 'PUBLIC' : 'TEACHER_PRIVATE';
 
+        const downgraded: Array<{ index: number; reason: string }> = [];
+
         const created = await prisma.$transaction(async (tx) => {
             const results: any[] = [];
-            for (const q of questions) {
+            for (const [index, q] of questions.entries()) {
+                const bookId = role === 'ADMIN' && q.bookId ? q.bookId : null;
+                const sourcePageStart = role === 'ADMIN' && Number.isInteger(q.sourcePageStart) ? q.sourcePageStart : null;
+                const sourcePageEnd = role === 'ADMIN' && Number.isInteger(q.sourcePageEnd) ? q.sourcePageEnd : null;
+                const printedNumber = role === 'ADMIN' ? (q.printedNumber || null) : null;
+                const provenance = deriveProvenance(bookId);
+
+                let status: string = role === 'ADMIN' ? (q.status || "APPROVED") : "PENDING_REVIEW";
+                if (status === 'APPROVED') {
+                    // The Question Bank acceptance gate: a book-sourced question
+                    // (has a bookId) needs its source page and printed number
+                    // before it can be approved -- see lib/question-provenance.ts.
+                    // Rather than fail the whole batch over one under-provenanced
+                    // question, hold just that one back for human review and say
+                    // why, so the rest of a legitimate bulk import still lands.
+                    const reason = provenanceApprovalError({ provenance, bookId, sourcePageStart, sourcePageEnd, printedNumber });
+                    if (reason) {
+                        status = 'PENDING_REVIEW';
+                        downgraded.push({ index, reason });
+                    }
+                }
+
                 const question = await tx.question.create({
                     data: {
                         content: q.content || '',
@@ -205,15 +229,16 @@ export async function POST(req: Request) {
                         subject: q.subject || "Mathematics",
                         class: q.class || "Class 12",
                         scope,
-                        status: role === 'ADMIN' ? (q.status || "APPROVED") : "PENDING_REVIEW",
+                        status: status as any,
+                        provenance,
                         createdById: userId,
-                        bookId: role === 'ADMIN' && q.bookId ? q.bookId : null,
+                        bookId,
                         bookChapterId: role === 'ADMIN' && q.bookChapterId ? q.bookChapterId : null,
                         bookExerciseId: role === 'ADMIN' && q.bookExerciseId ? q.bookExerciseId : null,
-                        printedNumber: role === 'ADMIN' ? (q.printedNumber || null) : null,
+                        printedNumber,
                         printedSubpart: role === 'ADMIN' ? (q.printedSubpart || null) : null,
-                        sourcePageStart: role === 'ADMIN' && Number.isInteger(q.sourcePageStart) ? q.sourcePageStart : null,
-                        sourcePageEnd: role === 'ADMIN' && Number.isInteger(q.sourcePageEnd) ? q.sourcePageEnd : null,
+                        sourcePageStart,
+                        sourcePageEnd,
                     }
                 });
                 const tagIds: string[] = [];
@@ -261,7 +286,7 @@ export async function POST(req: Request) {
             return results;
         });
 
-        return NextResponse.json({ success: true, count: created.length, scope });
+        return NextResponse.json({ success: true, count: created.length, scope, downgraded });
     } catch (error: any) {
         console.error("Database Insert Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });

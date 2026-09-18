@@ -589,6 +589,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             tags,
             status: 'DRAFT',
             scope: 'PUBLIC',
+            provenance: 'BOOK_SOURCED',
             originalRawText: textForStructuring,
             createdById: auth.user.id,
             bookId: id,
