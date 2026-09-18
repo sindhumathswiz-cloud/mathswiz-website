@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { unlink } from 'node:fs/promises';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
+import { removePrivateImage } from '@/lib/book-storage';
 import { cropPageRegion } from '@/lib/page-image-crop';
 import { ocrPageWithMathpix } from '@/lib/extract-book-page';
 
@@ -77,6 +77,6 @@ export async function POST(
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Snip failed' }, { status: 500 });
   } finally {
-    if (croppedPath) await unlink(croppedPath).catch(() => undefined);
+    if (croppedPath) await removePrivateImage(croppedPath).catch(() => undefined);
   }
 }

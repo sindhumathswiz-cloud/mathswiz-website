@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
-import { assertPrivatePageImagePath } from '@/lib/book-storage';
+import { assertPrivateImageReference, readPrivateImage } from '@/lib/book-storage';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -57,14 +56,14 @@ export async function GET(
 
   let resolved: string;
   try {
-    resolved = assertPrivatePageImagePath(imagePath);
+    resolved = assertPrivateImageReference(imagePath);
   } catch {
     return NextResponse.json({ error: 'Invalid page image path' }, { status: 400 });
   }
 
   try {
-    const bytes = await readFile(resolved);
-    return new NextResponse(bytes, {
+    const bytes = await readPrivateImage(imagePath);
+    return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': contentTypeFor(resolved),
         'Cache-Control': 'private, max-age=86400',

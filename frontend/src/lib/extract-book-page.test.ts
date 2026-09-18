@@ -14,23 +14,18 @@ type MathpixFetchResponse = {
 };
 type MathpixFetch = (input: string, init: RequestInit) => Promise<MathpixFetchResponse>;
 
-const assertPrivatePageImagePath = vi.fn((p: string) => p);
+const assertPrivateImageReference = vi.fn((p: string) => p);
+const readPrivateImage = vi.fn(async () => Buffer.from('fake-image-bytes'));
 const cleanMathpixMarkdown = vi.fn((text: string) => `CLEANED:${text}`);
 const structureQuestions = vi.fn();
 const analyzeQuestion = vi.fn<(...args: unknown[]) => QAIssue[]>(() => []);
 const computeContentHash = vi.fn((content: string) => `hash:${content}`);
-const readFile = vi.fn(async () => Buffer.from('fake-image-bytes'));
 
-vi.mock('./book-storage', () => ({ assertPrivatePageImagePath }));
+vi.mock('./book-storage', () => ({ assertPrivateImageReference, readPrivateImage }));
 vi.mock('./mathpix-parser', () => ({ cleanMathpixMarkdown }));
 vi.mock('./structure-questions', () => ({ structureQuestions }));
 vi.mock('./question-qa', () => ({ analyzeQuestion }));
 vi.mock('./question-classifier', () => ({ computeContentHash }));
-// Vitest 4 checks a mocked built-in module's shape against the real one —
-// node:fs/promises' ESM interop shim exposes a `default` (the same methods
-// as one object) alongside the named exports, so the mock needs both or
-// Vitest rejects it with "No 'default' export is defined on the mock."
-vi.mock('node:fs/promises', () => ({ readFile, default: { readFile } }));
 
 describe('extractQuestionsFromPage', () => {
   const originalFetch = global.fetch;
@@ -67,7 +62,7 @@ describe('extractQuestionsFromPage', () => {
 
     expect(result.provider).toBe('NATIVE_TEXT');
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(readFile).not.toHaveBeenCalled();
+    expect(readPrivateImage).not.toHaveBeenCalled();
     expect(structureQuestions).toHaveBeenCalledWith(result.rawText, {});
     expect(result.questions).toHaveLength(1);
     expect(result.questions[0].contentHash).toBe('hash:Solve for x');
@@ -93,7 +88,7 @@ describe('extractQuestionsFromPage', () => {
     expect(result.rawText).toBe('CLEANED:raw ocr text');
     expect(result.ocrConfidence).toBe(0.87);
     // Uses the enhanced/processed image over the raw archival one when both exist.
-    expect(assertPrivatePageImagePath).toHaveBeenCalledWith('/private/page-2-processed.png');
+    expect(assertPrivateImageReference).toHaveBeenCalledWith('/private/page-2-processed.png');
     // No line_data in this mocked response -> no diagram regions, but the OCR
     // image path is still surfaced (needed even when a page has zero regions,
     // since a case-study stitch spanning this page still wants to know it was

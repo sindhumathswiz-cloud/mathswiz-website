@@ -3,18 +3,21 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const assertPrivatePageImagePath = vi.fn((p: string) => p);
-const privateQuestionImageDirectory = vi.fn((bookId: string, runId: string) => `/private/${bookId}/runs/${runId}/question-images`);
-const mkdir = vi.fn(async () => undefined);
+const withLocalPageImagePath = vi.fn((imagePath: string, fn: (p: string) => Promise<unknown>) => fn(imagePath));
+const resolvePrivateImageOutputDirectory = vi.fn(async (bookId: string, runId: string) => `/private/${bookId}/runs/${runId}/question-images`);
+// Defaults to an empty map -- cropPageRegion's `fileMap.get(fileName) ?? result.outputPath`
+// fallback then returns the crop script's own reported path, exactly like the
+// (unstaged, LOCAL_DISK-only) behavior this test suite covered before. Tests
+// that care about the staged/uploaded path set this per-call instead.
+const persistPrivateImageOutputDirectory = vi.fn(async () => new Map<string, string>());
+const discardPrivateImageOutputDirectory = vi.fn(async () => undefined);
 const spawn = vi.fn();
 
-vi.mock('./book-storage', () => ({ assertPrivatePageImagePath, privateQuestionImageDirectory }));
+vi.mock('./book-storage', () => ({ withLocalPageImagePath, resolvePrivateImageOutputDirectory, persistPrivateImageOutputDirectory, discardPrivateImageOutputDirectory }));
 // Vitest 4 checks a mocked built-in module's shape against the real one —
-// both node:fs/promises and node:child_process expose a `default` (mirroring
-// their named exports) via their ESM interop shim, so each mock needs a
-// `default` key too or Vitest rejects it with "No 'default' export is
-// defined on the mock."
-vi.mock('node:fs/promises', () => ({ mkdir, default: { mkdir } }));
+// node:child_process exposes a `default` (mirroring its named exports) via
+// its ESM interop shim, so the mock needs a `default` key too or Vitest
+// rejects it with "No 'default' export is defined on the mock."
 vi.mock('node:child_process', () => ({ spawn, default: { spawn } }));
 
 class FakeChildProcess extends EventEmitter {
@@ -36,8 +39,9 @@ describe('cropPageRegion', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mkdir.mockResolvedValue(undefined);
-    assertPrivatePageImagePath.mockImplementation((p: string) => p);
+    withLocalPageImagePath.mockImplementation((imagePath: string, fn: (p: string) => Promise<unknown>) => fn(imagePath));
+    resolvePrivateImageOutputDirectory.mockImplementation(async (bookId: string, runId: string) => `/private/${bookId}/runs/${runId}/question-images`);
+    persistPrivateImageOutputDirectory.mockResolvedValue(new Map());
     child = new FakeChildProcess();
     spawn.mockReturnValue(child);
   });
@@ -54,7 +58,8 @@ describe('cropPageRegion', () => {
     });
     await nextTick();
 
-    expect(mkdir).toHaveBeenCalledWith('/private/book-1/runs/run-1/question-images', { recursive: true });
+    expect(withLocalPageImagePath).toHaveBeenCalledWith('/private/book-1/runs/run-1/pages/page-3.jpg', expect.any(Function));
+    expect(resolvePrivateImageOutputDirectory).toHaveBeenCalledWith('book-1', 'run-1', 'question-images');
     expect(spawn).toHaveBeenCalledTimes(1);
     const [, args] = spawn.mock.calls[0];
     // The source code builds the output path with `path.join`, which
@@ -76,6 +81,23 @@ describe('cropPageRegion', () => {
       width: 300,
       height: 151,
     });
+    expect(persistPrivateImageOutputDirectory).toHaveBeenCalledWith('book-1', 'run-1', 'question-images', '/private/book-1/runs/run-1/question-images');
+  });
+
+  it('returns the persisted (e.g. uploaded Supabase) path when the output directory was staged', async () => {
+    persistPrivateImageOutputDirectory.mockResolvedValue(new Map([['q-1-0.jpg', 'book-1/runs/run-1/question-images/q-1-0.jpg']]));
+    const { cropPageRegion } = await import('./page-image-crop');
+
+    const promise = cropPageRegion('book-1', 'run-1', '/private/page-3.jpg', 'q-1-0.jpg', { x: 0, y: 0, width: 10, height: 10 });
+    await nextTick();
+    child.stdout.emit('data', JSON.stringify({ outputPath: '/tmp/qb-question-images-abc/q-1-0.jpg', width: 10, height: 10 }));
+    child.emit('close', 0);
+
+    await expect(promise).resolves.toEqual({
+      imagePath: 'book-1/runs/run-1/question-images/q-1-0.jpg',
+      width: 10,
+      height: 10,
+    });
   });
 
   it('rejects when the script reports an error object even with exit code 0', async () => {
@@ -87,6 +109,7 @@ describe('cropPageRegion', () => {
     child.emit('close', 0);
 
     await expect(promise).rejects.toThrow('cannot identify image file');
+    expect(discardPrivateImageOutputDirectory).toHaveBeenCalledWith('/private/book-1/runs/run-1/question-images');
   });
 
   it('rejects with stderr when the script exits non-zero and stdout is not valid JSON', async () => {
@@ -117,8 +140,8 @@ describe('cropPageRegion', () => {
     expect(spawn).not.toHaveBeenCalled();
   });
 
-  it('validates the source image path before spawning', async () => {
-    assertPrivatePageImagePath.mockImplementation(() => { throw new Error('Invalid private page image path'); });
+  it('validates (or stages) the source image before spawning', async () => {
+    withLocalPageImagePath.mockRejectedValue(new Error('Invalid private page image path'));
     const { cropPageRegion } = await import('./page-image-crop');
     await expect(cropPageRegion('book-1', 'run-1', '/etc/passwd', 'q-1-0.jpg', { x: 0, y: 0, width: 10, height: 10 }))
       .rejects.toThrow('Invalid private page image path');

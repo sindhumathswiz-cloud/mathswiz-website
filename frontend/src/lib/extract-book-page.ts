@@ -1,6 +1,5 @@
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { assertPrivatePageImagePath } from './book-storage';
+import { assertPrivateImageReference, readPrivateImage } from './book-storage';
 import { cleanMathpixMarkdown } from './mathpix-parser';
 import { structureQuestions } from './structure-questions';
 import { analyzeQuestion, type QAIssue } from './question-qa';
@@ -90,13 +89,13 @@ function imageMime(filePath: string): string {
 // cropped region the exact same way; this function doesn't care whether the
 // image it's given is a whole page or a crop of one.
 export async function ocrPageWithMathpix(imagePath: string): Promise<{ text: string; confidence: number | null; diagramRegions: DiagramRegion[]; textLines: OcrTextLine[]; safeImagePath: string }> {
-  const safePath = assertPrivatePageImagePath(imagePath);
+  const safePath = assertPrivateImageReference(imagePath);
   if (!process.env.MATHPIX_APP_ID || !process.env.MATHPIX_APP_KEY) {
     throw new Error('Mathpix credentials are not configured (MATHPIX_APP_ID / MATHPIX_APP_KEY)');
   }
-  const bytes = await readFile(safePath);
+  const bytes = await readPrivateImage(imagePath);
   const form = new FormData();
-  form.set('file', new Blob([bytes], { type: imageMime(safePath) }), path.basename(safePath));
+  form.set('file', new Blob([new Uint8Array(bytes)], { type: imageMime(safePath) }), path.basename(safePath));
   form.set('options_json', JSON.stringify({
     formats: ['text'],
     rm_spaces: false,

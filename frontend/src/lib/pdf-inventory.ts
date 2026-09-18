@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { assertPrivateBookPdfPath } from './book-storage';
+import { withLocalBookPdfPath } from './book-storage';
 
 export type PdfSourceProfile = 'DIGITAL_MATH' | 'MIXED_LAYOUT_ASSESSMENT' | 'IMAGE_BOOK' | 'PHOTOGRAPHED_BOOK';
 
@@ -17,8 +17,7 @@ export type PdfInventory = {
   sample_pages: Record<string, { characters: number; words: number; images: number; preview: string }>;
 };
 
-export function inspectPrivatePdf(filePath: string): Promise<PdfInventory> {
-  const safePath = assertPrivateBookPdfPath(filePath);
+function runInventoryScript(safePath: string): Promise<PdfInventory> {
   const bundledPython = path.join(process.env.USERPROFILE || '', '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'python', 'python.exe');
   const python = process.env.QB_PYTHON_EXECUTABLE || (existsSync(bundledPython) ? bundledPython : 'python');
   const script = path.join(process.cwd(), 'scripts', 'analyze-pdf-pilot.py');
@@ -48,4 +47,9 @@ export function inspectPrivatePdf(filePath: string): Promise<PdfInventory> {
       }
     });
   });
+}
+
+/** filePath is a stored book PDF's path (LOCAL_DISK) or storage key (SUPABASE) — see withLocalBookPdfPath. */
+export function inspectPrivatePdf(filePath: string): Promise<PdfInventory> {
+  return withLocalBookPdfPath(filePath, (safePath) => runInventoryScript(safePath));
 }

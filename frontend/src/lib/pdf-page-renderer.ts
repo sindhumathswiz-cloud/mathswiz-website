@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { assertPrivateBookPdfPath, privatePageImageDirectory } from './book-storage';
+import { discardPrivateImageOutputDirectory, persistPrivateImageOutputDirectory, resolvePrivateImageOutputDirectory, withLocalBookPdfPath } from './book-storage';
 import type { PdfSourceProfile } from './pdf-inventory';
 
 export type RenderedPage = {
@@ -24,9 +24,7 @@ function localTool(relativePath: string, fallback: string) {
   return existsSync(candidate) ? candidate : fallback;
 }
 
-export function renderPrivatePdfBatch(inputPath: string, bookId: string, runId: string, start: number, end: number, profile: PdfSourceProfile): Promise<RenderedPage[]> {
-  const safeInput = assertPrivateBookPdfPath(inputPath);
-  const outputDirectory = privatePageImageDirectory(bookId, runId);
+function runRenderScript(safeInput: string, outputDirectory: string, start: number, end: number, profile: PdfSourceProfile): Promise<RenderedPage[]> {
   const python = process.env.QB_PYTHON_EXECUTABLE || localTool(path.join('python', 'python.exe'), 'python');
   const pdftoppm = process.env.QB_PDFTOPPM_EXECUTABLE || localTool(path.join('native', 'poppler', 'Library', 'bin', 'pdftoppm.exe'), 'pdftoppm');
   const script = path.join(process.cwd(), 'scripts', 'render-pdf-page-batch.py');
@@ -55,5 +53,32 @@ export function renderPrivatePdfBatch(inputPath: string, bookId: string, runId: 
         reject(error);
       }
     });
+  });
+}
+
+/**
+ * inputPath is a stored book PDF's path (LOCAL_DISK) or storage key
+ * (SUPABASE) — staged into a real local file for the Python script either
+ * way via withLocalBookPdfPath. Its output images are written into a
+ * per-batch directory that's either the run's real on-disk home
+ * (LOCAL_DISK) or a scratch temp directory uploaded to Supabase Storage
+ * once the script finishes (SUPABASE) — see book-storage.ts.
+ */
+export function renderPrivatePdfBatch(inputPath: string, bookId: string, runId: string, start: number, end: number, profile: PdfSourceProfile): Promise<RenderedPage[]> {
+  return withLocalBookPdfPath(inputPath, async (safeInput) => {
+    const outputDirectory = await resolvePrivateImageOutputDirectory(bookId, runId, 'pages');
+    let pages: RenderedPage[];
+    try {
+      pages = await runRenderScript(safeInput, outputDirectory, start, end, profile);
+    } catch (error) {
+      await discardPrivateImageOutputDirectory(outputDirectory);
+      throw error;
+    }
+    const fileMap = await persistPrivateImageOutputDirectory(bookId, runId, 'pages', outputDirectory);
+    return pages.map((page) => ({
+      ...page,
+      imagePath: fileMap.get(path.basename(page.imagePath)) ?? page.imagePath,
+      processedImagePath: page.processedImagePath ? (fileMap.get(path.basename(page.processedImagePath)) ?? page.processedImagePath) : null,
+    }));
   });
 }

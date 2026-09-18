@@ -1,9 +1,8 @@
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { z } from 'zod';
-import { assertPrivatePageImagePath } from './book-storage';
+import { assertPrivateImageReference, readPrivateImage } from './book-storage';
 
 export const BENCHMARK_PROMPT_VERSION = 'QB_PAGE_EXTRACTION_V1';
 export type BenchmarkProvider = 'GEMINI_VISION' | 'MATHPIX_OCR';
@@ -59,8 +58,8 @@ function structuredMetrics(data: z.infer<typeof extractedPageSchema>) {
 }
 
 export async function benchmarkGeminiVision(imagePath: string) {
-  const safePath = assertPrivatePageImagePath(imagePath);
-  const bytes = await readFile(safePath);
+  const safePath = assertPrivateImageReference(imagePath);
+  const bytes = await readPrivateImage(imagePath);
   const keys = geminiKeys();
   if (!keys.length) throw new Error('No Gemini API key is configured');
   const model = process.env.QB_GEMINI_VISION_MODEL || 'gemini-3.6-flash';
@@ -82,8 +81,8 @@ JSON shape: {"pageType":"QUESTION|ANSWER_KEY|SOLUTION|MIXED|CONTENT|UNKNOWN","qu
 }
 
 export async function benchmarkOpenAiVision(imagePath: string) {
-  const safePath = assertPrivatePageImagePath(imagePath);
-  const bytes = await readFile(safePath);
+  const safePath = assertPrivateImageReference(imagePath);
+  const bytes = await readPrivateImage(imagePath);
   const keys = openAiKeys();
   if (!keys.length) throw new Error('No OpenAI API key is configured');
   const model = process.env.QB_OPENAI_VISION_MODEL || 'gpt-4o';
@@ -108,11 +107,11 @@ JSON shape: {"pageType":"QUESTION|ANSWER_KEY|SOLUTION|MIXED|CONTENT|UNKNOWN","qu
 }
 
 export async function benchmarkMathpixOcr(imagePath: string) {
-  const safePath = assertPrivatePageImagePath(imagePath);
+  const safePath = assertPrivateImageReference(imagePath);
   if (!process.env.MATHPIX_APP_ID || !process.env.MATHPIX_APP_KEY) throw new Error('Mathpix credentials are not configured');
-  const bytes = await readFile(safePath);
+  const bytes = await readPrivateImage(imagePath);
   const form = new FormData();
-  form.set('file', new Blob([bytes], { type: imageMime(safePath) }), path.basename(safePath));
+  form.set('file', new Blob([new Uint8Array(bytes)], { type: imageMime(safePath) }), path.basename(safePath));
   form.set('options_json', JSON.stringify({ formats: ['text', 'data'], include_line_data: true, rm_spaces: false, math_inline_delimiters: ['\\(', '\\)'], math_display_delimiters: ['\\[', '\\]'] }));
   const response = await fetch('https://api.mathpix.com/v3/text', { method: 'POST', headers: { app_id: process.env.MATHPIX_APP_ID, app_key: process.env.MATHPIX_APP_KEY }, body: form, signal: AbortSignal.timeout(90_000) });
   const output = await response.json();
@@ -129,9 +128,9 @@ export async function benchmarkMathpixOcr(imagePath: string) {
 }
 
 export async function benchmarkMistralOcr(imagePath: string) {
-  const safePath = assertPrivatePageImagePath(imagePath);
+  const safePath = assertPrivateImageReference(imagePath);
   if (!process.env.MISTRAL_API_KEY) throw new Error('Mistral API key is not configured');
-  const bytes = await readFile(safePath);
+  const bytes = await readPrivateImage(imagePath);
   const model = process.env.QB_MISTRAL_OCR_MODEL || 'mistral-ocr-latest';
   const response = await fetch('https://api.mistral.ai/v1/ocr', {
     method: 'POST',

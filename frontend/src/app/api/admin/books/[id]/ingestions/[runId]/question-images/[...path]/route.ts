@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
-import { assertPrivatePageImagePath, privateQuestionImageDirectory } from '@/lib/book-storage';
+import { privateImageReference, readPrivateImage } from '@/lib/book-storage';
 
 /**
  * Streams one cropped question-diagram image out of private storage. These
@@ -45,14 +44,14 @@ export async function GET(
 
   let resolved: string;
   try {
-    resolved = assertPrivatePageImagePath(path.join(privateQuestionImageDirectory(id, runId), fileName));
+    resolved = privateImageReference(id, runId, 'question-images', fileName);
   } catch {
     return NextResponse.json({ error: 'Invalid image path' }, { status: 400 });
   }
 
   try {
-    const bytes = await readFile(resolved);
-    return new NextResponse(bytes, {
+    const bytes = await readPrivateImage(resolved);
+    return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': contentTypeFor(resolved),
         // Private storage, but cacheable within one admin's session — these

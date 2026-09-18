@@ -5,13 +5,13 @@ const book = { findUnique: vi.fn() };
 const documentPage = { findFirst: vi.fn() };
 const cropPageRegion = vi.fn();
 const ocrPageWithMathpix = vi.fn();
-const unlink = vi.fn();
+const removePrivateImage = vi.fn();
 
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
 vi.mock('@/lib/prisma', () => ({ default: { book, documentPage } }));
 vi.mock('@/lib/page-image-crop', () => ({ cropPageRegion }));
 vi.mock('@/lib/extract-book-page', () => ({ ocrPageWithMathpix }));
-vi.mock('node:fs/promises', () => ({ unlink, default: { unlink } }));
+vi.mock('@/lib/book-storage', () => ({ removePrivateImage }));
 
 function post(body: unknown) {
   return new Request('http://localhost/api/admin/books/book-1/pages/12/snip', {
@@ -30,7 +30,7 @@ describe('POST /api/admin/books/[id]/pages/[pageNumber]/snip', () => {
     documentPage.findFirst.mockResolvedValue({ processedImagePath: '/private/p12.jpg', pageImagePath: null });
     cropPageRegion.mockResolvedValue({ imagePath: '/private/snip-123.jpg', width: 300, height: 120 });
     ocrPageWithMathpix.mockResolvedValue({ text: '$A \\times B$', confidence: 0.9, diagramRegions: [], textLines: [], safeImagePath: '/private/snip-123.jpg' });
-    unlink.mockResolvedValue(undefined);
+    removePrivateImage.mockResolvedValue(undefined);
   });
 
   it('rejects non-admin callers', async () => {
@@ -95,7 +95,7 @@ describe('POST /api/admin/books/[id]/pages/[pageNumber]/snip', () => {
       { x: 10, y: 20, width: 300, height: 120 },
     );
     expect(ocrPageWithMathpix).toHaveBeenCalledWith('/private/snip-123.jpg');
-    expect(unlink).toHaveBeenCalledWith('/private/snip-123.jpg');
+    expect(removePrivateImage).toHaveBeenCalledWith('/private/snip-123.jpg');
   });
 
   it('still cleans up the crop file when OCR fails', async () => {
@@ -104,7 +104,7 @@ describe('POST /api/admin/books/[id]/pages/[pageNumber]/snip', () => {
     const response = (await POST(post({ x: 10, y: 20, width: 300, height: 120 }), { params: params('12') })) as Response;
 
     expect(response.status).toBe(500);
-    expect(unlink).toHaveBeenCalledWith('/private/snip-123.jpg');
+    expect(removePrivateImage).toHaveBeenCalledWith('/private/snip-123.jpg');
   });
 
   it('never leaves a dangling temp file reference when the crop itself fails', async () => {
@@ -113,6 +113,6 @@ describe('POST /api/admin/books/[id]/pages/[pageNumber]/snip', () => {
     const response = (await POST(post({ x: 10, y: 20, width: 300, height: 120 }), { params: params('12') })) as Response;
 
     expect(response.status).toBe(500);
-    expect(unlink).not.toHaveBeenCalled();
+    expect(removePrivateImage).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { assertPrivatePageImagePath, privateQuestionImageDirectory } from './book-storage';
+import { discardPrivateImageOutputDirectory, persistPrivateImageOutputDirectory, resolvePrivateImageOutputDirectory, withLocalPageImagePath } from './book-storage';
 
 /**
  * Crops one diagram/figure region out of an already-rendered page image and
@@ -75,23 +74,30 @@ export async function cropPageRegion(
   fileName: string,
   region: PageDiagramRegion,
 ): Promise<CroppedQuestionImage> {
-  const safeSource = assertPrivatePageImagePath(sourceImagePath);
   if (!/^[a-zA-Z0-9_.-]+\.jpg$/.test(fileName)) throw new Error('Invalid question image file name');
 
-  const outputDirectory = privateQuestionImageDirectory(bookId, runId);
-  await mkdir(outputDirectory, { recursive: true });
-  const outputPath = path.join(outputDirectory, fileName);
+  return withLocalPageImagePath(sourceImagePath, async (safeSource) => {
+    const outputDirectory = await resolvePrivateImageOutputDirectory(bookId, runId, 'question-images');
+    const outputPath = path.join(outputDirectory, fileName);
 
-  const python = process.env.QB_PYTHON_EXECUTABLE || localTool(path.join('python', 'python.exe'), 'python');
-  const script = path.join(process.cwd(), 'scripts', 'crop-page-region.py');
+    const python = process.env.QB_PYTHON_EXECUTABLE || localTool(path.join('python', 'python.exe'), 'python');
+    const script = path.join(process.cwd(), 'scripts', 'crop-page-region.py');
 
-  const result = await runCropScript(python, script, [
-    safeSource,
-    outputPath,
-    '--x', String(Math.round(region.x)),
-    '--y', String(Math.round(region.y)),
-    '--width', String(Math.round(region.width)),
-    '--height', String(Math.round(region.height)),
-  ]);
-  return { imagePath: result.outputPath, width: result.width, height: result.height };
+    let result: { outputPath: string; width: number; height: number };
+    try {
+      result = await runCropScript(python, script, [
+        safeSource,
+        outputPath,
+        '--x', String(Math.round(region.x)),
+        '--y', String(Math.round(region.y)),
+        '--width', String(Math.round(region.width)),
+        '--height', String(Math.round(region.height)),
+      ]);
+    } catch (error) {
+      await discardPrivateImageOutputDirectory(outputDirectory);
+      throw error;
+    }
+    const fileMap = await persistPrivateImageOutputDirectory(bookId, runId, 'question-images', outputDirectory);
+    return { imagePath: fileMap.get(fileName) ?? result.outputPath, width: result.width, height: result.height };
+  });
 }
