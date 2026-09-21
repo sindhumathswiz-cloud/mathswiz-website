@@ -6,6 +6,7 @@ vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 const mockPrisma = {
   question: { create: vi.fn() },
   questionTag: { create: vi.fn() },
+  pageFigure: { findMany: vi.fn() },
   $transaction: vi.fn(),
 };
 vi.mock('@/lib/prisma', () => ({ default: mockPrisma }));
@@ -31,6 +32,7 @@ describe('POST /api/admin/questions/bulk-approve', () => {
     } as any);
     mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
     mockPrisma.question.create.mockImplementation(({ data }: any) => Promise.resolve({ id: `q-${data.content?.slice(0, 4) || 'x'}`, ...data }));
+    mockPrisma.pageFigure.findMany.mockResolvedValue([]);
   });
 
   it('rejects unauthenticated callers', async () => {
@@ -155,6 +157,57 @@ describe('POST /api/admin/questions/bulk-approve', () => {
       expect(mockPrisma.question.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ status: 'PENDING_REVIEW' }),
       }));
+    });
+  });
+
+  describe('figure gate', () => {
+    it('downgrades a figure-referencing, book-linked question with no retained figure asset', async () => {
+      const { POST } = await import('./route');
+      const response = await POST(post({
+        questions: [{
+          question: 'Study the diagram below and find x.', correctOption: 'A', options: validOptions,
+          bookId: 'book-1', sourcePageStart: 10, sourcePageEnd: 10, printedNumber: '3',
+        }],
+      }) as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.question.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: 'PENDING_REVIEW' }),
+      }));
+      expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('figure asset') }]);
+    });
+
+    it('approves a figure-referencing question once its linked figure has completed review', async () => {
+      mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.questionId ? [{ id: 'f-1', reviewedAt: new Date(), matchedAutomatically: false }] : []));
+      const { POST } = await import('./route');
+      const response = await POST(post({
+        questions: [{
+          question: 'Study the diagram below and find x.', correctOption: 'A', options: validOptions,
+          bookId: 'book-1', sourcePageStart: 10, sourcePageEnd: 10, printedNumber: '3',
+        }],
+      }) as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.downgraded).toEqual([]);
+    });
+
+    it('downgrades approval when an unresolved figure sits on the question\'s source page, even without figure-referencing text', async () => {
+      mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.questionId === null ? [{ id: 'f-2', pageNumber: 10 }] : []));
+      const { POST } = await import('./route');
+      const response = await POST(post({
+        questions: [{
+          question: 'Solve for x in the equation.', correctOption: 'A', options: validOptions,
+          bookId: 'book-1', sourcePageStart: 10, sourcePageEnd: 10, printedNumber: '3',
+        }],
+      }) as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('unmatched figure') }]);
     });
   });
 });

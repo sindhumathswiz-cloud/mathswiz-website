@@ -6,7 +6,7 @@ vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 const recordAuditLog = vi.fn();
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 
-const mockPrisma = { question: { findUnique: vi.fn(), update: vi.fn() } };
+const mockPrisma = { question: { findUnique: vi.fn(), update: vi.fn() }, pageFigure: { findMany: vi.fn() } };
 vi.mock('@/lib/prisma', () => ({ default: mockPrisma }));
 
 function post(body: unknown) {
@@ -30,6 +30,7 @@ describe('POST /api/admin/questions/review', () => {
     vi.clearAllMocks();
     const { getServerSession } = await import('next-auth');
     vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as any);
+    mockPrisma.pageFigure.findMany.mockResolvedValue([]);
   });
 
   it('rejects non-admin callers', async () => {
@@ -105,6 +106,57 @@ describe('POST /api/admin/questions/review', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toContain('BAD_ANSWER_OPTION');
+    expect(mockPrisma.question.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks approval of a figure-referencing question with no retained figure asset', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue({ ...bookSourcedPending, content: 'Study the diagram below and find x.' });
+    const { POST } = await import('./route');
+    const response = await POST(post({ questionId: 'q-1', action: 'APPROVE' }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('figure asset');
+    expect(mockPrisma.question.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks approval when its linked figure was only auto-matched and never reviewed', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue(bookSourcedPending);
+    mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.questionId === 'q-1' ? [{ id: 'f-1', reviewedAt: null, matchedAutomatically: true }] : []));
+    const { POST } = await import('./route');
+    const response = await POST(post({ questionId: 'q-1', action: 'APPROVE' }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('visual review');
+    expect(mockPrisma.question.update).not.toHaveBeenCalled();
+  });
+
+  it('approves once its linked figure has completed visual review', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue({ ...bookSourcedPending, content: 'Study the diagram below and find x.' });
+    mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.questionId === 'q-1' ? [{ id: 'f-1', reviewedAt: new Date(), matchedAutomatically: true }] : []));
+    mockPrisma.question.update.mockResolvedValue({ ...bookSourcedPending, status: 'APPROVED' });
+    const { POST } = await import('./route');
+    const response = await POST(post({ questionId: 'q-1', action: 'APPROVE' }) as any);
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.question.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'APPROVED' }),
+    }));
+  });
+
+  it('blocks approval when an unresolved unmatched figure sits on the same source page', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue(bookSourcedPending);
+    mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.questionId === null ? [{ id: 'f-2', pageNumber: 12 }] : []));
+    const { POST } = await import('./route');
+    const response = await POST(post({ questionId: 'q-1', action: 'APPROVE' }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('unmatched figure');
     expect(mockPrisma.question.update).not.toHaveBeenCalled();
   });
 

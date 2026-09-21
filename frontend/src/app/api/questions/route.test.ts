@@ -20,6 +20,9 @@ const mockPrisma = {
     findMany: vi.fn(),
     findUnique: vi.fn()
   },
+  pageFigure: {
+    findMany: vi.fn()
+  },
   $transaction: vi.fn()
 };
 
@@ -135,6 +138,7 @@ describe('API Route - Questions', () => {
         // gate logic lives inside that callback.
         mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
         mockPrisma.question.create.mockImplementation(({ data }: any) => Promise.resolve({ id: 'q1', ...data }));
+        mockPrisma.pageFigure.findMany.mockResolvedValue([]);
       });
 
       it('downgrades a book-linked question to PENDING_REVIEW when it has no source page or printed number', async () => {
@@ -197,6 +201,7 @@ describe('API Route - Questions', () => {
         } as any);
         mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
         mockPrisma.question.create.mockImplementation(({ data }: any) => Promise.resolve({ id: 'q1', ...data }));
+        mockPrisma.pageFigure.findMany.mockResolvedValue([]);
       });
 
       it('downgrades a question with duplicate options to PENDING_REVIEW instead of approving it', async () => {
@@ -226,6 +231,55 @@ describe('API Route - Questions', () => {
 
         expect(response.status).toBe(200);
         expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('BAD_ANSWER_OPTION') }]);
+      });
+    });
+
+    describe('figure gate', () => {
+      beforeEach(async () => {
+        const { getServerSession } = await import('next-auth');
+        vi.mocked(getServerSession).mockResolvedValue({
+          user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' },
+        } as any);
+        mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
+        mockPrisma.question.create.mockImplementation(({ data }: any) => Promise.resolve({ id: 'q1', ...data }));
+      });
+
+      it('downgrades a figure-referencing, book-linked question with no retained figure asset', async () => {
+        mockPrisma.pageFigure.findMany.mockResolvedValue([]);
+        const { POST } = await import('@/app/api/questions/route');
+        const req = new Request('http://localhost/api/questions', {
+          method: 'POST',
+          body: JSON.stringify([{
+            content: 'Study the diagram below and find x.', type: 'SINGLE_CHOICE', options: ['2', '3', '4', '5'], correctAnswer: 'A',
+            bookId: 'book-1', sourcePageStart: 12, sourcePageEnd: 12, printedNumber: '4',
+          }]),
+        });
+        const response = await POST(req);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(mockPrisma.question.create).toHaveBeenCalledWith(expect.objectContaining({
+          data: expect.objectContaining({ status: 'PENDING_REVIEW' }),
+        }));
+        expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('figure asset') }]);
+      });
+
+      it('approves a figure-referencing question once its linked figure has completed review', async () => {
+        mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+          Promise.resolve(where.questionId ? [{ id: 'f-1', reviewedAt: new Date(), matchedAutomatically: false }] : []));
+        const { POST } = await import('@/app/api/questions/route');
+        const req = new Request('http://localhost/api/questions', {
+          method: 'POST',
+          body: JSON.stringify([{
+            content: 'Study the diagram below and find x.', type: 'SINGLE_CHOICE', options: ['2', '3', '4', '5'], correctAnswer: 'A',
+            bookId: 'book-1', sourcePageStart: 12, sourcePageEnd: 12, printedNumber: '4',
+          }]),
+        });
+        const response = await POST(req);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.downgraded).toEqual([]);
       });
     });
   });

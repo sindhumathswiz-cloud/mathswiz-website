@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
 import { provenanceApprovalError } from "@/lib/question-provenance";
 import { structuralApprovalError } from "@/lib/question-qa";
+import { figureApprovalError } from "@/lib/question-figures";
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +73,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 type: type !== undefined ? type : existing.type,
             });
             if (structuralReason) return NextResponse.json({ error: structuralReason }, { status: 400 });
+
+            // The figure half of the same gate: a question depending on a
+            // diagram needs its retained asset AND completed human visual
+            // review, and any unresolved unmatched figure on its source page
+            // must be triaged first -- see lib/question-figures.ts.
+            const figureReason = await figureApprovalError({
+                id: questionId,
+                bookId: existing.bookId,
+                sourcePageStart: existing.sourcePageStart,
+                sourcePageEnd: existing.sourcePageEnd,
+                content: content !== undefined ? content : existing.content,
+                explanation: explanation !== undefined ? explanation : existing.explanation,
+            });
+            if (figureReason) return NextResponse.json({ error: figureReason }, { status: 400 });
         }
 
         const updateData: any = {};

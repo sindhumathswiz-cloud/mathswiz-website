@@ -6,9 +6,10 @@ const fetchFromLLM = vi.fn();
 
 const book = { findUnique: vi.fn() };
 const question = { findMany: vi.fn(), update: vi.fn() };
+const pageFigure = { findMany: vi.fn() };
 
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
-vi.mock('@/lib/prisma', () => ({ default: { book, question } }));
+vi.mock('@/lib/prisma', () => ({ default: { book, question, pageFigure } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 vi.mock('@/lib/llm', () => ({ fetchFromLLM }));
 
@@ -35,6 +36,10 @@ describe('POST /api/admin/books/[id]/verify-mathematics', () => {
     vi.clearAllMocks();
     getAuthenticatedUser.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     book.findUnique.mockResolvedValue({ id: 'book-1' });
+    // No linked/unresolved figures by default -- baseQuestion's plain "What
+    // is 2 + 2?" content doesn't reference a figure either, so the gate
+    // passes cleanly unless a test deliberately overrides this.
+    pageFigure.findMany.mockResolvedValue([]);
   });
 
   it('rejects non-admin callers', async () => {
@@ -121,6 +126,39 @@ describe('POST /api/admin/books/[id]/verify-mathematics', () => {
     // BOOK_SOURCED question missing its printed number must not reach
     // APPROVED, even on a confirmed verdict.
     const call = question.update.mock.calls[0][0];
+    expect(call.data).not.toHaveProperty('status');
+  });
+
+  it('applies a verified verdict but withholds approval when a figure-referencing question has no retained figure asset', async () => {
+    question.findMany.mockResolvedValue([{ ...baseQuestion, status: 'REPORTED', content: 'Study the diagram below and find x.' }]);
+    fetchFromLLM.mockResolvedValue('{"verdict":"verified"}');
+    pageFigure.findMany.mockResolvedValue([]); // no linked figure, nothing unresolved on the page
+
+    const { POST } = await import('./route');
+    await POST(post({ apply: true }), { params });
+
+    expect(question.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'q-1' },
+      data: expect.objectContaining({
+        verificationStatus: 'MATHEMATICALLY_VERIFIED',
+        reviewNotes: expect.stringContaining('figure asset'),
+      }),
+    }));
+    const call = question.update.mock.calls[0][0];
+    expect(call.data).not.toHaveProperty('status');
+  });
+
+  it('applies a verified verdict but withholds approval when the linked figure has not completed visual review', async () => {
+    question.findMany.mockResolvedValue([{ ...baseQuestion, status: 'REPORTED' }]);
+    fetchFromLLM.mockResolvedValue('{"verdict":"verified"}');
+    pageFigure.findMany.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.questionId === 'q-1' ? [{ id: 'f-1', reviewedAt: null, matchedAutomatically: true }] : []));
+
+    const { POST } = await import('./route');
+    await POST(post({ apply: true }), { params });
+
+    const call = question.update.mock.calls[0][0];
+    expect(call.data.reviewNotes).toContain('visual review');
     expect(call.data).not.toHaveProperty('status');
   });
 

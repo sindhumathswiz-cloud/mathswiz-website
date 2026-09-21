@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { deriveProvenance, provenanceApprovalError } from "@/lib/question-provenance";
 import { structuralApprovalError } from "@/lib/question-qa";
+import { figureApprovalError } from "@/lib/question-figures";
 
 export const dynamic = 'force-dynamic';
 
@@ -219,9 +220,17 @@ export async function POST(req: Request) {
                     // lib/question-qa.ts. Rather than fail the whole batch over
                     // one bad question, hold just that one back for human review
                     // and say why, so the rest of a legitimate bulk import lands.
+                    // The figure half of the same gate (lib/question-figures.ts).
+                    // This row doesn't exist yet, so no PageFigure could already be
+                    // linked to it -- the placeholder id only matters for that
+                    // lookup, which correctly comes back empty either way.
+                    const figureReason = (bookId && sourcePageStart != null && sourcePageEnd != null)
+                        ? await figureApprovalError({ id: `pending-${index}`, bookId, sourcePageStart, sourcePageEnd, content, explanation })
+                        : null;
                     const reasons = [
                         provenanceApprovalError({ provenance, bookId, sourcePageStart, sourcePageEnd, printedNumber }),
                         structuralApprovalError({ content, options, correctAnswer, explanation, type }),
+                        figureReason,
                     ].filter((r): r is string => r != null);
                     if (reasons.length > 0) {
                         status = 'PENDING_REVIEW';

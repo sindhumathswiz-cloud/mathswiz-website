@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { deriveProvenance, provenanceApprovalError } from "@/lib/question-provenance";
 import { structuralApprovalError } from "@/lib/question-qa";
+import { figureApprovalError } from "@/lib/question-figures";
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,9 +82,20 @@ export async function POST(request: NextRequest) {
           // option) may be approved either -- see lib/question-provenance.ts
           // and lib/question-qa.ts. Hold just this one back for review rather
           // than failing the whole batch or silently approving it.
+          // The figure half of the same gate (lib/question-figures.ts). This
+          // row doesn't exist yet, so no PageFigure could possibly already be
+          // linked to it -- the placeholder id below only matters for that
+          // lookup, which correctly comes back empty either way -- but a
+          // figure-referencing question with a real page range can still be
+          // caught missing its asset, or blocked by a stray unresolved
+          // figure sitting on that same page.
+          const figureReason = (bookId && sourcePageStart != null && sourcePageEnd != null)
+            ? await figureApprovalError({ id: `pending-${index}`, bookId, sourcePageStart, sourcePageEnd, content, explanation })
+            : null;
           const reasons = [
             provenanceApprovalError({ provenance, bookId, sourcePageStart, sourcePageEnd, printedNumber }),
             structuralApprovalError({ content, options, correctAnswer, explanation, type: mappedType }),
+            figureReason,
           ].filter((r): r is string => r != null);
           if (reasons.length > 0) {
             status = 'PENDING_REVIEW';

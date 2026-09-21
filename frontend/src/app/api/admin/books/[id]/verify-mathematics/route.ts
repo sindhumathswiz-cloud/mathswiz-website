@@ -5,6 +5,7 @@ import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { fetchFromLLM } from '@/lib/llm';
 import { provenanceApprovalError } from '@/lib/question-provenance';
 import { structuralApprovalError } from '@/lib/question-qa';
+import { figureApprovalError } from '@/lib/question-figures';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -140,16 +141,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       verified++;
       // The Question Bank acceptance gate: mathematical verification alone
       // doesn't satisfy it -- a BOOK_SOURCED question also needs its source
-      // page and printed number (lib/question-provenance.ts), AND no
+      // page and printed number (lib/question-provenance.ts), no
       // error-severity structural QA issue -- duplicate/missing options, an
-      // unresolvable answer (lib/question-qa.ts) -- may reach APPROVED.
-      // Every candidate here already passed STRUCTURALLY_VALID at
-      // extraction time, so the structural check is defense-in-depth (a
-      // question can be edited after extraction); the only way this
-      // commonly fires is a book-sourced question still missing its
-      // sourcePage/printedNumber. Either way: verify the math and record
-      // it, but leave status for a human once the gap is fixed, rather than
-      // silently skipping the check because "it came from a book route."
+      // unresolvable answer (lib/question-qa.ts) -- and, if it depends on a
+      // diagram, a retained + human-reviewed figure asset
+      // (lib/question-figures.ts). Every candidate here already passed
+      // STRUCTURALLY_VALID at extraction time, so the structural check is
+      // defense-in-depth (a question can be edited after extraction); the
+      // most common real block is a book-sourced question still missing its
+      // sourcePage/printedNumber or figure review. Either way: verify the
+      // math and record it, but leave status for a human once the gap is
+      // fixed, rather than silently skipping the check because "it came
+      // from a book route."
       const blockReasons = [
         provenanceApprovalError(q),
         structuralApprovalError({
@@ -159,6 +162,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           explanation: q.explanation ?? undefined,
           type: q.type,
         }),
+        await figureApprovalError(q),
       ].filter((r): r is string => r != null);
       const blocked = blockReasons.length > 0;
       details.push({ questionId: q.id, outcome: apply ? (blocked ? 'verified_pending_provenance' : 'verified') : 'would_verify' });

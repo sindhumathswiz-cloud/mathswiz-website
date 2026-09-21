@@ -6,6 +6,7 @@ import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { computeContentHash } from '@/lib/question-classifier';
 import { provenanceApprovalError } from '@/lib/question-provenance';
 import { structuralApprovalError } from '@/lib/question-qa';
+import { figureApprovalError } from '@/lib/question-figures';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,13 +97,21 @@ export async function POST(request: Request) {
 
   // A consolidated question is always BOOK_SOURCED (bookId is required above)
   // and subject to the same acceptance gate as any other book-derived row --
-  // see lib/question-provenance.ts and lib/question-qa.ts. Folding several
-  // sub-questions into one doesn't exempt it from needing a source page and
-  // printed identifier, or from passing structural QA on its own merged
-  // content.
+  // see lib/question-provenance.ts, lib/question-qa.ts, and
+  // lib/question-figures.ts. Folding several sub-questions into one doesn't
+  // exempt it from needing a source page and printed identifier, from
+  // passing structural QA on its own merged content, or from having its
+  // figure retained -- note this route does NOT reassign the retired
+  // originals' linked figures to the new row, so a figure any of them had
+  // must be manually re-attached via the figure review screen; the gate
+  // below is what catches that rather than letting it silently ship without
+  // its diagram.
   let resolvedStatus = typeof status === 'string' ? status : 'APPROVED';
   let downgradeReason: string | null = null;
   if (resolvedStatus === 'APPROVED') {
+    const figureReason = (resolvedSourcePageStart != null && resolvedSourcePageEnd != null)
+      ? await figureApprovalError({ id: 'pending-consolidation', bookId, sourcePageStart: resolvedSourcePageStart, sourcePageEnd: resolvedSourcePageEnd, content: contentStr, explanation: resolvedExplanation })
+      : null;
     downgradeReason = [
       provenanceApprovalError({
         provenance: 'BOOK_SOURCED',
@@ -112,6 +121,7 @@ export async function POST(request: Request) {
         printedNumber: resolvedPrintedNumber,
       }),
       structuralApprovalError({ content: contentStr, options: resolvedOptions, correctAnswer: resolvedCorrectAnswer ?? undefined, explanation: resolvedExplanation ?? undefined, type: resolvedType }),
+      figureReason,
     ].filter((r): r is string => r != null).join(' | ') || null;
     if (downgradeReason) resolvedStatus = 'PENDING_REVIEW';
   }

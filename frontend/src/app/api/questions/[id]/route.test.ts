@@ -10,6 +10,7 @@ const mockPrisma = {
   question: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
   questionTag: { deleteMany: vi.fn(), create: vi.fn(), findMany: vi.fn() },
   tagTaxonomy: { findMany: vi.fn() },
+  pageFigure: { findMany: vi.fn() },
 };
 vi.mock('@/lib/prisma', () => ({ default: mockPrisma }));
 
@@ -37,6 +38,7 @@ describe('PATCH /api/questions/[id] -- provenance acceptance gate', () => {
     const { getServerSession } = await import('next-auth');
     vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as any);
     mockPrisma.questionTag.findMany.mockResolvedValue([]);
+    mockPrisma.pageFigure.findMany.mockResolvedValue([]);
   });
 
   it('approves a BOOK_SOURCED question that has its source page and printed number', async () => {
@@ -96,6 +98,7 @@ describe('PATCH /api/questions/[id] -- structural QA gate', () => {
     const { getServerSession } = await import('next-auth');
     vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as any);
     mockPrisma.questionTag.findMany.mockResolvedValue([]);
+    mockPrisma.pageFigure.findMany.mockResolvedValue([]);
   });
 
   it('blocks approval of a question with duplicate options, without writing', async () => {
@@ -125,6 +128,67 @@ describe('PATCH /api/questions/[id] -- structural QA gate', () => {
     mockPrisma.question.update.mockResolvedValue({ id: 'q-1', status: 'APPROVED' });
     const { PATCH } = await import('./route');
     const response = await PATCH(patch({ status: 'APPROVED', options: ['2', '3', '4', '5'] }) as any, { params: params() });
+
+    expect(response.status).toBe(200);
+    expect(mockPrisma.question.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'APPROVED' }),
+    }));
+  });
+});
+
+describe('PATCH /api/questions/[id] -- figure gate', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { getServerSession } = await import('next-auth');
+    vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as any);
+    mockPrisma.questionTag.findMany.mockResolvedValue([]);
+    mockPrisma.pageFigure.findMany.mockResolvedValue([]);
+  });
+
+  it('blocks approval of a figure-referencing question with no retained figure asset', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue({ ...bookSourced, content: 'Study the diagram below and find x.' });
+    const { PATCH } = await import('./route');
+    const response = await PATCH(patch({ status: 'APPROVED' }) as any, { params: params() });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('figure asset');
+    expect(mockPrisma.question.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks approval when its linked figure was only auto-matched and never reviewed', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue(bookSourced);
+    mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.questionId === 'q-1' ? [{ id: 'f-1', reviewedAt: null, matchedAutomatically: true }] : []));
+    const { PATCH } = await import('./route');
+    const response = await PATCH(patch({ status: 'APPROVED' }) as any, { params: params() });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('visual review');
+    expect(mockPrisma.question.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks approval when an unresolved unmatched figure sits on the same source page', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue(bookSourced);
+    mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.questionId === null ? [{ id: 'f-2', pageNumber: 8 }] : []));
+    const { PATCH } = await import('./route');
+    const response = await PATCH(patch({ status: 'APPROVED' }) as any, { params: params() });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('unmatched figure');
+    expect(mockPrisma.question.update).not.toHaveBeenCalled();
+  });
+
+  it('approves once its linked figure has completed visual review', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue({ ...bookSourced, content: 'Study the diagram below and find x.' });
+    mockPrisma.pageFigure.findMany.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.questionId === 'q-1' ? [{ id: 'f-1', reviewedAt: new Date(), matchedAutomatically: true }] : []));
+    mockPrisma.question.update.mockResolvedValue({ id: 'q-1', status: 'APPROVED' });
+    const { PATCH } = await import('./route');
+    const response = await PATCH(patch({ status: 'APPROVED' }) as any, { params: params() });
 
     expect(response.status).toBe(200);
     expect(mockPrisma.question.update).toHaveBeenCalledWith(expect.objectContaining({
