@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
 import { provenanceApprovalError } from "@/lib/question-provenance";
+import { structuralApprovalError } from "@/lib/question-qa";
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         // Check ownership/permission
         const existing = await prisma.question.findUnique({
             where: { id: questionId },
-            select: { createdById: true, scope: true, provenance: true, bookId: true, sourcePageStart: true, sourcePageEnd: true, printedNumber: true }
+            select: {
+                createdById: true, scope: true, provenance: true, bookId: true, sourcePageStart: true, sourcePageEnd: true, printedNumber: true,
+                content: true, options: true, correctAnswer: true, explanation: true, type: true,
+            }
         });
 
         if (!existing) {
@@ -46,14 +50,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         // lib/question-provenance.ts. MANUALLY_AUTHORED (settable here, for a
         // question that genuinely has no book source) is exempt.
         if (status === 'APPROVED') {
-            const reason = provenanceApprovalError({
+            const provenanceReason = provenanceApprovalError({
                 provenance: provenance ?? existing.provenance,
                 bookId: existing.bookId,
                 sourcePageStart: existing.sourcePageStart,
                 sourcePageEnd: existing.sourcePageEnd,
                 printedNumber: existing.printedNumber,
             });
-            if (reason) return NextResponse.json({ error: reason }, { status: 400 });
+            if (provenanceReason) return NextResponse.json({ error: provenanceReason }, { status: 400 });
+
+            // The structural half of the same gate: no question with an
+            // error-severity QA issue may reach APPROVED -- see
+            // lib/question-qa.ts. Uses this same request's own edits where
+            // present (a reviewer can fix a bad option and approve in one
+            // PATCH), falling back to the stored row otherwise.
+            const structuralReason = structuralApprovalError({
+                content: content !== undefined ? content : existing.content,
+                options: Array.isArray(options ?? existing.options) ? (options ?? existing.options) as string[] : undefined,
+                correctAnswer: (correctAnswer !== undefined ? correctAnswer : existing.correctAnswer) ?? undefined,
+                explanation: (explanation !== undefined ? explanation : existing.explanation) ?? undefined,
+                type: type !== undefined ? type : existing.type,
+            });
+            if (structuralReason) return NextResponse.json({ error: structuralReason }, { status: 400 });
         }
 
         const updateData: any = {};

@@ -5,6 +5,7 @@ import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { computeContentHash } from '@/lib/question-classifier';
 import { provenanceApprovalError } from '@/lib/question-provenance';
+import { structuralApprovalError } from '@/lib/question-qa';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,21 +89,30 @@ export async function POST(request: Request) {
   const resolvedSourcePageStart = typeof sourcePageStart === 'number' ? sourcePageStart : null;
   const resolvedSourcePageEnd = typeof sourcePageEnd === 'number' ? sourcePageEnd : null;
   const resolvedPrintedNumber = typeof printedNumber === 'string' && printedNumber ? printedNumber : null;
+  const resolvedOptions = Array.isArray(options) ? options as string[] : [];
+  const resolvedCorrectAnswer = typeof correctAnswer === 'string' && correctAnswer ? correctAnswer : null;
+  const resolvedExplanation = typeof explanation === 'string' && explanation ? explanation : null;
+  const resolvedType = typeof type === 'string' ? type : 'CASE_STUDY';
 
   // A consolidated question is always BOOK_SOURCED (bookId is required above)
   // and subject to the same acceptance gate as any other book-derived row --
-  // see lib/question-provenance.ts. Folding several sub-questions into one
-  // doesn't exempt it from needing a source page and printed identifier.
+  // see lib/question-provenance.ts and lib/question-qa.ts. Folding several
+  // sub-questions into one doesn't exempt it from needing a source page and
+  // printed identifier, or from passing structural QA on its own merged
+  // content.
   let resolvedStatus = typeof status === 'string' ? status : 'APPROVED';
   let downgradeReason: string | null = null;
   if (resolvedStatus === 'APPROVED') {
-    downgradeReason = provenanceApprovalError({
-      provenance: 'BOOK_SOURCED',
-      bookId,
-      sourcePageStart: resolvedSourcePageStart,
-      sourcePageEnd: resolvedSourcePageEnd,
-      printedNumber: resolvedPrintedNumber,
-    });
+    downgradeReason = [
+      provenanceApprovalError({
+        provenance: 'BOOK_SOURCED',
+        bookId,
+        sourcePageStart: resolvedSourcePageStart,
+        sourcePageEnd: resolvedSourcePageEnd,
+        printedNumber: resolvedPrintedNumber,
+      }),
+      structuralApprovalError({ content: contentStr, options: resolvedOptions, correctAnswer: resolvedCorrectAnswer ?? undefined, explanation: resolvedExplanation ?? undefined, type: resolvedType }),
+    ].filter((r): r is string => r != null).join(' | ') || null;
     if (downgradeReason) resolvedStatus = 'PENDING_REVIEW';
   }
 
@@ -112,10 +122,10 @@ export async function POST(request: Request) {
         data: {
           content: contentStr,
           contentHash: computeContentHash(contentStr),
-          options: (Array.isArray(options) ? options : []) as Prisma.InputJsonValue,
-          correctAnswer: typeof correctAnswer === 'string' && correctAnswer ? correctAnswer : null,
-          explanation: typeof explanation === 'string' && explanation ? explanation : null,
-          type: (typeof type === 'string' ? type : 'CASE_STUDY') as never,
+          options: resolvedOptions as Prisma.InputJsonValue,
+          correctAnswer: resolvedCorrectAnswer,
+          explanation: resolvedExplanation,
+          type: resolvedType as never,
           difficulty: (typeof difficulty === 'string' ? difficulty : 'MEDIUM') as never,
           subject: typeof subject === 'string' ? subject : null,
           class: typeof classLevel === 'string' ? classLevel : null,

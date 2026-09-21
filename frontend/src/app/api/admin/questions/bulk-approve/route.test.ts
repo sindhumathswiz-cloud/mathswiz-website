@@ -17,6 +17,11 @@ function post(body: unknown) {
   });
 }
 
+// Structurally valid MCQ options (4 distinct choices, answer "A" resolves to
+// the first) — the gate tests below vary provenance, not structural QA, so
+// every question needs to already clear question-qa.ts's error bar.
+const validOptions = [{ text: '2' }, { text: '3' }, { text: '4' }, { text: '5' }];
+
 describe('POST /api/admin/questions/bulk-approve', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -45,7 +50,7 @@ describe('POST /api/admin/questions/bulk-approve', () => {
   it('downgrades a book-linked question with no printed number to PENDING_REVIEW instead of approving it', async () => {
     const { POST } = await import('./route');
     const response = await POST(post({
-      questions: [{ question: 'Solve x', correctOption: 'A', bookId: 'book-1' }],
+      questions: [{ question: 'Solve x', correctOption: 'A', options: validOptions, bookId: 'book-1' }],
     }) as any);
     const data = await response.json();
 
@@ -59,7 +64,7 @@ describe('POST /api/admin/questions/bulk-approve', () => {
   it('approves a book-linked question that carries its full source page and printed number', async () => {
     const { POST } = await import('./route');
     const response = await POST(post({
-      questions: [{ question: 'Solve x', correctOption: 'A', bookId: 'book-1', sourcePageStart: 10, sourcePageEnd: 10, printedNumber: '3' }],
+      questions: [{ question: 'Solve x', correctOption: 'A', options: validOptions, bookId: 'book-1', sourcePageStart: 10, sourcePageEnd: 10, printedNumber: '3' }],
     }) as any);
     const data = await response.json();
 
@@ -73,7 +78,7 @@ describe('POST /api/admin/questions/bulk-approve', () => {
   it('approves a question with no book link as MANUALLY_AUTHORED, unaffected by the gate', async () => {
     const { POST } = await import('./route');
     const response = await POST(post({
-      questions: [{ question: 'A free-standing question', correctOption: 'A' }],
+      questions: [{ question: 'A free-standing question', correctOption: 'A', options: validOptions }],
     }) as any);
     const data = await response.json();
 
@@ -87,7 +92,7 @@ describe('POST /api/admin/questions/bulk-approve', () => {
   it('honors an explicit MANUALLY_AUTHORED override on a question that does carry a bookId', async () => {
     const { POST } = await import('./route');
     const response = await POST(post({
-      questions: [{ question: 'Loosely based on chapter 4', correctOption: 'A', bookId: 'book-1', provenance: 'MANUALLY_AUTHORED' }],
+      questions: [{ question: 'Loosely based on chapter 4', correctOption: 'A', options: validOptions, bookId: 'book-1', provenance: 'MANUALLY_AUTHORED' }],
     }) as any);
     const data = await response.json();
 
@@ -96,5 +101,60 @@ describe('POST /api/admin/questions/bulk-approve', () => {
       data: expect.objectContaining({ status: 'APPROVED', provenance: 'MANUALLY_AUTHORED' }),
     }));
     expect(data.downgraded).toEqual([]);
+  });
+
+  describe('structural QA gate', () => {
+    it('downgrades a question with duplicate options to PENDING_REVIEW instead of approving it', async () => {
+      const { POST } = await import('./route');
+      const response = await POST(post({
+        questions: [{ question: 'What is 2 + 2?', correctOption: 'A', options: [{ text: '4' }, { text: '4' }, { text: '5' }, { text: '6' }] }],
+      }) as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.question.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: 'PENDING_REVIEW' }),
+      }));
+      expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('DUPLICATE_OPTIONS') }]);
+    });
+
+    it('downgrades a question whose answer letter points past the last option', async () => {
+      const { POST } = await import('./route');
+      const response = await POST(post({
+        questions: [{ question: 'What is 2 + 2?', correctOption: 'E', options: validOptions }],
+      }) as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.question.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: 'PENDING_REVIEW' }),
+      }));
+      expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('BAD_ANSWER_OPTION') }]);
+    });
+
+    it('downgrades a question with fewer than 2 options', async () => {
+      const { POST } = await import('./route');
+      const response = await POST(post({
+        questions: [{ question: 'What is 2 + 2?', correctOption: 'A', options: [{ text: '4' }] }],
+      }) as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('MISSING_OPTIONS') }]);
+    });
+
+    it('never runs the structural gate for a question already requesting PENDING_REVIEW', async () => {
+      const { POST } = await import('./route');
+      const response = await POST(post({
+        questions: [{ question: 'What is 2 + 2?', correctOption: 'E', options: validOptions, status: 'PENDING_REVIEW' }],
+      }) as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.downgraded).toEqual([]);
+      expect(mockPrisma.question.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: 'PENDING_REVIEW' }),
+      }));
+    });
   });
 });

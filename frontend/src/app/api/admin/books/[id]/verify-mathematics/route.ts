@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { fetchFromLLM } from '@/lib/llm';
 import { provenanceApprovalError } from '@/lib/question-provenance';
+import { structuralApprovalError } from '@/lib/question-qa';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -139,23 +140,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       verified++;
       // The Question Bank acceptance gate: mathematical verification alone
       // doesn't satisfy it -- a BOOK_SOURCED question also needs its source
-      // page and printed number before it can reach APPROVED (see
-      // lib/question-provenance.ts). Every candidate here already has a
-      // bookId (query-scoped above), so the only way this fires is a
-      // book-sourced question missing sourcePage/printedNumber -- verify the
-      // math and record it, but leave status for a human to approve once
-      // provenance is filled in, rather than silently skipping the check
-      // because "it came from a book route."
-      const provenanceReason = provenanceApprovalError(q);
-      details.push({ questionId: q.id, outcome: apply ? (provenanceReason ? 'verified_pending_provenance' : 'verified') : 'would_verify' });
+      // page and printed number (lib/question-provenance.ts), AND no
+      // error-severity structural QA issue -- duplicate/missing options, an
+      // unresolvable answer (lib/question-qa.ts) -- may reach APPROVED.
+      // Every candidate here already passed STRUCTURALLY_VALID at
+      // extraction time, so the structural check is defense-in-depth (a
+      // question can be edited after extraction); the only way this
+      // commonly fires is a book-sourced question still missing its
+      // sourcePage/printedNumber. Either way: verify the math and record
+      // it, but leave status for a human once the gap is fixed, rather than
+      // silently skipping the check because "it came from a book route."
+      const blockReasons = [
+        provenanceApprovalError(q),
+        structuralApprovalError({
+          content: q.content,
+          options: Array.isArray(q.options) ? q.options as string[] : undefined,
+          correctAnswer: q.correctAnswer ?? undefined,
+          explanation: q.explanation ?? undefined,
+          type: q.type,
+        }),
+      ].filter((r): r is string => r != null);
+      const blocked = blockReasons.length > 0;
+      details.push({ questionId: q.id, outcome: apply ? (blocked ? 'verified_pending_provenance' : 'verified') : 'would_verify' });
       if (apply) {
-        const note = provenanceReason
-          ? `[AI-Verified -- ${new Date().toISOString().slice(0, 10)}]\nIndependently re-derived by an automated verification pass and confirmed correct. NOT auto-approved: ${provenanceReason}`
+        const note = blocked
+          ? `[AI-Verified -- ${new Date().toISOString().slice(0, 10)}]\nIndependently re-derived by an automated verification pass and confirmed correct. NOT auto-approved: ${blockReasons.join(' | ')}`
           : `[AI-Verified -- ${new Date().toISOString().slice(0, 10)}]\nIndependently re-derived by an automated verification pass and confirmed correct. Auto-approved: passed deterministic QA and independent mathematical re-derivation.`;
         await prisma.question.update({
           where: { id: q.id },
           data: {
-            ...(provenanceReason ? {} : { status: 'APPROVED' }),
+            ...(blocked ? {} : { status: 'APPROVED' }),
             verificationStatus: 'MATHEMATICALLY_VERIFIED',
             tags: Array.from(new Set([...q.tags, 'AI-Verified: Confirmed'])),
             reviewNotes: q.reviewNotes ? `${q.reviewNotes}\n\n${note}` : note,

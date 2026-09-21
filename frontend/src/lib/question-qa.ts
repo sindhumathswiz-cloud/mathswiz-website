@@ -91,6 +91,21 @@ export function analyzeQuestion(q: QAQuestion): QAIssue[] {
         issues.push({ severity: 'error', code: 'MISSING_OPTIONS', message: 'Multiple-choice question has fewer than 2 options' });
     }
 
+    // 5b. Duplicate options — two choices that read as the same thing (modulo
+    // whitespace/LaTeX formatting) make the question unanswerable as written.
+    if (MCQ_TYPES.has(type) && options.length >= 2) {
+        const seen = new Set<string>();
+        const duplicates = new Set<string>();
+        for (const o of options) {
+            const key = loosen(o);
+            if (seen.has(key)) duplicates.add(o);
+            seen.add(key);
+        }
+        if (duplicates.size > 0) {
+            issues.push({ severity: 'error', code: 'DUPLICATE_OPTIONS', message: `Duplicate option(s): ${Array.from(duplicates).join(', ')}` });
+        }
+    }
+
     // 6. Missing answer on an objective question
     if (OBJECTIVE_TYPES.has(type) && !answer) {
         issues.push({ severity: 'warn', code: 'MISSING_ANSWER', message: 'No answer key set' });
@@ -142,4 +157,25 @@ export function worstSeverity(issues: QAIssue[]): QASeverity | null {
     if (issues.some((i) => i.severity === 'error')) return 'error';
     if (issues.length > 0) return 'warn';
     return null;
+}
+
+/**
+ * The structural half of the approval bar, alongside provenance
+ * (lib/question-provenance.ts): a question with an error-severity QA
+ * issue — duplicate or missing options, an answer that doesn't resolve to
+ * an option, unrenderable math, empty content — must not reach APPROVED.
+ * Every route that can set Question.status = APPROVED calls this before
+ * writing, the same way extraction-time already gates verificationStatus
+ * on the identical error/warn split (see extract-questions/route.ts).
+ *
+ * Warn-severity issues (a missing explanation, a fuzzy text-answer
+ * mismatch) stay advisory, not blocking — consistent with how they've
+ * always been treated at extraction time; this only enforces the bar that
+ * already exists, it doesn't raise it.
+ */
+export function structuralApprovalError(question: QAQuestion): string | null {
+    const issues = analyzeQuestion(question);
+    const errors = issues.filter((i) => i.severity === 'error');
+    if (errors.length === 0) return null;
+    return `Question fails structural QA and cannot be approved (${errors.map((e) => e.code).join(', ')}): ${errors.map((e) => e.message).join('; ')}`;
 }

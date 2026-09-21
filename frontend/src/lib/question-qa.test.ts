@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeQuestion, worstSeverity } from './question-qa';
+import { analyzeQuestion, structuralApprovalError, worstSeverity } from './question-qa';
 
 const codes = (q: Parameters<typeof analyzeQuestion>[0]) => analyzeQuestion(q).map((i) => i.code);
 
@@ -95,6 +95,21 @@ describe('analyzeQuestion', () => {
       .toContain('ANSWER_NOT_IN_OPTIONS');
   });
 
+  it('flags duplicate options (exact text)', () => {
+    expect(codes({ content: 'What is $2+2$?', options: ['$4$', '$4$', '$5$', '$6$'], correctAnswer: 'A', type: 'SINGLE_CHOICE' }))
+      .toContain('DUPLICATE_OPTIONS');
+  });
+
+  it('flags duplicate options that only differ by whitespace/LaTeX formatting', () => {
+    expect(codes({ content: 'What is $2+2$?', options: ['$4$', '$ 4 $', '$5$', '$6$'], correctAnswer: 'A', type: 'SINGLE_CHOICE' }))
+      .toContain('DUPLICATE_OPTIONS');
+  });
+
+  it('does NOT flag distinct options as duplicates', () => {
+    expect(codes({ content: 'What is $2+2$?', options: ['$3$', '$4$', '$5$', '$6$'], correctAnswer: 'B', type: 'SINGLE_CHOICE' }))
+      .not.toContain('DUPLICATE_OPTIONS');
+  });
+
   it('flags missing premise data (matrix referenced but absent)', () => {
     expect(codes({ content: 'For the given matrix $A$, find $|A|$.', type: 'SUBJECTIVE' }))
       .toContain('MISSING_DATA');
@@ -110,5 +125,46 @@ describe('worstSeverity', () => {
     expect(worstSeverity([{ severity: 'warn', code: 'X', message: '' }, { severity: 'error', code: 'Y', message: '' }])).toBe('error');
     expect(worstSeverity([{ severity: 'warn', code: 'X', message: '' }])).toBe('warn');
     expect(worstSeverity([])).toBeNull();
+  });
+});
+
+describe('structuralApprovalError', () => {
+  const cleanMcq = {
+    content: 'What is $2+2$?',
+    options: ['$3$', '$4$', '$5$', '$6$'],
+    correctAnswer: 'B',
+    explanation: 'Adding $2+2$ gives $4$, which is option B.',
+    type: 'SINGLE_CHOICE',
+  };
+
+  it('allows a structurally clean question', () => {
+    expect(structuralApprovalError(cleanMcq)).toBeNull();
+  });
+
+  it('blocks a question with duplicate options', () => {
+    const error = structuralApprovalError({ ...cleanMcq, options: ['$4$', '$4$', '$5$', '$6$'] });
+    expect(error).toContain('DUPLICATE_OPTIONS');
+  });
+
+  it('blocks a question with fewer than 2 options', () => {
+    const error = structuralApprovalError({ ...cleanMcq, options: ['$4$'] });
+    expect(error).toContain('MISSING_OPTIONS');
+  });
+
+  it('blocks an answer letter that points past the last option', () => {
+    const error = structuralApprovalError({ ...cleanMcq, correctAnswer: 'E' });
+    expect(error).toContain('BAD_ANSWER_OPTION');
+  });
+
+  it('does NOT block on a warn-only issue (missing explanation)', () => {
+    // Matches extraction-time behavior: warn-severity issues (a missing
+    // explanation, a fuzzy text-answer mismatch) stay advisory, not
+    // blocking -- this gate enforces the existing error/warn bar, it
+    // doesn't raise it.
+    expect(structuralApprovalError({ ...cleanMcq, explanation: '' })).toBeNull();
+  });
+
+  it('does NOT block on a text answer that fuzzy-mismatches every option (warn, not error)', () => {
+    expect(structuralApprovalError({ ...cleanMcq, correctAnswer: '$99$' })).toBeNull();
   });
 });

@@ -141,7 +141,7 @@ describe('API Route - Questions', () => {
         const { POST } = await import('@/app/api/questions/route');
         const req = new Request('http://localhost/api/questions', {
           method: 'POST',
-          body: JSON.stringify([{ content: 'Test question', type: 'SINGLE_CHOICE', status: 'APPROVED', bookId: 'book-1' }]),
+          body: JSON.stringify([{ content: 'Test question', type: 'SINGLE_CHOICE', options: ['2', '3', '4', '5'], correctAnswer: 'A', status: 'APPROVED', bookId: 'book-1' }]),
         });
         const response = await POST(req);
         const data = await response.json();
@@ -158,7 +158,7 @@ describe('API Route - Questions', () => {
         const req = new Request('http://localhost/api/questions', {
           method: 'POST',
           body: JSON.stringify([{
-            content: 'Test question', type: 'SINGLE_CHOICE', status: 'APPROVED',
+            content: 'Test question', type: 'SINGLE_CHOICE', options: ['2', '3', '4', '5'], correctAnswer: 'A', status: 'APPROVED',
             bookId: 'book-1', sourcePageStart: 12, sourcePageEnd: 12, printedNumber: '4',
           }]),
         });
@@ -176,7 +176,7 @@ describe('API Route - Questions', () => {
         const { POST } = await import('@/app/api/questions/route');
         const req = new Request('http://localhost/api/questions', {
           method: 'POST',
-          body: JSON.stringify([{ content: 'Test question', type: 'SINGLE_CHOICE' }]),
+          body: JSON.stringify([{ content: 'Test question', type: 'SINGLE_CHOICE', options: ['2', '3', '4', '5'], correctAnswer: 'A' }]),
         });
         const response = await POST(req);
         const data = await response.json();
@@ -186,6 +186,46 @@ describe('API Route - Questions', () => {
           data: expect.objectContaining({ status: 'APPROVED', provenance: 'MANUALLY_AUTHORED', bookId: null }),
         }));
         expect(data.downgraded).toEqual([]);
+      });
+    });
+
+    describe('structural QA gate', () => {
+      beforeEach(async () => {
+        const { getServerSession } = await import('next-auth');
+        vi.mocked(getServerSession).mockResolvedValue({
+          user: { id: 'admin-1', role: 'ADMIN', email: 'admin@test.com' },
+        } as any);
+        mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
+        mockPrisma.question.create.mockImplementation(({ data }: any) => Promise.resolve({ id: 'q1', ...data }));
+      });
+
+      it('downgrades a question with duplicate options to PENDING_REVIEW instead of approving it', async () => {
+        const { POST } = await import('@/app/api/questions/route');
+        const req = new Request('http://localhost/api/questions', {
+          method: 'POST',
+          body: JSON.stringify([{ content: 'What is 2 + 2?', type: 'SINGLE_CHOICE', options: ['4', '4', '5', '6'], correctAnswer: 'A' }]),
+        });
+        const response = await POST(req);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(mockPrisma.question.create).toHaveBeenCalledWith(expect.objectContaining({
+          data: expect.objectContaining({ status: 'PENDING_REVIEW' }),
+        }));
+        expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('DUPLICATE_OPTIONS') }]);
+      });
+
+      it('downgrades a question whose answer letter points past the last option', async () => {
+        const { POST } = await import('@/app/api/questions/route');
+        const req = new Request('http://localhost/api/questions', {
+          method: 'POST',
+          body: JSON.stringify([{ content: 'What is 2 + 2?', type: 'SINGLE_CHOICE', options: ['3', '4', '5', '6'], correctAnswer: 'E' }]),
+        });
+        const response = await POST(req);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.downgraded).toEqual([{ index: 0, reason: expect.stringContaining('BAD_ANSWER_OPTION') }]);
       });
     });
   });

@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { deriveProvenance, provenanceApprovalError } from "@/lib/question-provenance";
+import { structuralApprovalError } from "@/lib/question-qa";
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,6 +55,10 @@ export async function POST(request: NextRequest) {
       for (const [index, q] of questions.entries()) {
         const mappedType = typeMap[q.type] || "SINGLE_CHOICE";
         const mappedDifficulty = difficultyMap[q.difficulty] || "MEDIUM";
+        const content = q.question || "";
+        const options = q.options ? q.options.map((o: any) => o.text) : [];
+        const correctAnswer = q.correctOption || "";
+        const explanation = q.solution || "";
 
         const bookId = q.bookId || null;
         const sourcePageStart = Number.isInteger(q.sourcePageStart) ? q.sourcePageStart : null;
@@ -70,22 +75,28 @@ export async function POST(request: NextRequest) {
         let status: string = q.status === "PENDING_REVIEW" ? "PENDING_REVIEW" : "APPROVED";
         if (status === 'APPROVED') {
           // The Question Bank acceptance gate: no source-derived question may
-          // be approved without its source page and printed identifier -- see
-          // lib/question-provenance.ts. Hold just this one back for review
-          // rather than failing the whole batch or silently approving it.
-          const reason = provenanceApprovalError({ provenance, bookId, sourcePageStart, sourcePageEnd, printedNumber });
-          if (reason) {
+          // be approved without its source page and printed identifier, and
+          // no question with an error-severity structural QA issue
+          // (duplicate/missing options, an answer that doesn't resolve to an
+          // option) may be approved either -- see lib/question-provenance.ts
+          // and lib/question-qa.ts. Hold just this one back for review rather
+          // than failing the whole batch or silently approving it.
+          const reasons = [
+            provenanceApprovalError({ provenance, bookId, sourcePageStart, sourcePageEnd, printedNumber }),
+            structuralApprovalError({ content, options, correctAnswer, explanation, type: mappedType }),
+          ].filter((r): r is string => r != null);
+          if (reasons.length > 0) {
             status = 'PENDING_REVIEW';
-            downgraded.push({ index, reason });
+            downgraded.push({ index, reason: reasons.join(' | ') });
           }
         }
 
         const question = await tx.question.create({
           data: {
-            content: q.question || "",
-            options: q.options ? q.options.map((o: any) => o.text) : [],
-            correctAnswer: q.correctOption || "",
-            explanation: q.solution || "",
+            content,
+            options,
+            correctAnswer,
+            explanation,
             tags: q.tags || [],
             type: mappedType as any,
             difficulty: mappedDifficulty as any,

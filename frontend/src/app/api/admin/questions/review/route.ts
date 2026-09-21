@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { provenanceApprovalError } from '@/lib/question-provenance';
+import { structuralApprovalError } from '@/lib/question-qa';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +46,21 @@ export async function POST(req: Request) {
             // The Question Bank acceptance gate: a BOOK_SOURCED question needs
             // its source page and printed number before it can be approved --
             // see lib/question-provenance.ts. MANUALLY_AUTHORED is exempt.
-            const reason = provenanceApprovalError(question);
-            if (reason) return NextResponse.json({ error: reason }, { status: 400 });
+            const provenanceReason = provenanceApprovalError(question);
+            if (provenanceReason) return NextResponse.json({ error: provenanceReason }, { status: 400 });
+
+            // The structural half of the same gate: no question with an
+            // error-severity QA issue (duplicate/missing options, an answer
+            // that doesn't resolve to an option, unrenderable math) may reach
+            // APPROVED -- see lib/question-qa.ts.
+            const structuralReason = structuralApprovalError({
+                content: question.content,
+                options: Array.isArray(question.options) ? question.options as string[] : undefined,
+                correctAnswer: question.correctAnswer ?? undefined,
+                explanation: question.explanation ?? undefined,
+                type: question.type,
+            });
+            if (structuralReason) return NextResponse.json({ error: structuralReason }, { status: 400 });
 
             updateData.status = 'APPROVED';
             updateData.scope = 'PUBLIC';

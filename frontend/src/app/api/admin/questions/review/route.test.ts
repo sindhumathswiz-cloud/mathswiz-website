@@ -16,9 +16,13 @@ function post(body: unknown) {
   });
 }
 
+// Structurally valid MCQ content -- the provenance-gate tests below vary
+// provenance, not structural QA, so this fixture needs to already clear
+// question-qa.ts's error bar.
 const bookSourcedPending = {
   id: 'q-1', status: 'PENDING_REVIEW', reviewNotes: null,
   provenance: 'BOOK_SOURCED', bookId: 'book-1', sourcePageStart: 12, sourcePageEnd: 12, printedNumber: '5',
+  content: 'What is 2 + 2?', options: ['2', '3', '4', '5'], correctAnswer: 'C', explanation: 'Basic addition.', type: 'SINGLE_CHOICE',
 };
 
 describe('POST /api/admin/questions/review', () => {
@@ -67,7 +71,10 @@ describe('POST /api/admin/questions/review', () => {
   });
 
   it('approves a MANUALLY_AUTHORED question with no source page at all', async () => {
-    const manual = { id: 'q-2', status: 'PENDING_REVIEW', reviewNotes: null, provenance: 'MANUALLY_AUTHORED', bookId: null, sourcePageStart: null, sourcePageEnd: null, printedNumber: null };
+    const manual = {
+      id: 'q-2', status: 'PENDING_REVIEW', reviewNotes: null, provenance: 'MANUALLY_AUTHORED', bookId: null, sourcePageStart: null, sourcePageEnd: null, printedNumber: null,
+      content: 'Prove that the square root of 2 is irrational.', options: null, correctAnswer: null, explanation: 'Proof by contradiction.', type: 'LONG_ANSWER',
+    };
     mockPrisma.question.findUnique.mockResolvedValue(manual);
     mockPrisma.question.update.mockResolvedValue({ ...manual, status: 'APPROVED' });
     const { POST } = await import('./route');
@@ -77,6 +84,28 @@ describe('POST /api/admin/questions/review', () => {
     expect(mockPrisma.question.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: 'APPROVED' }),
     }));
+  });
+
+  it('blocks approval of a question with duplicate options, without writing', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue({ ...bookSourcedPending, options: ['4', '4', '5', '6'] });
+    const { POST } = await import('./route');
+    const response = await POST(post({ questionId: 'q-1', action: 'APPROVE' }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('DUPLICATE_OPTIONS');
+    expect(mockPrisma.question.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks approval of a question whose answer letter points past the last option', async () => {
+    mockPrisma.question.findUnique.mockResolvedValue({ ...bookSourcedPending, correctAnswer: 'E' });
+    const { POST } = await import('./route');
+    const response = await POST(post({ questionId: 'q-1', action: 'APPROVE' }) as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('BAD_ANSWER_OPTION');
+    expect(mockPrisma.question.update).not.toHaveBeenCalled();
   });
 
   it('rejecting a question never touches the provenance gate', async () => {

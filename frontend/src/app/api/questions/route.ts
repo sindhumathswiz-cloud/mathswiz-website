@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { deriveProvenance, provenanceApprovalError } from "@/lib/question-provenance";
+import { structuralApprovalError } from "@/lib/question-qa";
 
 export const dynamic = 'force-dynamic';
 
@@ -196,6 +197,12 @@ export async function POST(req: Request) {
         const created = await prisma.$transaction(async (tx) => {
             const results: any[] = [];
             for (const [index, q] of questions.entries()) {
+                const content = q.content || '';
+                const options = q.options || [];
+                const correctAnswer = q.correctAnswer || '';
+                const explanation = q.explanation || '';
+                const type = mapType(q.type);
+
                 const bookId = role === 'ADMIN' && q.bookId ? q.bookId : null;
                 const sourcePageStart = role === 'ADMIN' && Number.isInteger(q.sourcePageStart) ? q.sourcePageStart : null;
                 const sourcePageEnd = role === 'ADMIN' && Number.isInteger(q.sourcePageEnd) ? q.sourcePageEnd : null;
@@ -205,26 +212,31 @@ export async function POST(req: Request) {
                 let status: string = role === 'ADMIN' ? (q.status || "APPROVED") : "PENDING_REVIEW";
                 if (status === 'APPROVED') {
                     // The Question Bank acceptance gate: a book-sourced question
-                    // (has a bookId) needs its source page and printed number
-                    // before it can be approved -- see lib/question-provenance.ts.
-                    // Rather than fail the whole batch over one under-provenanced
-                    // question, hold just that one back for human review and say
-                    // why, so the rest of a legitimate bulk import still lands.
-                    const reason = provenanceApprovalError({ provenance, bookId, sourcePageStart, sourcePageEnd, printedNumber });
-                    if (reason) {
+                    // (has a bookId) needs its source page and printed number, and
+                    // no question with an error-severity structural QA issue
+                    // (duplicate/missing options, an unresolvable answer) may be
+                    // approved either -- see lib/question-provenance.ts and
+                    // lib/question-qa.ts. Rather than fail the whole batch over
+                    // one bad question, hold just that one back for human review
+                    // and say why, so the rest of a legitimate bulk import lands.
+                    const reasons = [
+                        provenanceApprovalError({ provenance, bookId, sourcePageStart, sourcePageEnd, printedNumber }),
+                        structuralApprovalError({ content, options, correctAnswer, explanation, type }),
+                    ].filter((r): r is string => r != null);
+                    if (reasons.length > 0) {
                         status = 'PENDING_REVIEW';
-                        downgraded.push({ index, reason });
+                        downgraded.push({ index, reason: reasons.join(' | ') });
                     }
                 }
 
                 const question = await tx.question.create({
                     data: {
-                        content: q.content || '',
-                        options: q.options || [],
-                        correctAnswer: q.correctAnswer || '',
-                        explanation: q.explanation || '',
+                        content,
+                        options,
+                        correctAnswer,
+                        explanation,
                         tags: Array.isArray(q.tags) ? q.tags : [],
-                        type: mapType(q.type),
+                        type,
                         difficulty: mapDifficulty(q.difficulty),
                         subject: q.subject || "Mathematics",
                         class: q.class || "Class 12",
