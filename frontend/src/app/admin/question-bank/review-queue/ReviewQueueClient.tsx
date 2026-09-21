@@ -20,6 +20,10 @@ interface QuestionRow {
   sourcePageStart: number | null;
   bookId: string | null;
   book: { title: string } | null;
+  // Roadmap Phase 3: composed from the provenance/structural/figure approval
+  // gates (lib/question-risk.ts) -- blockers are the exact reasons this row
+  // would be rejected if someone tried to approve it right now.
+  risk?: { score: number; blockers: string[] };
 }
 
 interface BookOption {
@@ -173,7 +177,7 @@ export default function ReviewQueueClient() {
       <header className="mb-5">
         <h1 className="text-2xl font-black text-slate-900">Review queue</h1>
         <p className="mt-1 text-xs font-bold text-slate-400">
-          Every DRAFT/REPORTED question flagged by the second review or the automated AI verification pass, with its evidence and a suggested resolution.
+          Every open question the approval gates would reject right now, or that's been flagged by the second review or the automated AI verification pass — riskiest first.
         </p>
       </header>
 
@@ -226,12 +230,28 @@ export default function ReviewQueueClient() {
                     {q.book ? `${q.book.title} · ` : 'Non-book · '}{q.topic || 'Untopiced'}{q.subTopic ? ` / ${q.subTopic}` : ''}
                     {q.sourcePageStart ? ` · p.${q.sourcePageStart}` : ''}
                   </span>
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-500">{q.status} · {q.verificationStatus}</span>
+                  <span className="flex items-center gap-2">
+                    {q.risk && (
+                      <span className={`rounded-md px-2 py-0.5 font-black ${q.risk.score < 40 ? 'bg-rose-100 text-rose-700' : q.risk.score < 70 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        Risk {q.risk.score}
+                      </span>
+                    )}
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-500">{q.status} · {q.verificationStatus}</span>
+                  </span>
                 </div>
 
                 <div className="mb-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-800">
                   <MathRenderer content={q.content} />
                 </div>
+
+                {q.risk && q.risk.blockers.length > 0 && (
+                  <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+                    <div className="mb-1 font-black">Would be rejected right now — {q.risk.blockers.length} blocker{q.risk.blockers.length > 1 ? 's' : ''}</div>
+                    <ul className="list-disc space-y-1 pl-4">
+                      {q.risk.blockers.map((b, i) => <li key={i}>{b}</li>)}
+                    </ul>
+                  </div>
+                )}
 
                 {note && (
                   <details className="mb-3 rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs text-amber-900">

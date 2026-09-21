@@ -37,6 +37,40 @@ export interface FigureApprovableQuestion {
   sourcePageEnd: number | null;
 }
 
+/** The data figureApprovalError needs, pre-fetched — split out so a bulk caller (lib/question-risk.ts) can supply it batched instead of one question at a time. */
+export interface FigureContext {
+  linkedFigures: Array<{ reviewedAt: Date | null; matchedAutomatically: boolean }>;
+  unresolvedOnPagePages: number[];
+}
+
+/**
+ * The decision logic alone, given already-fetched figure data — no
+ * database access, so it's cheap to run for every row in a bulk risk
+ * listing without a query per question. figureApprovalError below is this
+ * same logic wired to a live, single-question fetch.
+ */
+export function evaluateFigureContext(question: Pick<FigureApprovableQuestion, 'content' | 'explanation'>, context: FigureContext): string | null {
+  const { linkedFigures, unresolvedOnPagePages } = context;
+  const requiresFigure = linkedFigures.length > 0 || contentReferencesFigure(question.content) || contentReferencesFigure(question.explanation);
+
+  if (requiresFigure && linkedFigures.length === 0) {
+    return 'Question text references a figure/diagram but has no retained figure asset linked -- attach one via the figure review screen before approving.';
+  }
+
+  const unreviewed = linkedFigures.filter((f) => f.reviewedAt == null);
+  if (requiresFigure && unreviewed.length > 0) {
+    const autoOnly = unreviewed.every((f) => f.matchedAutomatically);
+    return `Question has ${unreviewed.length} linked figure(s) that ${autoOnly ? 'were only auto-matched by position and have' : 'have'} not completed visual review -- confirm them via the figure review screen before approving.`;
+  }
+
+  if (unresolvedOnPagePages.length > 0) {
+    const pages = [...new Set(unresolvedOnPagePages)].sort((a, b) => a - b);
+    return `Page ${pages.join(', ')} has ${unresolvedOnPagePages.length} unmatched figure(s) not yet reviewed -- resolve them (assign or dismiss) before approving questions sourced from ${pages.length > 1 ? 'these pages' : 'this page'}.`;
+  }
+
+  return null;
+}
+
 /**
  * Returns a reason the question cannot be approved yet, or null if it may
  * be. Only meaningful for a question with a real book + page range —
@@ -66,22 +100,5 @@ export async function figureApprovalError(question: FigureApprovableQuestion): P
     }),
   ]);
 
-  const requiresFigure = linkedFigures.length > 0 || contentReferencesFigure(question.content) || contentReferencesFigure(question.explanation);
-
-  if (requiresFigure && linkedFigures.length === 0) {
-    return 'Question text references a figure/diagram but has no retained figure asset linked -- attach one via the figure review screen before approving.';
-  }
-
-  const unreviewed = linkedFigures.filter((f) => f.reviewedAt == null);
-  if (requiresFigure && unreviewed.length > 0) {
-    const autoOnly = unreviewed.every((f) => f.matchedAutomatically);
-    return `Question has ${unreviewed.length} linked figure(s) that ${autoOnly ? 'were only auto-matched by position and have' : 'have'} not completed visual review -- confirm them via the figure review screen before approving.`;
-  }
-
-  if (unresolvedOnPage.length > 0) {
-    const pages = [...new Set(unresolvedOnPage.map((f) => f.pageNumber))].sort((a, b) => a - b);
-    return `Page ${pages.join(', ')} has ${unresolvedOnPage.length} unmatched figure(s) not yet reviewed -- resolve them (assign or dismiss) before approving questions sourced from ${pages.length > 1 ? 'these pages' : 'this page'}.`;
-  }
-
-  return null;
+  return evaluateFigureContext(question, { linkedFigures, unresolvedOnPagePages: unresolvedOnPage.map((f) => f.pageNumber) });
 }
