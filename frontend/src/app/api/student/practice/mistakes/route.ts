@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { extractClaimedAnswerIndex, parseQuestionOptions, resolveCorrectOptionIndex } from '@/lib/arena-answer';
-import { computeMistakeQueue, isDueForReview } from '@/lib/mistake-queue';
+import { mistakesFromCards, isDueForReview } from '@/lib/mistake-queue';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,13 +27,13 @@ export async function GET(req: Request) {
     // review only the misses from that path's own topic.
     const topic = searchParams.get('topic');
 
-    const events = await prisma.masteryEvent.findMany({
+    const cards = await prisma.spacedRepetitionCard.findMany({
       where: { userId: studentId, questionId: { not: null } },
-      select: { questionId: true, isCorrect: true, createdAt: true },
+      select: { questionId: true, lapses: true, lastReviewedAt: true, createdAt: true, dueAt: true },
     });
 
     const now = new Date();
-    const allMistakes = computeMistakeQueue(events, now);
+    const allMistakes = mistakesFromCards(cards as { questionId: string; lapses: number; lastReviewedAt: Date | null; createdAt: Date; dueAt: Date }[]);
     const relevant = scope === 'all' ? allMistakes : allMistakes.filter((e) => isDueForReview(e, now));
 
     if (relevant.length === 0) {

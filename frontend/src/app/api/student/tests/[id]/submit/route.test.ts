@@ -6,6 +6,7 @@ const awardPoints = vi.fn();
 const recordAuditLog = vi.fn();
 const requestAuditContext = vi.fn(() => ({}));
 const applyMasteryUpdate = vi.fn();
+const recordQuestionReview = vi.fn();
 
 const tx = {
   testAttempt: { updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
@@ -24,6 +25,7 @@ vi.mock('next/cache', () => ({ revalidatePath }));
 vi.mock('@/lib/gamification', () => ({ awardPoints, POINTS_RULES: { TEST_COMPLETED: 10, TEST_PERFECT_SCORE: 20 } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext }));
 vi.mock('@/lib/mastery', () => ({ applyMasteryUpdate }));
+vi.mock('@/lib/spaced-repetition-review', () => ({ recordQuestionReview }));
 
 const SECTION = { marksPerQuestion: 4, negativeMarks: 1 };
 const QUESTION = { id: 'q1', type: 'SINGLE_CHOICE', correctAnswer: 'B', topic: 'Algebra', difficulty: 'MEDIUM' };
@@ -38,6 +40,7 @@ function setUpTest() {
   tx.testAttempt.updateMany.mockResolvedValue({ count: 1 });
   tx.testAttempt.findUniqueOrThrow.mockResolvedValue({ id: 'attempt-1', status: 'SUBMITTED' });
   tx.testResponse.createMany.mockResolvedValue({ count: 1 });
+  recordQuestionReview.mockResolvedValue(null);
 }
 
 function submit(responses: Record<string, unknown>) {
@@ -109,5 +112,28 @@ describe('POST /api/student/tests/[id]/submit -- mark-for-review propagation', (
     expect(tx.testAttempt.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ totalScore: 4, totalCorrect: 1, totalIncorrect: 0, totalSkipped: 0 }),
     }));
+  });
+
+  it('records an SM-2 review with wasMarkedForReview true for an answered-and-marked response', async () => {
+    await submit({ q1: { selectedOption: 'A', status: 'ANSWERED_AND_MARKED', timeSpent: 10 } })();
+
+    expect(recordQuestionReview).toHaveBeenCalledWith(tx, expect.objectContaining({
+      userId: 'student-1',
+      questionId: 'q1',
+      signal: expect.objectContaining({ isCorrect: false, timeSpent: 10, wasMarkedForReview: true }),
+    }));
+  });
+
+  it('records an SM-2 review with wasMarkedForReview false for a plain answer', async () => {
+    await submit({ q1: { selectedOption: 'B', status: 'ANSWERED', timeSpent: 10 } })();
+
+    expect(recordQuestionReview).toHaveBeenCalledWith(tx, expect.objectContaining({
+      signal: expect.objectContaining({ isCorrect: true, wasMarkedForReview: false }),
+    }));
+  });
+
+  it('never records an SM-2 review for a question with no objective answer submitted (pure mark, unanswered)', async () => {
+    await submit({ q1: { selectedOption: null, status: 'MARKED_FOR_REVIEW', timeSpent: 3 } })();
+    expect(recordQuestionReview).not.toHaveBeenCalled();
   });
 });

@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getServerSession = vi.fn();
 const testAttempt = { findFirst: vi.fn(), count: vi.fn() };
 const testResponse = { groupBy: vi.fn() };
-const masteryEvent = { findMany: vi.fn() };
+const spacedRepetitionCard = { findMany: vi.fn() };
 const studentProgress = { findFirst: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { testAttempt, testResponse, masteryEvent, studentProgress } }));
+vi.mock('@/lib/prisma', () => ({ default: { testAttempt, testResponse, spacedRepetitionCard, studentProgress } }));
 
 const baseAttempt = {
   id: 'attempt-1',
@@ -35,7 +35,7 @@ describe('GET /api/student/performance/[attemptId] -- insights and recommended a
     testAttempt.findFirst.mockResolvedValue(baseAttempt);
     testAttempt.count.mockResolvedValue(0);
     testResponse.groupBy.mockResolvedValue([]);
-    masteryEvent.findMany.mockResolvedValue([]);
+    spacedRepetitionCard.findMany.mockResolvedValue([]);
     studentProgress.findFirst.mockResolvedValue(null);
   });
 
@@ -52,8 +52,8 @@ describe('GET /api/student/performance/[attemptId] -- insights and recommended a
   });
 
   it('recommends REVIEW_MISTAKES when the mistake queue has due entries', async () => {
-    masteryEvent.findMany.mockResolvedValue([
-      { questionId: 'q-9', isCorrect: false, createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) },
+    spacedRepetitionCard.findMany.mockResolvedValue([
+      { questionId: 'q-9', lapses: 1, lastReviewedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), dueAt: new Date(Date.now() - 60_000) },
     ]);
     const body = await (await call()).json();
     expect(body.recommendedAction).toEqual({ type: 'REVIEW_MISTAKES', count: 1 });

@@ -8,6 +8,8 @@ const tx = {
   testAttempt: { findFirst: vi.fn(), create: vi.fn() },
   studentProgress: { findUnique: vi.fn(), upsert: vi.fn() },
   masteryEvent: { create: vi.fn() },
+  testResponse: { findMany: vi.fn() },
+  spacedRepetitionCard: { findUnique: vi.fn(), upsert: vi.fn() },
 };
 const $transaction = vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx));
 
@@ -30,6 +32,9 @@ describe('student practice submit', () => {
     tx.studentProgress.findUnique.mockResolvedValue({ masteryScore: 98, currentStreak: 4 });
     tx.studentProgress.upsert.mockResolvedValue({});
     tx.masteryEvent.create.mockResolvedValue({});
+    tx.testResponse.findMany.mockResolvedValue([]);
+    tx.spacedRepetitionCard.findUnique.mockResolvedValue(null);
+    tx.spacedRepetitionCard.upsert.mockResolvedValue({});
   });
 
   async function submit(body: Record<string, unknown>) {
@@ -57,6 +62,19 @@ describe('student practice submit', () => {
     }));
     expect(tx.masteryEvent.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ source: 'PRACTICE', previousScore: 98, newScore: 100, delta: 2 }),
+    }));
+    // A correct answer with no existing SM-2 card must not silently create one.
+    expect(tx.spacedRepetitionCard.upsert).not.toHaveBeenCalled();
+  });
+
+  it('creates an SM-2 review card on an incorrect answer', async () => {
+    const response = await submit({ questionId: 'question-1', selectedOption: 'A', timeSpent: 12 });
+    const body = await response.json();
+
+    expect(body.isCorrect).toBe(false);
+    expect(tx.spacedRepetitionCard.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId_questionId: { userId: 'student-1', questionId: 'question-1' } },
+      create: expect.objectContaining({ userId: 'student-1', questionId: 'question-1', lapses: 1, repetitions: 0, intervalDays: 1 }),
     }));
   });
 
@@ -117,6 +135,7 @@ describe('student practice submit', () => {
     expect(tx.studentProgress.upsert).not.toHaveBeenCalled();
     expect(tx.masteryEvent.create).not.toHaveBeenCalled();
     expect(awardPoints).not.toHaveBeenCalled();
+    expect(tx.spacedRepetitionCard.upsert).not.toHaveBeenCalled();
   });
 
   it('scales the mastery delta by the question difficulty', async () => {

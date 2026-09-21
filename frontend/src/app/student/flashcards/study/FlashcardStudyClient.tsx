@@ -1,11 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
+import { readJsonResponse } from '@/lib/http-json';
+import type { SM2Grade } from '@/lib/spaced-repetition';
 
 type Card = { id: string; front: string; back: string; topic: string | null };
+
+const GRADE_BUTTONS: { grade: SM2Grade; label: string; className: string }[] = [
+  { grade: 'AGAIN', label: 'Again', className: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
+  { grade: 'HARD', label: 'Hard', className: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
+  { grade: 'GOOD', label: 'Good', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
+  { grade: 'EASY', label: 'Easy', className: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' },
+];
 
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
@@ -16,22 +27,57 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
-export default function FlashcardStudyClient() {
+function FlashcardStudyInner() {
+  const searchParams = useSearchParams();
+  const dueOnly = searchParams?.get('mode') === 'due';
+
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [grading, setGrading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/student/flashcards/mine')
+    fetch(`/api/student/flashcards/mine${dueOnly ? '?mode=due' : ''}`)
       .then((response) => response.json())
       .then((data) => setCards(shuffle(data.cards || [])))
       .finally(() => setLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dueOnly]);
 
   const go = (delta: number) => {
     setFlipped(false);
     setIndex((i) => Math.max(0, Math.min(cards.length - 1, i + delta)));
+  };
+
+  const handleGrade = async (grade: SM2Grade) => {
+    const card = cards[index];
+    if (!card || grading) return;
+    setGrading(true);
+    try {
+      const response = await fetch('/api/student/flashcards/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flashcardId: card.id, grade }),
+      });
+      if (!response.ok) {
+        const body = await readJsonResponse(response);
+        toast.error((body?.error as string) || 'Could not save that review');
+        return;
+      }
+      // In due-only mode, a graded card may no longer belong in this
+      // session (it's rescheduled forward), so drop it from the queue
+      // rather than just advancing past it.
+      if (dueOnly) {
+        setCards((prev) => prev.filter((c) => c.id !== card.id));
+        setFlipped(false);
+        setIndex((i) => Math.min(i, Math.max(0, cards.length - 2)));
+      } else {
+        go(1);
+      }
+    } finally {
+      setGrading(false);
+    }
   };
 
   if (loading) return <main className="min-h-screen bg-slate-50 p-10"><Loader2 className="mx-auto my-20 h-8 w-8 animate-spin text-indigo-600" /></main>;
@@ -45,12 +91,12 @@ export default function FlashcardStudyClient() {
 
         {cards.length === 0 ? (
           <div className="rounded-3xl border border-dashed bg-white p-16 text-center font-bold text-slate-600">
-            No flashcards to study yet.
+            {dueOnly ? "No cards due for review right now — nice work!" : 'No flashcards to study yet.'}
           </div>
         ) : (
           <>
             <p className="mb-4 text-center text-sm font-black uppercase tracking-wide text-slate-400">
-              Card {index + 1} of {cards.length}
+              {dueOnly ? `${cards.length} due` : `Card ${index + 1} of ${cards.length}`}
             </p>
             <AnimatePresence mode="wait">
               <motion.div
@@ -63,31 +109,57 @@ export default function FlashcardStudyClient() {
               >
                 {cards[index].topic && <span className="mb-4 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-slate-500">{cards[index].topic}</span>}
                 <p className="text-lg font-black text-slate-900">{flipped ? cards[index].back : cards[index].front}</p>
-                <p className="mt-6 flex items-center gap-1 text-xs font-bold text-slate-400"><RotateCw className="h-3 w-3" />Tap to flip</p>
+                {!flipped && <p className="mt-6 flex items-center gap-1 text-xs font-bold text-slate-400"><RotateCw className="h-3 w-3" />Tap to flip</p>}
               </motion.div>
             </AnimatePresence>
 
-            <div className="mt-6 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => go(-1)}
-                disabled={index === 0}
-                className="inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 px-5 py-3 text-sm font-black text-slate-600 disabled:opacity-30"
-              >
-                <ChevronLeft className="h-4 w-4" />Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => go(1)}
-                disabled={index === cards.length - 1}
-                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white disabled:opacity-30"
-              >
-                Next<ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
+            {flipped ? (
+              <div className="mt-6 grid grid-cols-4 gap-2">
+                {GRADE_BUTTONS.map(({ grade, label, className }) => (
+                  <button
+                    key={grade}
+                    type="button"
+                    disabled={grading}
+                    onClick={() => handleGrade(grade)}
+                    className={`rounded-2xl border-2 px-3 py-3 text-xs font-black uppercase tracking-wide transition disabled:opacity-40 ${className}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-6 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => go(-1)}
+                  disabled={index === 0}
+                  className="inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 px-5 py-3 text-sm font-black text-slate-600 disabled:opacity-30"
+                >
+                  <ChevronLeft className="h-4 w-4" />Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => go(1)}
+                  disabled={index === cards.length - 1}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white disabled:opacity-30"
+                >
+                  Next<ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
     </main>
+  );
+}
+
+export default function FlashcardStudyClient() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-slate-50 p-10"><Loader2 className="mx-auto my-20 h-8 w-8 animate-spin text-indigo-600" /></main>
+    }>
+      <FlashcardStudyInner />
+    </Suspense>
   );
 }

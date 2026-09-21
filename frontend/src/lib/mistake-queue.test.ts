@@ -1,86 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { computeMistakeQueue, isDueForReview } from './mistake-queue';
+import { mistakesFromCards, isDueForReview } from './mistake-queue';
 
-const hoursAgo = (h: number, now: Date) => new Date(now.getTime() - h * 60 * 60 * 1000);
-
-describe('computeMistakeQueue', () => {
-  it('excludes questions whose most recent attempt was correct', () => {
+describe('mistakesFromCards', () => {
+  it('maps lapses to missCount and dueAt straight through', () => {
     const now = new Date('2026-01-10T00:00:00Z');
-    const events = [
-      { questionId: 'q1', isCorrect: false, createdAt: hoursAgo(48, now) },
-      { questionId: 'q1', isCorrect: true, createdAt: hoursAgo(1, now) },
+    const cards = [{ questionId: 'q1', lapses: 3, lastReviewedAt: now, createdAt: now, dueAt: now }];
+    const result = mistakesFromCards(cards);
+    expect(result).toEqual([{ questionId: 'q1', missCount: 3, lastMissedAt: now, dueAt: now }]);
+  });
+
+  it('falls back lastMissedAt to createdAt when a card has never been reviewed', () => {
+    const created = new Date('2026-01-01T00:00:00Z');
+    const cards = [{ questionId: 'q1', lapses: 1, lastReviewedAt: null, createdAt: created, dueAt: created }];
+    expect(mistakesFromCards(cards)[0].lastMissedAt).toEqual(created);
+  });
+
+  it('sorts oldest-review-first', () => {
+    const now = new Date('2026-01-10T00:00:00Z');
+    const older = new Date('2026-01-01T00:00:00Z');
+    const cards = [
+      { questionId: 'recent', lapses: 1, lastReviewedAt: now, createdAt: now, dueAt: now },
+      { questionId: 'old', lapses: 1, lastReviewedAt: older, createdAt: older, dueAt: older },
     ];
-    expect(computeMistakeQueue(events, now)).toEqual([]);
+    expect(mistakesFromCards(cards).map((r) => r.questionId)).toEqual(['old', 'recent']);
   });
 
-  it('includes a question whose most recent attempt was incorrect, with a miss count', () => {
-    const now = new Date('2026-01-10T00:00:00Z');
-    const events = [
-      { questionId: 'q1', isCorrect: true, createdAt: hoursAgo(200, now) },
-      { questionId: 'q1', isCorrect: false, createdAt: hoursAgo(48, now) },
-      { questionId: 'q1', isCorrect: false, createdAt: hoursAgo(1, now) },
-    ];
-    const result = computeMistakeQueue(events, now);
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ questionId: 'q1', missCount: 2 });
-  });
-
-  it('ignores events with no questionId', () => {
-    const now = new Date('2026-01-10T00:00:00Z');
-    const events = [{ questionId: null, isCorrect: false, createdAt: now }];
-    expect(computeMistakeQueue(events, now)).toEqual([]);
-  });
-
-  it('sorts oldest-missed-first', () => {
-    const now = new Date('2026-01-10T00:00:00Z');
-    const events = [
-      { questionId: 'recent', isCorrect: false, createdAt: hoursAgo(1, now) },
-      { questionId: 'old', isCorrect: false, createdAt: hoursAgo(100, now) },
-    ];
-    const result = computeMistakeQueue(events, now);
-    expect(result.map(r => r.questionId)).toEqual(['old', 'recent']);
-  });
-
-  it('backs off further out the more times a question is missed in a row', () => {
-    const now = new Date('2026-01-10T00:00:00Z');
-    const oneMiss = computeMistakeQueue(
-      [{ questionId: 'q1', isCorrect: false, createdAt: hoursAgo(2, now) }],
-      now,
-    )[0];
-    const threeMisses = computeMistakeQueue(
-      [
-        { questionId: 'q2', isCorrect: false, createdAt: hoursAgo(6, now) },
-        { questionId: 'q2', isCorrect: false, createdAt: hoursAgo(4, now) },
-        { questionId: 'q2', isCorrect: false, createdAt: hoursAgo(2, now) },
-      ],
-      now,
-    )[0];
-
-    // A single miss 2 hours ago (4h interval) isn't due yet; a third
-    // consecutive miss on the same question resurfaces sooner relative to
-    // its own last-miss time isn't the point here — the point is the
-    // interval itself grows with missCount.
-    expect(threeMisses.dueAt.getTime() - threeMisses.lastMissedAt.getTime())
-      .toBeGreaterThan(oneMiss.dueAt.getTime() - oneMiss.lastMissedAt.getTime());
+  it('returns an empty array for no cards', () => {
+    expect(mistakesFromCards([])).toEqual([]);
   });
 });
 
 describe('isDueForReview', () => {
-  it('is false before the interval has elapsed', () => {
+  it('is false before dueAt', () => {
     const now = new Date('2026-01-10T00:00:00Z');
-    const [entry] = computeMistakeQueue(
-      [{ questionId: 'q1', isCorrect: false, createdAt: hoursAgo(1, now) }],
-      now,
-    );
+    const entry = { questionId: 'q1', missCount: 1, lastMissedAt: now, dueAt: new Date(now.getTime() + 60_000) };
     expect(isDueForReview(entry, now)).toBe(false);
   });
 
-  it('is true once the interval has elapsed', () => {
+  it('is true once dueAt has passed', () => {
     const now = new Date('2026-01-10T00:00:00Z');
-    const [entry] = computeMistakeQueue(
-      [{ questionId: 'q1', isCorrect: false, createdAt: hoursAgo(200, now) }],
-      now,
-    );
+    const entry = { questionId: 'q1', missCount: 1, lastMissedAt: now, dueAt: new Date(now.getTime() - 60_000) };
     expect(isDueForReview(entry, now)).toBe(true);
   });
 });

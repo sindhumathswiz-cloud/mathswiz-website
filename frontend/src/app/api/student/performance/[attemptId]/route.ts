@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
 import { classifyErrorType, deriveConfidence, COMMON_MISTAKE_MIN_COUNT } from '@/lib/response-insight';
-import { computeMistakeQueue, isDueForReview } from '@/lib/mistake-queue';
+import { mistakesFromCards, isDueForReview } from '@/lib/mistake-queue';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,11 +132,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
     // Recommended next action: due mistakes first (there's already a
     // dedicated review flow for those), otherwise nudge toward the weakest
     // topic this attempt actually touched, otherwise nothing to flag.
-    const masteryEvents = await prisma.masteryEvent.findMany({
-      where: { userId: session.user.id },
-      select: { questionId: true, isCorrect: true, createdAt: true },
+    const spacedRepetitionCards = await prisma.spacedRepetitionCard.findMany({
+      where: { userId: session.user.id, questionId: { not: null } },
+      select: { questionId: true, lapses: true, lastReviewedAt: true, createdAt: true, dueAt: true },
     });
-    const dueMistakes = computeMistakeQueue(masteryEvents).filter((e) => isDueForReview(e));
+    const dueMistakes = mistakesFromCards(spacedRepetitionCards as { questionId: string; lapses: number; lastReviewedAt: Date | null; createdAt: Date; dueAt: Date }[]).filter((e) => isDueForReview(e));
 
     let recommendedAction: { type: 'REVIEW_MISTAKES'; count: number } | { type: 'PRACTICE_WEAK_TOPIC'; topic: string } | { type: 'KEEP_GOING' };
     if (dueMistakes.length > 0) {

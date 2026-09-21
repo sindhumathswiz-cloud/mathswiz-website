@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { awardPoints, POINTS_RULES } from '@/lib/gamification';
 import { applyMasteryUpdate } from '@/lib/mastery';
 import { withSerializableRetry } from '@/lib/prisma-retry';
+import { recordQuestionReview, getQuestionTimeBaseline } from '@/lib/spaced-repetition-review';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +105,8 @@ export async function POST(req: Request) {
       // mastery — only a real attempt updates it.
       if (question.topic && !skipped) {
         await applyMasteryUpdate(tx, { userId: studentId, topic: question.topic, isCorrect, source: 'PRACTICE', difficulty: question.difficulty, attemptId: attempt.id, questionId, at: now });
+        const medianTime = await getQuestionTimeBaseline(tx, questionId);
+        await recordQuestionReview(tx, { userId: studentId, questionId, signal: { isCorrect, timeSpent, medianTime }, at: now });
       }
 
       return { attempt, created: true };

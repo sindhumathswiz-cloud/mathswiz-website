@@ -20,7 +20,8 @@ import {
     BookX,
     Bookmark,
     Layers,
-    Trophy
+    Trophy,
+    CalendarClock
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -76,6 +77,7 @@ export default function StudentSidebar({ active }: { active?: string }) {
         { href: '/student/mistakes', icon: <BookX size={18} />, label: 'My Mistakes' },
         { href: '/student/bookmarks', icon: <Bookmark size={18} />, label: 'Bookmarks' },
         { href: '/student/flashcards', icon: <Layers size={18} />, label: 'Flashcards' },
+        { href: '/student/planner', icon: <CalendarClock size={18} />, label: 'Revision Planner' },
     ];
 
     const handleLogout = async () => {

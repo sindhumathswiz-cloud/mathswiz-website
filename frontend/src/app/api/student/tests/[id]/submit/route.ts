@@ -7,6 +7,7 @@ import { awardPoints, POINTS_RULES } from '@/lib/gamification';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { applyMasteryUpdate } from '@/lib/mastery';
 import { withSerializableRetry } from '@/lib/prisma-retry';
+import { recordQuestionReview } from '@/lib/spaced-repetition-review';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       reviewStatus: 'NOT_REQUIRED' | 'PENDING';
       timeSpent: number;
     }> = [];
-    const masteryItems: Array<{ topic: string; questionId: string; isCorrect: boolean; difficulty: string | null }> = [];
+    const masteryItems: Array<{ topic: string; questionId: string; isCorrect: boolean; difficulty: string | null; timeSpent: number; wasMarkedForReview: boolean }> = [];
 
     for (const section of test.sections) {
       for (const tq of section.questions) {
@@ -108,7 +109,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               marksAwarded = -section.negativeMarks; // subtract negative marks
               totalIncorrect++;
             }
-            if (q.topic) masteryItems.push({ topic: q.topic, questionId: q.id, isCorrect, difficulty: q.difficulty ?? null });
+            if (q.topic) {
+              masteryItems.push({
+                topic: q.topic,
+                questionId: q.id,
+                isCorrect,
+                difficulty: q.difficulty ?? null,
+                timeSpent: studentResponse?.timeSpent || 0,
+                wasMarkedForReview: studentResponse?.status === 'MARKED_FOR_REVIEW' || studentResponse?.status === 'ANSWERED_AND_MARKED',
+              });
+            }
           }
         } else {
           totalSkipped++;
@@ -139,6 +149,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
 
+    // A per-attempt time baseline for SM-2 quality derivation (no per-question
+    // history query needed here, unlike the single-question practice-arena
+    // path -- this attempt's own answered responses are a fine baseline).
+    const answeredTimes = responseRecords.filter((r) => r.timeSpent > 0).map((r) => r.timeSpent).sort((a, b) => a - b);
+    const medianTime = answeredTimes.length > 0 ? answeredTimes[Math.floor(answeredTimes.length / 2)] : 45;
+
     const submittedAt = new Date();
     const updatedAttempt = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
       const claimed = await tx.testAttempt.updateMany({
@@ -156,6 +172,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           difficulty: item.difficulty,
           attemptId,
           questionId: item.questionId,
+          at: submittedAt,
+        });
+        await recordQuestionReview(tx, {
+          userId: studentId,
+          questionId: item.questionId,
+          signal: { isCorrect: item.isCorrect, timeSpent: item.timeSpent, medianTime, wasMarkedForReview: item.wasMarkedForReview },
           at: submittedAt,
         });
       }

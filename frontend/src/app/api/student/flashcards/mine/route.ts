@@ -17,11 +17,31 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const topic = searchParams.get('topic');
+    const dueOnly = searchParams.get('mode') === 'due';
 
-    const cards = await prisma.studentFlashcard.findMany({
+    if (!dueOnly) {
+      const cards = await prisma.studentFlashcard.findMany({
+        where: { userId: session.user.id, ...(topic ? { topic } : {}) },
+        orderBy: { updatedAt: 'desc' },
+      });
+      return NextResponse.json({ cards });
+    }
+
+    // mode=due -- a card that's never been reviewed, or whose SM-2 schedule
+    // says it's due, gets studied; a card not yet due stays hidden here
+    // (still reachable via the unfiltered list above).
+    const now = new Date();
+    const allCards = await prisma.studentFlashcard.findMany({
       where: { userId: session.user.id, ...(topic ? { topic } : {}) },
       orderBy: { updatedAt: 'desc' },
+      include: { spacedRepetitionCards: true },
     });
+    const cards = allCards
+      .filter((c) => {
+        const schedule = c.spacedRepetitionCards[0];
+        return !schedule || schedule.dueAt <= now;
+      })
+      .map(({ spacedRepetitionCards, ...card }) => card);
 
     return NextResponse.json({ cards });
   } catch (error) {

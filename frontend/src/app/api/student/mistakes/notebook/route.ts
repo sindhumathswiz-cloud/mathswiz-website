@@ -2,18 +2,18 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { computeMistakeQueue } from '@/lib/mistake-queue';
+import { mistakesFromCards } from '@/lib/mistake-queue';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * The "My Mistakes" notebook: a standalone browsable list merging two
- * sources -- questions the student is currently wrong on (auto-derived from
- * MasteryEvent via the same computeMistakeQueue() the passive review nudge
- * uses, see /api/student/practice/mistakes) and questions the student
- * explicitly pinned via MistakeNotebookEntry, independent of whether they
- * ever got it wrong. A question present in both is reported once with
- * source: 'both'.
+ * sources -- questions the student has a persisted SM-2 review card for
+ * (see lib/spaced-repetition.ts, mistakesFromCards() converts to this
+ * route's shape; the same source the passive review nudge uses, see
+ * /api/student/practice/mistakes) and questions the student explicitly
+ * pinned via MistakeNotebookEntry, independent of whether they ever got it
+ * wrong. A question present in both is reported once with source: 'both'.
  */
 export async function GET() {
   try {
@@ -23,10 +23,10 @@ export async function GET() {
     }
     const studentId = session.user.id;
 
-    const [events, flagged] = await Promise.all([
-      prisma.masteryEvent.findMany({
+    const [cards, flagged] = await Promise.all([
+      prisma.spacedRepetitionCard.findMany({
         where: { userId: studentId, questionId: { not: null } },
-        select: { questionId: true, isCorrect: true, createdAt: true },
+        select: { questionId: true, lapses: true, lastReviewedAt: true, createdAt: true, dueAt: true },
       }),
       prisma.mistakeNotebookEntry.findMany({
         where: { userId: studentId },
@@ -34,8 +34,7 @@ export async function GET() {
       }),
     ]);
 
-    const now = new Date();
-    const autoMistakes = computeMistakeQueue(events, now);
+    const autoMistakes = mistakesFromCards(cards as { questionId: string; lapses: number; lastReviewedAt: Date | null; createdAt: Date; dueAt: Date }[]);
     const autoById = new Map(autoMistakes.map((e) => [e.questionId, e]));
     const flaggedById = new Map(flagged.map((e) => [e.questionId, e]));
 

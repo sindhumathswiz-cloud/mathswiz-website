@@ -114,6 +114,7 @@ model User {
   bookmarkLists             BookmarkList[]
   flashcards                StudentFlashcard[]
   learningPathProgress      LearningPathProgress[]
+  spacedRepetitionCards     SpacedRepetitionCard[]
 }
 
 model AuditLog {
@@ -528,6 +529,7 @@ model Question {
   embeddings     QuestionEmbedding[]
   mistakeNotebookEntries MistakeNotebookEntry[]
   bookmarkItems          BookmarkItem[]
+  spacedRepetitionCards  SpacedRepetitionCard[]
 
   @@index([contentHash])
   @@index([bookId, bookChapterId, bookExerciseId])
@@ -903,10 +905,40 @@ model StudentFlashcard {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spacedRepetitionCards SpacedRepetitionCard[]
 
   @@index([userId, updatedAt])
   @@index([userId, topic])
+}
+
+// A single SM-2 spaced-repetition schedule, shared by two kinds of review
+// items: a missed question (questionId set) or a flashcard (flashcardId
+// set) -- never both, never neither (enforced by a hand-added CHECK
+// constraint in the migration, since Prisma has no @@check in this schema
+// style). Two nullable FKs each with their own unique constraint is safe
+// here because Postgres unique indexes ignore NULLs.
+model SpacedRepetitionCard {
+  id             String    @id @default(cuid())
+  userId         String
+  questionId     String?
+  flashcardId    String?
+  easinessFactor Float     @default(2.5)
+  intervalDays   Int       @default(0)
+  repetitions    Int       @default(0)
+  lapses         Int       @default(0) // times graded <3 (a "miss") -- powers missCount in the mistakes notebook
+  dueAt          DateTime
+  lastReviewedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question  Question?         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  flashcard StudentFlashcard? @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@unique([userId, flashcardId])
+  @@index([userId, dueAt])
 }
 
 enum LearningPathStage {

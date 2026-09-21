@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getServerSession = vi.fn();
-const masteryEvent = { findMany: vi.fn() };
+const spacedRepetitionCard = { findMany: vi.fn() };
 const mistakeNotebookEntry = { findMany: vi.fn(), upsert: vi.fn() };
 const question = { findMany: vi.fn(), findFirst: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { masteryEvent, mistakeNotebookEntry, question } }));
+vi.mock('@/lib/prisma', () => ({ default: { spacedRepetitionCard, mistakeNotebookEntry, question } }));
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
 
@@ -22,7 +22,7 @@ describe('GET /api/student/mistakes/notebook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'student-1', role: 'STUDENT' } });
-    masteryEvent.findMany.mockResolvedValue([]);
+    spacedRepetitionCard.findMany.mockResolvedValue([]);
     mistakeNotebookEntry.findMany.mockResolvedValue([]);
   });
 
@@ -41,9 +41,9 @@ describe('GET /api/student/mistakes/notebook', () => {
     expect(question.findMany).not.toHaveBeenCalled();
   });
 
-  it('marks a question missed via auto-capture as source "auto"', async () => {
-    masteryEvent.findMany.mockResolvedValue([
-      { questionId: 'q-auto', isCorrect: false, createdAt: hoursAgo(200) },
+  it('marks a question with an SM-2 review card as source "auto"', async () => {
+    spacedRepetitionCard.findMany.mockResolvedValue([
+      { questionId: 'q-auto', lapses: 1, lastReviewedAt: hoursAgo(200), createdAt: hoursAgo(200), dueAt: hoursAgo(1) },
     ]);
     question.findMany.mockResolvedValue([{ id: 'q-auto', content: 'x', topic: 'Algebra', subject: 'Math', difficulty: 'MEDIUM' }]);
     const { GET } = await import('./route');
@@ -52,6 +52,7 @@ describe('GET /api/student/mistakes/notebook', () => {
     expect(body.entries).toHaveLength(1);
     expect(body.entries[0].source).toBe('auto');
     expect(body.entries[0].dueAt).not.toBeNull();
+    expect(body.entries[0].missCount).toBe(1);
   });
 
   it('marks an explicitly pinned question as source "flagged"', async () => {
@@ -69,8 +70,8 @@ describe('GET /api/student/mistakes/notebook', () => {
   });
 
   it('dedupes a question that is both wrong and flagged into source "both"', async () => {
-    masteryEvent.findMany.mockResolvedValue([
-      { questionId: 'q-both', isCorrect: false, createdAt: hoursAgo(200) },
+    spacedRepetitionCard.findMany.mockResolvedValue([
+      { questionId: 'q-both', lapses: 1, lastReviewedAt: hoursAgo(200), createdAt: hoursAgo(200), dueAt: hoursAgo(1) },
     ]);
     mistakeNotebookEntry.findMany.mockResolvedValue([
       { id: 'entry-1', userId: 'student-1', questionId: 'q-both', note: null, createdAt: new Date() },
@@ -81,6 +82,20 @@ describe('GET /api/student/mistakes/notebook', () => {
     const body = await response.json();
     expect(body.entries).toHaveLength(1);
     expect(body.entries[0].source).toBe('both');
+  });
+
+  it('keeps a card whose most recent review was correct (real SM-2, not the old vanish-on-correct behavior)', async () => {
+    // lapses can be 0 here -- the card still exists and is still shown,
+    // it's just scheduled further out by its own dueAt.
+    spacedRepetitionCard.findMany.mockResolvedValue([
+      { questionId: 'q-recovering', lapses: 0, lastReviewedAt: hoursAgo(1), createdAt: hoursAgo(300), dueAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000) },
+    ]);
+    question.findMany.mockResolvedValue([{ id: 'q-recovering', content: 'x', topic: 'Algebra', subject: 'Math', difficulty: 'MEDIUM' }]);
+    const { GET } = await import('./route');
+    const response = await GET();
+    const body = await response.json();
+    expect(body.entries).toHaveLength(1);
+    expect(body.entries[0].missCount).toBe(0);
   });
 });
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Layers, Loader2, Plus, Shuffle, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Clock, Layers, Loader2, Plus, Shuffle, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { readJsonResponse } from '@/lib/http-json';
 
@@ -17,6 +17,7 @@ export default function FlashcardsClient() {
   const [topic, setTopic] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [dueCount, setDueCount] = useState(0);
 
   const load = () => {
     setLoading(true);
@@ -26,7 +27,14 @@ export default function FlashcardsClient() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  const loadDueCount = () => {
+    fetch('/api/student/flashcards/mine?mode=due')
+      .then((response) => response.json())
+      .then((data) => setDueCount(Array.isArray(data.cards) ? data.cards.length : 0))
+      .catch(() => {});
+  };
+
+  useEffect(() => { load(); loadDueCount(); }, []);
 
   const create = async () => {
     if (!front.trim() || !back.trim() || saving) return;
@@ -78,6 +86,11 @@ export default function FlashcardsClient() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {dueCount > 0 && (
+              <Link href="/student/flashcards/study?mode=due" className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-amber-200 hover:bg-amber-600 transition-colors">
+                <Clock className="h-4 w-4" />Study due ({dueCount})
+              </Link>
+            )}
             {cards.length > 0 && (
               <Link href="/student/flashcards/study" className="inline-flex items-center gap-2 rounded-2xl border-2 border-indigo-200 px-5 py-3 text-sm font-black text-indigo-700 hover:bg-indigo-50 transition-colors">
                 <Shuffle className="h-4 w-4" />Study

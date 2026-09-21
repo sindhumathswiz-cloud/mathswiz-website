@@ -32,6 +32,28 @@ describe('GET /api/student/flashcards/mine', () => {
   });
 });
 
+describe('GET /api/student/flashcards/mine?mode=due', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getServerSession.mockResolvedValue({ user: { id: 'student-1', role: 'STUDENT' } });
+  });
+
+  it('includes a never-reviewed card and a card whose schedule is due, excludes a not-yet-due card', async () => {
+    const now = Date.now();
+    studentFlashcard.findMany.mockResolvedValue([
+      { id: 'never-reviewed', spacedRepetitionCards: [] },
+      { id: 'due', spacedRepetitionCards: [{ dueAt: new Date(now - 60_000) }] },
+      { id: 'not-due', spacedRepetitionCards: [{ dueAt: new Date(now + 60_000) }] },
+    ]);
+    const { GET } = await import('./route');
+    const response = await GET(new Request('http://localhost/api/student/flashcards/mine?mode=due'));
+    const body = await response.json();
+
+    expect(body.cards.map((c: any) => c.id)).toEqual(['never-reviewed', 'due']);
+    expect(body.cards[0].spacedRepetitionCards).toBeUndefined();
+  });
+});
+
 describe('POST /api/student/flashcards/mine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
