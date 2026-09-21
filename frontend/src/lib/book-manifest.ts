@@ -656,6 +656,8 @@ export const NON_QUESTION_SECTIONS = NON_QUESTION_SECTION_TYPES;
 
 export interface ConfirmedSection {
   id: string;
+  code: string | null;
+  title: string | null;
   sectionType: string | null;
   startPage: number | null;
   endPage: number | null;
@@ -667,6 +669,14 @@ export interface ConfirmedSection {
   solutionsStartPage: number | null;
   solutionsEndPage: number | null;
   solutionCoverage: string | null;
+  // Reconciliation (lib/exercise-reconciliation.ts) -- expectedQuestionCount
+  // is admin-entered; the other three plus reconciledAt are only ever
+  // written by that module, never by the extraction pipeline itself.
+  expectedQuestionCount: number | null;
+  extractedQuestionCount: number;
+  matchedQuestionCount: number;
+  unresolvedQuestionCount: number;
+  reconciledAt: Date | null;
 }
 
 export interface ConfirmedChapter {
@@ -707,6 +717,8 @@ export async function loadConfirmedChapters(bookId: string): Promise<ConfirmedCh
         orderBy: { orderIndex: 'asc' },
         select: {
           id: true,
+          code: true,
+          title: true,
           sectionType: true,
           startPage: true,
           endPage: true,
@@ -718,6 +730,11 @@ export async function loadConfirmedChapters(bookId: string): Promise<ConfirmedCh
           solutionsStartPage: true,
           solutionsEndPage: true,
           solutionCoverage: true,
+          expectedQuestionCount: true,
+          extractedQuestionCount: true,
+          matchedQuestionCount: true,
+          unresolvedQuestionCount: true,
+          reconciledAt: true,
         },
       },
     },

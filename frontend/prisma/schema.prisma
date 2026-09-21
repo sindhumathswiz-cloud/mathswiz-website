@@ -1286,7 +1286,13 @@ model BookExercise {
   endPage                 Int?
   expectedQuestionCount   Int?
   extractedQuestionCount  Int      @default(0)
+  matchedQuestionCount    Int      @default(0)
   unresolvedQuestionCount Int      @default(0)
+  // Set every time lib/exercise-reconciliation.ts recomputes the four counts
+  // above from this exercise's confirmed page range -- null means "never
+  // reconciled", not "reconciled and clean". See that file and
+  // api/admin/books/[id]/reconciliation/route.ts.
+  reconciledAt            DateTime?
   // Per-section answer layout, part of the confirmed chapter manifest. The
   // four *Page fields locate separate blocks printed elsewhere in the chapter;
   // all independent (a section can have both a letter key and a solutions

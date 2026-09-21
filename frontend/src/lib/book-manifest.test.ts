@@ -225,10 +225,11 @@ describe('detectManifest (TOC-driven)', () => {
 
 describe('confirmed-manifest consumer helpers', () => {
   const section = (over: Partial<ConfirmedSection>): ConfirmedSection => ({
-    id: 's', sectionType: 'MCQ', startPage: null, endPage: null,
+    id: 's', code: null, title: null, sectionType: 'MCQ', startPage: null, endPage: null,
     inlineAnswers: false, noAnswers: false,
     answerKeyStartPage: null, answerKeyEndPage: null, answerKeyCoverage: null,
     solutionsStartPage: null, solutionsEndPage: null, solutionCoverage: null,
+    expectedQuestionCount: null, extractedQuestionCount: 0, matchedQuestionCount: 0, unresolvedQuestionCount: 0, reconciledAt: null,
     ...over,
   });
   const chapters: ConfirmedChapter[] = [
