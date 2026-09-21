@@ -93,11 +93,25 @@ function PracticeArenaInner() {
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
     useEffect(() => {
-        fetchRecommendedTopics();
         fetchMistakesDue();
-        if (searchParams?.get('mode') === 'mistakes') {
+        const mode = searchParams?.get('mode');
+        if (mode === 'mistakes') {
+            fetchRecommendedTopics();
             handleReviewMistakes();
+        } else if (mode === 'smart') {
+            // One-tap Smart Practice: jump straight into the student's
+            // single weakest topic instead of the default unfiltered feed.
+            // Falls back to ordinary practice when there's no mastery
+            // history yet (new student, nothing to recommend from).
+            fetchRecommendedTopics().then((topics) => {
+                if (topics.length > 0) {
+                    handlePracticeTopic(topics[0]);
+                } else {
+                    fetchNextQuestion();
+                }
+            });
         } else {
+            fetchRecommendedTopics();
             fetchNextQuestion();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,17 +133,20 @@ function PracticeArenaInner() {
         return `${m}:${s}`;
     };
 
-    const fetchRecommendedTopics = async () => {
+    const fetchRecommendedTopics = async (): Promise<string[]> => {
         try {
             const res = await fetch('/api/student/mastery');
             const data = await readJsonResponse<{ topics?: { topic: string; masteryScore: number }[] }>(res);
             if (res.ok && Array.isArray(data?.topics)) {
                 // /api/student/mastery already sorts weakest-first.
-                setRecommended(data.topics.slice(0, 3).map(t => t.topic).filter(Boolean));
+                const topics = data.topics.slice(0, 3).map(t => t.topic).filter(Boolean);
+                setRecommended(topics);
+                return topics;
             }
         } catch (err) {
             // Non-critical — the setup panel just shows no shortcuts.
         }
+        return [];
     };
 
     const fetchMistakesDue = async () => {
@@ -240,7 +257,10 @@ function PracticeArenaInner() {
             const res = await fetch('/api/student/practice/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic: topicFilter, difficulty: difficultyFilter || 'MEDIUM', count: 5 }),
+                // Omitting difficulty when the student hasn't picked one lets
+                // the server derive a mastery-weighted band instead of
+                // defaulting every generation to MEDIUM.
+                body: JSON.stringify({ topic: topicFilter, difficulty: difficultyFilter || undefined, count: 5 }),
             });
             const data = await readJsonResponse<{ success?: boolean; questions?: any[]; error?: string; generated?: number }>(res);
             if (!res.ok || !data?.success || !Array.isArray(data.questions) || data.questions.length === 0) {

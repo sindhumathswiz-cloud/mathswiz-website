@@ -17,7 +17,9 @@ export async function GET() {
     // avg time-per-question by topic in app code. Capped at 2000 most
     // recent responses as a safety bound against unbounded history.
     prisma.testResponse.findMany({
-      where: { attempt: { userId: session.user.id }, status: 'ANSWERED' },
+      // Not an exact 'ANSWERED' match: a marked-for-review response is still
+      // an answered one for avg-time purposes, only 'SKIPPED' should drop out.
+      where: { attempt: { userId: session.user.id }, status: { not: 'SKIPPED' } },
       select: { timeSpent: true, question: { select: { topic: true } } },
       orderBy: { id: 'desc' },
       take: 2000,

@@ -6,19 +6,22 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
     PieChart, Pie, Cell, LineChart, Line, AreaChart, Area 
 } from 'recharts';
-import { 
-    ChevronLeft, 
-    Target, 
-    Zap, 
-    Clock, 
-    AlertCircle, 
-    CheckCircle2, 
+import {
+    ChevronLeft,
+    Target,
+    Zap,
+    Clock,
+    AlertCircle,
+    CheckCircle2,
     Trophy,
     TrendingUp,
     Timer,
     MousePointer2,
     Calendar,
-    ArrowUpRight
+    ArrowUpRight,
+    Sparkles,
+    BookX,
+    PartyPopper
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 import toast from 'react-hot-toast';
@@ -60,8 +63,21 @@ export default function PerformanceAnalytics() {
 
     if (!data) return <div>Error loading data.</div>;
 
-    const { attempt, behavioral, rank, totalTakers } = data;
-    
+    const { attempt, behavioral, rank, totalTakers, responseInsights, recommendedAction } = data;
+    const insightByResponseId = new Map((responseInsights || []).map((ri: any) => [ri.responseId, ri]));
+
+    const ERROR_TYPE_LABEL: Record<string, string> = {
+        SKIPPED: 'Skipped',
+        CARELESS: 'Careless',
+        NEEDS_REVIEW: 'Needs Review',
+        COMMON_MISTAKE: 'Common Mistake',
+    };
+    const CONFIDENCE_STYLE: Record<string, string> = {
+        HIGH: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+        MEDIUM: 'bg-amber-50 text-amber-700 border-amber-100',
+        LOW: 'bg-rose-50 text-rose-700 border-rose-100',
+    };
+
     // Data for charts
     const behavioralData = [
         { name: 'Perfect', value: behavioral.perfect, color: '#10b981', detail: 'Correct & Efficient' },
@@ -123,6 +139,42 @@ export default function PerformanceAnalytics() {
                         </div>
                     ))}
                 </div>
+
+                {/* Recommended Next Action */}
+                {recommendedAction && recommendedAction.type !== 'KEEP_GOING' && (
+                    <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[40px] p-8 shadow-xl shadow-indigo-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 text-white">
+                        <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                                {recommendedAction.type === 'REVIEW_MISTAKES' ? <BookX className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-100 mb-1">Recommended Next Action</p>
+                                {recommendedAction.type === 'REVIEW_MISTAKES' ? (
+                                    <h3 className="text-lg font-black">You have {recommendedAction.count} mistake{recommendedAction.count === 1 ? '' : 's'} due for review</h3>
+                                ) : (
+                                    <h3 className="text-lg font-black">Practice your weakest topic from this attempt: {recommendedAction.topic}</h3>
+                                )}
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => router.push(recommendedAction.type === 'REVIEW_MISTAKES' ? '/student/practice?mode=mistakes' : '/student/practice?mode=smart')}
+                            className="bg-white text-indigo-700 font-black px-6 py-3 rounded-2xl hover:bg-indigo-50 transition shadow-lg text-sm uppercase tracking-widest shrink-0"
+                        >
+                            {recommendedAction.type === 'REVIEW_MISTAKES' ? 'Review Mistakes' : 'Start Smart Practice'}
+                        </button>
+                    </div>
+                )}
+                {recommendedAction && recommendedAction.type === 'KEEP_GOING' && (
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-[40px] p-6 flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                            <PartyPopper className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Recommended Next Action</p>
+                            <h3 className="text-sm font-black text-emerald-900">Nothing urgent — keep up the momentum!</h3>
+                        </div>
+                    </div>
+                )}
 
                 {/* Behavioral & Time Analytics */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -223,17 +275,33 @@ export default function PerformanceAnalytics() {
                     </div>
 
                     <div className="divide-y divide-slate-50">
-                        {attempt.responses.map((r: any, i: number) => (
+                        {attempt.responses.map((r: any, i: number) => {
+                            const insight = insightByResponseId.get(r.id) as { errorType: string | null; confidence: string | null } | undefined;
+                            return (
                             <div key={i} className="p-8 hover:bg-slate-50/50 transition-colors">
                                 <div className="flex flex-col lg:flex-row gap-8">
                                     <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shrink-0">
                                         {i + 1}
                                     </div>
                                     <div className="flex-1 space-y-6">
+                                        {(insight?.errorType || insight?.confidence) && (
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {insight.errorType && (
+                                                    <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                                        {ERROR_TYPE_LABEL[insight.errorType] || insight.errorType}
+                                                    </span>
+                                                )}
+                                                {insight.confidence && (
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${CONFIDENCE_STYLE[insight.confidence]}`}>
+                                                        {insight.confidence} Confidence
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                         <div className="prose prose-slate max-w-none">
                                             <MathRenderer content={r.question.content} />
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div className={`p-4 rounded-2xl border ${r.isCorrect ? 'bg-emerald-50 border-emerald-100 text-emerald-900' : 'bg-rose-50 border-rose-100 text-rose-900'} flex items-center gap-3`}>
                                                 {r.isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
@@ -264,7 +332,8 @@ export default function PerformanceAnalytics() {
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>

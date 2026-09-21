@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { 
+import React, { useState } from 'react';
+import {
     LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, BarChart, Bar, Cell
 } from 'recharts';
@@ -11,7 +11,17 @@ interface PerformanceAnalyticsProps {
     attempts: any[];
 }
 
+type TrendFilter = 'all' | 'mock' | 'regular';
+
 export default function PerformanceAnalytics({ attempts }: PerformanceAnalyticsProps) {
+    const [trendFilter, setTrendFilter] = useState<TrendFilter>('all');
+
+    const trendAttempts = attempts.filter((a) => {
+        if (trendFilter === 'mock') return a.test?.templateType === 'MOCK_EXAM';
+        if (trendFilter === 'regular') return a.test?.templateType !== 'MOCK_EXAM';
+        return true;
+    });
+
     // 1. Prepare Mastery Data (Radar Chart)
     const subjectWise = attempts.reduce((acc: any, curr: any) => {
         const subject = curr.test?.subject || 'General';
@@ -29,7 +39,7 @@ export default function PerformanceAnalytics({ attempts }: PerformanceAnalyticsP
     }));
 
     // 2. Prepare Time vs Score (Area Chart)
-    const timelineData = [...attempts].reverse().map((a, i) => ({
+    const timelineData = [...trendAttempts].reverse().map((a, i) => ({
         index: i + 1,
         score: Math.round((a.totalScore / (a.test?.totalMarks || 100)) * 100),
         date: new Date(a.endTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
@@ -122,9 +132,26 @@ export default function PerformanceAnalytics({ attempts }: PerformanceAnalyticsP
 
                 {/* Score Progression */}
                 <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                    <h3 className="text-lg font-black text-slate-900 mb-8 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-emerald-500" /> Score Progression
-                    </h3>
+                    <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
+                        <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-emerald-500" /> Score Progression
+                        </h3>
+                        <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+                            {([
+                                ['all', 'All'],
+                                ['mock', 'Mock Exams'],
+                                ['regular', 'Regular'],
+                            ] as [TrendFilter, string][]).map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    onClick={() => setTrendFilter(value)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${trendFilter === value ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <div className="h-[300px] w-full">
                         {timelineData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">

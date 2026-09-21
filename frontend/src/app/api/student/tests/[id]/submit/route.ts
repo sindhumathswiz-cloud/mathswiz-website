@@ -116,6 +116,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         totalScore += marksAwarded;
 
+        // Scoring above is already fully finalized -- this only changes what
+        // gets persisted for the response, so propagating the client's
+        // "marked for review" flag here can't affect isCorrect/marksAwarded
+        // or any of the totals.
+        const storedStatus = (studentResponse?.status === 'MARKED_FOR_REVIEW' || studentResponse?.status === 'ANSWERED_AND_MARKED')
+          ? 'MARKED_FOR_REVIEW'
+          : status;
+
         responseRecords.push({
           attemptId,
           questionId: q.id,
@@ -124,7 +132,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           subjectiveImage,
           isCorrect,
           marksAwarded,
-          status,
+          status: storedStatus,
           reviewStatus,
           timeSpent: studentResponse?.timeSpent || 0
         });

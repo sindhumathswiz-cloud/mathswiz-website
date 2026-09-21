@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { readJsonResponse } from "@/lib/http-json";
+import { masteryToDifficultyBand } from "@/lib/question-selection";
 
 // Re-use the same load balancer logic from Task 4
 const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) => {
@@ -87,16 +88,34 @@ export async function POST(req: Request) {
         
         // Ensure Type and Difficulty match Prisma Enums exactly
         const searchType = (type || "SINGLE_CHOICE").toUpperCase().replace(/\s+/g, '_') as any;
-        const searchDiff = (difficulty || "MEDIUM").toUpperCase() as any;
+
+        // When the caller doesn't pin a difficulty (the student practice UI,
+        // once it stops forcing MEDIUM client-side), derive a band from the
+        // student's own mastery on this topic instead of hardcoding MEDIUM --
+        // same band-derivation already used for Phase-2 interventions.
+        let difficultyBand: string[];
+        if (difficulty) {
+            difficultyBand = [(difficulty as string).toUpperCase()];
+        } else {
+            const progress = await prisma.studentProgress.findFirst({
+                where: { userId, topic: { equals: topic, mode: 'insensitive' } },
+                select: { masteryScore: true }
+            });
+            difficultyBand = masteryToDifficultyBand(progress?.masteryScore ?? 50);
+        }
+        // The LLM prompt needs one target difficulty; use the harder end of
+        // the band so generated content isn't systematically softer than the
+        // DB-first query above, which draws from the whole band.
+        const searchDiff = difficultyBand[difficultyBand.length - 1] as any;
 
         // 1. Query Database First (Bypass if forceAI is true)
         let dbQuestions: any[] = [];
         if (!forceAI) {
             dbQuestions = await prisma.question.findMany({
-                where: { 
-                    status: "APPROVED", 
-                    type: searchType, 
-                    difficulty: searchDiff, 
+                where: {
+                    status: "APPROVED",
+                    type: searchType,
+                    difficulty: { in: difficultyBand as any[] },
                     topic: { equals: topic, mode: 'insensitive' },
                     ...(subtopic ? { subTopic: { equals: subtopic, mode: 'insensitive' } } : {})
                 },

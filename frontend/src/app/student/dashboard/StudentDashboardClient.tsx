@@ -135,6 +135,7 @@ export default function StudentDashboardClient({
                     ]}
                     actions={[
                         { label: 'Start practice', href: '/student/practice', icon: Target },
+                        { label: 'Smart Practice', href: '/student/practice?mode=smart', icon: Sparkles },
                         { label: 'Ask Doubt Buddy', href: '/student/doubt-buddy', icon: Bot },
                         { label: 'View assigned tests', icon: ClipboardList, onClick: () => setActiveTab('tests') },
                     ]}
@@ -408,6 +409,7 @@ export default function StudentDashboardClient({
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-2">
                                                         <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${assignment.kind === 'HOMEWORK' ? 'bg-violet-100 text-violet-700' : 'bg-red-100 text-red-700'}`}>{assignment.kind === 'HOMEWORK' ? 'Homework' : 'Test'}</span>
+                                                        {assignment.test?.templateType === 'MOCK_EXAM' && <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-700">Mock Exam</span>}
                                                         {isExpired && <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500">Expired</span>}
                                                     </div>
                                                     <h3 className="text-lg font-black text-gray-900">{assignment.test?.title}</h3>

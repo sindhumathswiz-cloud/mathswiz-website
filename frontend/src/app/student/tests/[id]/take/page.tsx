@@ -685,12 +685,20 @@ export default function TestTakingUI() {
                             </div>
                         </div>
 
-                        <button 
-                            onClick={() => router.push('/student/dashboard')}
-                            className="w-full bg-slate-900 text-white font-black py-5 rounded-[20px] hover:bg-slate-800 transition shadow-xl shadow-slate-200 text-sm uppercase tracking-[0.2em]"
-                        >
-                            Return to Command Center
-                        </button>
+                        <div className="grid grid-cols-1 gap-3">
+                            <button
+                                onClick={() => router.push(`/student/performance/${testResult.id}`)}
+                                className="w-full bg-indigo-600 text-white font-black py-5 rounded-[20px] hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 text-sm uppercase tracking-[0.2em]"
+                            >
+                                View Full Report
+                            </button>
+                            <button
+                                onClick={() => router.push('/student/dashboard')}
+                                className="w-full bg-slate-900 text-white font-black py-5 rounded-[20px] hover:bg-slate-800 transition shadow-xl shadow-slate-200 text-sm uppercase tracking-[0.2em]"
+                            >
+                                Return to Command Center
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
