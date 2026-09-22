@@ -25,10 +25,10 @@ export async function linkStudentAction(parentId: string, studentEmail: string) 
     }
 
     const existingLink = await prisma.parentLink.findFirst({
-        where: { studentId: student.id }
+        where: { studentId: student.id, parentId: session.user.id }
     });
     if (existingLink) {
-        throw new Error("This student is already linked to a parent account.");
+        throw new Error("This student is already linked to your account.");
     }
 
     await prisma.parentLink.create({

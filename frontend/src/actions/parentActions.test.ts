@@ -33,11 +33,23 @@ describe('linkStudentAction', () => {
     await expect(linkStudentAction('parent-1', 'nope@example.com')).rejects.toThrow('not found');
   });
 
-  it('rejects a student already linked to a parent', async () => {
-    parentLink.findFirst.mockResolvedValue({ id: 'existing-link', parentId: 'other-parent', studentId: 'student-1' });
+  it('rejects re-linking a student already linked to THIS parent', async () => {
+    parentLink.findFirst.mockResolvedValue({ id: 'existing-link', parentId: 'parent-1', studentId: 'student-1' });
     const { linkStudentAction } = await import('./parentActions');
     await expect(linkStudentAction('parent-1', 'kid@example.com')).rejects.toThrow('already linked');
     expect(parentLink.create).not.toHaveBeenCalled();
+  });
+
+  it('allows a second, different parent to link a student already linked to another parent (two-parent households)', async () => {
+    // findFirst is scoped to {studentId, parentId: session.user.id} -- a link
+    // held by a DIFFERENT parent must not surface here.
+    parentLink.findFirst.mockImplementation(async ({ where }: any) =>
+      where.parentId === 'parent-1' ? null : { id: 'other-link', parentId: 'other-parent', studentId: 'student-1' }
+    );
+    const { linkStudentAction } = await import('./parentActions');
+    await linkStudentAction('parent-1', 'kid@example.com');
+
+    expect(parentLink.create).toHaveBeenCalledWith({ data: { parentId: 'parent-1', studentId: 'student-1' } });
   });
 
   it('creates a ParentLink row and audit-logs the link', async () => {
