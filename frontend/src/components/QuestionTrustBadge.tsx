@@ -8,7 +8,7 @@ const TRUST_STYLE: Record<QuestionTrustLevel, string> = {
 };
 
 const TRUST_LABEL: Record<QuestionTrustLevel, string> = {
-  verified: 'AI-verified solution',
+  verified: 'Verified solution',
   approved: 'Reviewed solution',
   pending: 'Pending review',
 };
