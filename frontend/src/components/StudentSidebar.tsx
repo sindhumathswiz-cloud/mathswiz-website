@@ -3,7 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
+import { useTheme } from 'next-themes';
+import {
     LayoutDashboard,
     BookOpen,
     ClipboardList,
@@ -22,7 +23,8 @@ import {
     Layers,
     Trophy,
     CalendarClock,
-    Swords
+    Swords,
+    Zap
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -35,19 +37,19 @@ interface SidebarItemProps {
 }
 
 const SidebarItem = ({ href, icon, label, isActive, badge }: SidebarItemProps) => (
-    <Link 
+    <Link
         href={href}
         className={`flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-200 group ${
-            isActive 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
-                : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'
+            isActive
+                ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white shadow-lg shadow-indigo-200 dark:shadow-none'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-indigo-600 dark:hover:text-brand'
         }`}
     >
         <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl transition-colors ${isActive ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-indigo-50'}`}>
+            <div className={`p-2 rounded-xl transition-colors ${isActive ? 'bg-white/20' : 'bg-slate-100 dark:bg-white/5 group-hover:bg-indigo-50 dark:group-hover:bg-brand/10'}`}>
                 {icon}
             </div>
-            <span className="font-bold text-sm tracking-tight">{label}</span>
+            <span className="font-body font-bold text-sm tracking-tight">{label}</span>
         </div>
         {badge && (
             <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isActive ? 'bg-white text-indigo-600' : 'bg-rose-500 text-white'}`}>
@@ -60,6 +62,9 @@ const SidebarItem = ({ href, icon, label, isActive, badge }: SidebarItemProps) =
 
 export default function StudentSidebar({ active }: { active?: string }) {
     const pathname = usePathname();
+    const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => setMounted(true), []);
 
     const menuItems = [
         { href: '/student/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
@@ -90,24 +95,31 @@ export default function StudentSidebar({ active }: { active?: string }) {
     };
 
     return (
-        <aside className="w-72 bg-white border-r border-slate-200 h-screen sticky top-0 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
+        <aside className="w-72 bg-white dark:bg-surface border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
             {/* Profile Brief */}
             <div className="p-8">
                 <div className="flex items-center gap-4 mb-8">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 shadow-inner">
+                    <div className="w-12 h-12 bg-indigo-100 dark:bg-brand/15 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-brand shadow-inner">
                         <UserCircle size={28} />
                     </div>
-                    <div>
-                        <h2 className="font-black text-slate-900 leading-none">Student Portal</h2>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Mathswiz Premium</span>
+                    <div className="flex-1 min-w-0">
+                        <h2 className="font-display font-black text-slate-900 dark:text-white leading-none">Student Portal</h2>
+                        <span className="font-body text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Mathswiz Premium</span>
                     </div>
+                    <button
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                        aria-label="Toggle dark mode"
+                        className="p-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-indigo-600 dark:hover:text-brand transition-colors shrink-0"
+                    >
+                        <Zap className={`w-4 h-4 ${(mounted && theme === 'dark') ? 'text-accent-warm fill-accent-warm' : ''}`} />
+                    </button>
                 </div>
 
                 {/* Main Navigation */}
                 <div className="space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-4">Command Center</p>
+                    <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Command Center</p>
                     {menuItems.map((item) => (
-                        <SidebarItem 
+                        <SidebarItem
                             key={item.href}
                             {...item}
                             isActive={pathname === item.href}
@@ -117,7 +129,7 @@ export default function StudentSidebar({ active }: { active?: string }) {
 
                 {/* Learning Loop Section */}
                 <div className="mt-10 space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-4">Learning Loop</p>
+                    <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Learning Loop</p>
                     {learningItems.map((item) => (
                         <SidebarItem
                             key={item.href}
@@ -129,27 +141,27 @@ export default function StudentSidebar({ active }: { active?: string }) {
 
                 {/* AI Tools Section */}
                 <div className="mt-10 space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-4">Intelligence</p>
-                    <Link 
+                    <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Intelligence</p>
+                    <Link
                         href="/student/doubt-buddy"
-                        className="flex items-center gap-3 px-4 py-4 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-xl shadow-indigo-100 hover:scale-[1.02] transition-transform group"
+                        className="flex items-center gap-3 px-4 py-4 rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-brand dark:to-brand-violet text-white shadow-xl shadow-indigo-100 dark:shadow-none hover:scale-[1.02] transition-transform group"
                     >
                         <div className="p-2 bg-white/20 rounded-xl">
                             <Sparkles size={18} />
                         </div>
                         <div>
-                            <span className="font-black text-sm block">Doubt Buddy AI</span>
-                            <span className="text-[9px] font-bold text-indigo-100 uppercase tracking-tighter">Instant Resolution</span>
+                            <span className="font-display font-black text-sm block">Doubt Buddy AI</span>
+                            <span className="font-body text-[9px] font-bold text-indigo-100 uppercase tracking-tighter">Instant Resolution</span>
                         </div>
                     </Link>
                 </div>
             </div>
 
             {/* Bottom Section */}
-            <div className="mt-auto p-8 border-t border-slate-100 bg-slate-50/50">
-                <button 
+            <div className="mt-auto p-8 border-t border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+                <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors font-bold text-sm"
+                    className="flex items-center gap-3 px-4 py-3 w-full rounded-2xl text-slate-500 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 transition-colors font-body font-bold text-sm"
                 >
                     <LogOut size={18} />
                     Log Out

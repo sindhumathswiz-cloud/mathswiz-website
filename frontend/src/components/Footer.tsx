@@ -28,7 +28,7 @@ export default function Footer() {
     const footerData = branding?.content?.footer;
 
     // HYDRATION & LAYOUT FIX: Hide global footer on dashboard routes
-    if (pathname?.startsWith('/admin') || pathname?.startsWith('/teacher')) {
+    if (pathname?.startsWith('/admin') || pathname?.startsWith('/teacher') || pathname?.startsWith('/student') || pathname?.startsWith('/parent')) {
         return null;
     }
 

@@ -1,10 +1,10 @@
 import React from 'react';
-import TeacherSidebar from '@/components/TeacherSidebar';
+import AdminSidebar from '@/components/AdminSidebar';
 
-export default function TeacherLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-background flex">
-            <TeacherSidebar />
+            <AdminSidebar />
             <main className="flex-1 h-screen overflow-y-auto custom-scrollbar">
                 {children}
             </main>

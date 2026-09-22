@@ -298,59 +298,59 @@ export default function AdminDashboardClient({
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-12">
+        <div className="min-h-screen bg-gray-50 dark:bg-background pb-12">
             {/* Top Navigation */}
-            <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+            <div className="bg-white dark:bg-surface border-b border-gray-200 dark:border-white/10 sticky top-0 z-30">
                 <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-8">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet rounded-lg flex items-center justify-center">
                                 <Activity className="w-5 h-5 text-white" />
                             </div>
-                            <span className="font-extrabold text-xl tracking-tight text-gray-900">ADMIN <span className="text-indigo-600">COMMAND</span></span>
+                            <span className="font-display font-extrabold text-xl tracking-tight text-gray-900 dark:text-white">ADMIN <span className="text-indigo-600 dark:text-brand">COMMAND</span></span>
                         </div>
-                        <div className="hidden md:flex items-center bg-gray-100 rounded-xl px-4 py-2 w-96 border border-gray-200 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+                        <div className="hidden md:flex items-center bg-gray-100 dark:bg-white/5 rounded-xl px-4 py-2 w-96 border border-gray-200 dark:border-white/10 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
                             <Search className="w-4 h-4 text-gray-400" />
-                            <input 
-                                type="text" 
-                                placeholder="Search by name, email or mobile..." 
+                            <input
+                                type="text"
+                                placeholder="Search by name, email or mobile..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-transparent border-none outline-none ml-3 text-sm w-full font-medium" 
+                                className="bg-transparent border-none outline-none ml-3 text-sm w-full font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500"
                             />
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <button 
+                        <button
                             onClick={() => setIsCreateBatchOpen(true)}
-                            className="hidden lg:flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-100"
+                            className="hidden lg:flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:brightness-105 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-md shadow-indigo-100 dark:shadow-none"
                         >
                             <Plus className="w-4 h-4" /> Create Batch
                         </button>
-                        <button className="p-2 text-gray-400 hover:bg-gray-100 rounded-full relative transition-colors">
+                        <button className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full relative transition-colors">
                             <Bell className="w-5 h-5" />
-                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-white dark:border-surface rounded-full"></span>
                         </button>
-                        <button 
+                        <button
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                            className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
                         >
-                            <Zap className={`w-5 h-5 ${(mounted && theme === 'dark') ? 'text-amber-400 fill-amber-400' : ''}`} />
+                            <Zap className={`w-5 h-5 ${(mounted && theme === 'dark') ? 'text-accent-warm fill-accent-warm' : ''}`} />
                         </button>
-                        <div className="h-8 w-px bg-gray-200 mx-2"></div>
+                        <div className="h-8 w-px bg-gray-200 dark:bg-white/10 mx-2"></div>
                         <div className="flex items-center gap-3 pl-2">
                             <div className="text-right hidden sm:block">
-                                <p className="text-sm font-bold text-gray-900">Master Admin</p>
-                                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Global Control</p>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">Master Admin</p>
+                                <p className="text-[10px] font-bold text-indigo-600 dark:text-brand uppercase tracking-widest">Global Control</p>
                             </div>
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-lg border-2 border-white shadow-sm">A</div>
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-brand dark:to-brand-violet flex items-center justify-center text-white font-black text-lg border-2 border-white dark:border-surface shadow-sm">A</div>
                         </div>
                         <button
                             type="button"
                             onClick={handleSignOut}
                             disabled={isSigningOut}
                             aria-label="Sign out of administrator account"
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-wait disabled:opacity-60"
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface px-3 text-sm font-bold text-slate-600 dark:text-slate-300 transition hover:border-rose-200 dark:hover:border-rose-500/30 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-700 dark:hover:text-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-wait disabled:opacity-60"
                         >
                             {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
                             <span className="hidden xl:inline">Sign out</span>

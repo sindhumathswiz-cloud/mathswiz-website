@@ -66,7 +66,9 @@ export default function Navbar() {
     ];
 
     // HYDRATION & LAYOUT FIX: Hide global navbar on dashboard routes to prevent double headers
-    if (pathname?.startsWith('/admin') || pathname?.startsWith('/teacher')) {
+    // -- each of these role areas now carries its own shell (sidebar or top bar) with its own
+    // dark-mode toggle, so the global Navbar would just duplicate chrome, not add a toggle.
+    if (pathname?.startsWith('/admin') || pathname?.startsWith('/teacher') || pathname?.startsWith('/student') || pathname?.startsWith('/parent')) {
         return null;
     }
 

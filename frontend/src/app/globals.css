@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Tailwind v4's default dark strategy is prefers-color-scheme; next-themes
+   toggles <html class="dark">, so dark: utilities need this to actually
+   respond to the in-app toggle instead of only the OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -8,22 +13,39 @@
   --border-subtle: #e2e8f0;
   --brand: #4f46e5;
   --brand-deep: #312e81;
+  --brand-violet: #7c3aed;
+  --accent-warm: #f59e0b;
   --radius-card: 1.5rem;
   --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 12px 32px rgb(15 23 42 / 0.05);
+}
+
+:root.dark {
+  --background: #0a0a0f;
+  --foreground: #ededed;
+  --surface: #14121f;
+  --surface-muted: #1b1830;
+  --border-subtle: #2c2747;
+  --brand: #8b7fff;
+  --brand-deep: #c4b8ff;
+  --brand-violet: #a78bfa;
+  --accent-warm: #fbbf24;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border-subtle: var(--border-subtle);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-violet: var(--brand-violet);
+  --color-accent-warm: var(--accent-warm);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-sora);
+  --font-body: var(--font-plex-sans);
 }
 
 body {
@@ -37,16 +59,16 @@ body {
   .today-hero { @apply relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-indigo-800 to-violet-700 p-7 shadow-xl shadow-indigo-950/10 sm:p-9; }
   .today-hero-orb { @apply absolute -right-16 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl; }
   .today-metrics { @apply grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4; }
-  .today-card { @apply rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md; }
+  .today-card { @apply rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md; }
   .today-icon { @apply inline-flex h-10 w-10 items-center justify-center rounded-xl; }
-  .today-panel { @apply rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6; }
-  .today-kicker { @apply text-xs font-black uppercase tracking-[0.16em] text-indigo-600; }
-  .today-title { @apply mt-1 text-xl font-black tracking-tight text-slate-950; }
-  .today-action { @apply flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-bold text-slate-800 transition hover:border-indigo-200 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500; }
-  .dashboard-tabs { @apply flex w-full gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm; scrollbar-width: thin; }
-  .dashboard-tab { @apply min-h-11 whitespace-nowrap rounded-xl border border-transparent px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500; }
-  .dashboard-tab-active { @apply bg-indigo-700 text-white shadow-sm hover:bg-indigo-800; }
-  .dashboard-empty { @apply rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500; }
+  .today-panel { @apply rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-5 shadow-sm sm:p-6; }
+  .today-kicker { @apply text-xs font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-brand; }
+  .today-title { @apply mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white; }
+  .today-action { @apply flex w-full items-center justify-between rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface px-4 py-3 text-left text-sm font-bold text-slate-800 dark:text-slate-100 transition hover:border-indigo-200 dark:hover:border-brand/40 hover:bg-indigo-50 dark:hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500; }
+  .dashboard-tabs { @apply flex w-full gap-2 overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-2 shadow-sm; scrollbar-width: thin; }
+  .dashboard-tab { @apply min-h-11 whitespace-nowrap rounded-xl border border-transparent px-4 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 transition hover:bg-slate-100 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500; }
+  .dashboard-tab-active { @apply bg-gradient-to-r from-indigo-700 to-violet-600 dark:from-brand dark:to-brand-violet text-white shadow-sm hover:brightness-105; }
+  .dashboard-empty { @apply rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-surface-muted p-10 text-center text-sm text-slate-500 dark:text-slate-400; }
 }
 
 @media print {

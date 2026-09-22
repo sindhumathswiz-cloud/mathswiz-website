@@ -6,18 +6,14 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import {
     LayoutDashboard,
-    Users,
-    ClipboardList,
+    CheckSquare,
     BookOpen,
-    ClipboardCheck,
-    Target,
-    Flame,
-    HeartHandshake,
+    FileStack,
     Library,
-    MessageSquareQuote,
-    UserCircle,
-    ChevronRight,
+    Globe,
+    ShieldCheck,
     LogOut,
+    ChevronRight,
     Zap,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
@@ -48,29 +44,26 @@ const SidebarItem = ({ href, icon, label, isActive }: SidebarItemProps) => (
     </Link>
 );
 
-export default function TeacherSidebar() {
+export default function AdminSidebar() {
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => setMounted(true), []);
 
+    // AdminDashboardClient itself hosts most platform/user/fee/report tabs
+    // internally (no routing) -- this sidebar covers /admin/dashboard as the
+    // hub plus the handful of admin areas that are genuinely separate routes.
     const menuItems = [
-        { href: '/teacher/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-        { href: '/teacher/batch-management', icon: <Users size={18} />, label: 'Batch Management' },
-        { href: '/teacher/question-bank', icon: <BookOpen size={18} />, label: 'Question Bank' },
-        { href: '/teacher/tests', icon: <ClipboardList size={18} />, label: 'Test Ledger' },
-        { href: '/teacher/homework', icon: <ClipboardCheck size={18} />, label: 'Homework Review' },
-    ];
-
-    const insightItems = [
-        { href: '/teacher/mastery', icon: <Target size={18} />, label: 'Student Mastery' },
-        { href: '/teacher/heatmap', icon: <Flame size={18} />, label: 'Class Heatmap' },
-        { href: '/teacher/interventions', icon: <HeartHandshake size={18} />, label: 'Interventions' },
+        { href: '/admin/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+        { href: '/admin/approvals', icon: <CheckSquare size={18} />, label: 'Approvals' },
+        { href: '/admin/question-bank', icon: <BookOpen size={18} />, label: 'Question Bank' },
+        { href: '/admin/ingestion', icon: <FileStack size={18} />, label: 'Book Ingestion' },
+        { href: '/admin/curriculum', icon: <Library size={18} />, label: 'Curriculum Manager' },
     ];
 
     const toolItems = [
-        { href: '/teacher/knowledge-base', icon: <Library size={18} />, label: 'Knowledge Base' },
-        { href: '/teacher/queries', icon: <MessageSquareQuote size={18} />, label: 'Student Queries' },
+        { href: '/admin/knowledge-base', icon: <Library size={18} />, label: 'Knowledge Base' },
+        { href: '/admin/manage-website', icon: <Globe size={18} />, label: 'Manage Website' },
     ];
 
     const handleLogout = async () => {
@@ -83,11 +76,11 @@ export default function TeacherSidebar() {
             <div className="p-8">
                 <div className="flex items-center gap-4 mb-8">
                     <div className="w-12 h-12 bg-indigo-100 dark:bg-brand/15 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-brand shadow-inner">
-                        <UserCircle size={28} />
+                        <ShieldCheck size={28} />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h2 className="font-display font-black text-slate-900 dark:text-white leading-none">Teacher Portal</h2>
-                        <span className="font-body text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Mathswiz Premium</span>
+                        <h2 className="font-display font-black text-slate-900 dark:text-white leading-none">Admin Portal</h2>
+                        <span className="font-body text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Mathswiz Control</span>
                     </div>
                     <button
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -101,13 +94,6 @@ export default function TeacherSidebar() {
                 <div className="space-y-2">
                     <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Command Center</p>
                     {menuItems.map((item) => (
-                        <SidebarItem key={item.href} {...item} isActive={pathname === item.href} />
-                    ))}
-                </div>
-
-                <div className="mt-10 space-y-2">
-                    <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Class Insights</p>
-                    {insightItems.map((item) => (
                         <SidebarItem key={item.href} {...item} isActive={pathname === item.href} />
                     ))}
                 </div>

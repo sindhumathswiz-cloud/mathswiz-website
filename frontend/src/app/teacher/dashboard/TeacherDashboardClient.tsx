@@ -269,9 +269,9 @@ export default function TeacherDashboardClient({
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-gray-50 dark:bg-background flex flex-col">
             <div className="flex-1 p-8">
-                <div className="max-w-7xl mx-auto">
+                <div className="max-w-7xl mx-auto text-gray-900 dark:text-foreground">
                     <TodayDashboard
                         role="Teacher"
                         title="Your teaching day"
@@ -293,7 +293,7 @@ export default function TeacherDashboardClient({
                         ]}
                     />
                     <div className="grid items-start gap-6 md:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)]">
-                        <aside className="sticky top-4 z-20 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm md:top-6" aria-label="Teacher workspace navigation">
+                        <aside className="sticky top-4 z-20 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-3 shadow-sm md:top-6" aria-label="Teacher workspace navigation">
                             <div className="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
                                 {['Platform Overview', 'Live Classes', 'User Directory', 'Lead CRM', 'Question Bank', 'Test & Exam Engine', 'AI Training Content', 'Study Materials', 'Fee Management', 'Reports & Export', 'System Features'].map((tab) => (
                                     <button
@@ -306,21 +306,21 @@ export default function TeacherDashboardClient({
                                     </button>
                                 ))}
                             </div>
-                            <div className="mt-3 border-t border-slate-200 pt-3">
-                                <Link href="/teacher/mastery" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 md:justify-start">
+                            <div className="mt-3 border-t border-slate-200 dark:border-white/10 pt-3">
+                                <Link href="/teacher/mastery" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 dark:text-brand transition hover:bg-indigo-50 dark:hover:bg-brand/10 md:justify-start">
                                     <TrendingUp className="h-4 w-4" /> Student mastery
                                 </Link>
-                                <Link href="/teacher/interventions" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 md:justify-start">
+                                <Link href="/teacher/interventions" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 dark:text-brand transition hover:bg-indigo-50 dark:hover:bg-brand/10 md:justify-start">
                                     <Users className="h-4 w-4" /> Interventions
                                 </Link>
-                                <Link href="/teacher/homework" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 md:justify-start">
+                                <Link href="/teacher/homework" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 dark:text-brand transition hover:bg-indigo-50 dark:hover:bg-brand/10 md:justify-start">
                                     <ClipboardList className="h-4 w-4" /> Homework review
                                 </Link>
                                 <button
                                     type="button"
                                     onClick={handleSignOut}
                                     disabled={isSigningOut}
-                                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60 md:justify-start"
+                                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-rose-700 dark:text-rose-400 transition hover:bg-rose-50 dark:hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60 md:justify-start"
                                 >
                                     {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
                                     {isSigningOut ? 'Signing out…' : 'Sign out'}
@@ -329,7 +329,7 @@ export default function TeacherDashboardClient({
                         </aside>
 
                         {/* Tab Content */}
-                        <div className="min-h-[500px] min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+                        <div className="min-h-[500px] min-w-0 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-5 shadow-sm sm:p-8">
                         {activeTab === 'Platform Overview' && (
                             <PlatformOverview 
                                 totalPending={totalPending} 

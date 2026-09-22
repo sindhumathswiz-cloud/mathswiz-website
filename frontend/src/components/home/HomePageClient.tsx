@@ -76,8 +76,8 @@ export default function HomePageClient({ content, globalSettings }: HomePageClie
         {/* Hero Section */}
         <section 
             id="section-hero"
-            className="relative pt-32 pb-24 md:pt-48 md:pb-40 overflow-hidden" 
-            style={{ backgroundColor: heroStyle.backgroundColor || '#f5f7ff' }}
+            className="relative pt-32 pb-24 md:pt-48 md:pb-40 overflow-hidden"
+            style={{ backgroundColor: heroStyle.backgroundColor || '#f7f7fc' }}
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col lg:flex-row items-center gap-16">
                 <motion.div 
@@ -90,15 +90,15 @@ export default function HomePageClient({ content, globalSettings }: HomePageClie
                             <Sparkles className="w-3 h-3" /> {hero.badgeText}
                         </span>
                     )}
-                    <h1 
-                        className="text-5xl md:text-7xl font-black leading-[0.95] mb-8 tracking-tighter"
-                        style={{ color: heroStyle.titleColor || '#111827', fontSize: heroStyle.titleFontSize || undefined }}
+                    <h1
+                        className="font-display text-5xl md:text-7xl font-black leading-[0.95] mb-8 tracking-tighter"
+                        style={{ color: heroStyle.titleColor || '#1e1b3a', fontSize: heroStyle.titleFontSize || undefined }}
                     >
                         {hero.title}
                     </h1>
-                    <p 
-                        className="text-lg md:text-xl font-medium mb-10 max-w-2xl mx-auto lg:mx-0"
-                        style={{ color: heroStyle.subtitleColor || '#4b5563' }}
+                    <p
+                        className="font-body text-lg md:text-xl font-medium mb-10 max-w-2xl mx-auto lg:mx-0"
+                        style={{ color: heroStyle.subtitleColor || '#635e85' }}
                     >
                         {hero.subtitle}
                     </p>
@@ -138,8 +138,8 @@ export default function HomePageClient({ content, globalSettings }: HomePageClie
                 <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-3 gap-8">
                     {stats.items.map((stat: any, i: number) => (
                         <div key={i} className="text-center">
-                            <h3 className="text-4xl md:text-5xl font-black mb-2" style={{ color: statsStyle.valueColor || primaryColor }}>{stat.value}</h3>
-                            <p className="text-xs font-black uppercase tracking-widest" style={{ color: statsStyle.textColor || '#6b7280' }}>{stat.label}</p>
+                            <h3 className="font-display text-4xl md:text-5xl font-black mb-2" style={{ color: statsStyle.valueColor || primaryColor }}>{stat.value}</h3>
+                            <p className="font-body text-xs font-black uppercase tracking-widest" style={{ color: statsStyle.textColor || '#635e85' }}>{stat.label}</p>
                         </div>
                     ))}
                 </div>
@@ -148,23 +148,23 @@ export default function HomePageClient({ content, globalSettings }: HomePageClie
 
         {/* Features Section */}
         {features?.items?.length > 0 && (
-            <section id="section-features" className="py-24 md:py-32" style={{ backgroundColor: featuresStyle.backgroundColor || '#f9fafb' }}>
+            <section id="section-features" className="py-24 md:py-32" style={{ backgroundColor: featuresStyle.backgroundColor || '#f7f7fc' }}>
                 <div className="max-w-7xl mx-auto px-4">
-                    <h2 className="text-3xl md:text-5xl font-black text-center mb-20 tracking-tighter uppercase" style={{ color: featuresStyle.titleColor || '#111827' }}>
+                    <h2 className="font-display text-3xl md:text-5xl font-black text-center mb-20 tracking-tighter uppercase" style={{ color: featuresStyle.titleColor || '#1e1b3a' }}>
                         {features.title}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {features.items.map((feat: any, i: number) => (
-                            <div 
-                                key={i} 
+                            <div
+                                key={i}
                                 className="p-10 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-xl transition-all group"
                                 style={{ backgroundColor: featuresStyle.cardBg || '#ffffff' }}
                             >
-                                <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition">
+                                <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition">
                                     {getIcon(feat.icon)}
                                 </div>
-                                <h3 className="text-xl font-bold mb-4" style={{ color: featuresStyle.titleColor || '#111827' }}>{feat.title}</h3>
-                                <p className="font-medium leading-relaxed" style={{ color: featuresStyle.descriptionColor || '#6b7280' }}>{feat.description}</p>
+                                <h3 className="font-display text-xl font-bold mb-4" style={{ color: featuresStyle.titleColor || '#1e1b3a' }}>{feat.title}</h3>
+                                <p className="font-body font-medium leading-relaxed" style={{ color: featuresStyle.descriptionColor || '#635e85' }}>{feat.description}</p>
                             </div>
                         ))}
                     </div>
@@ -174,13 +174,13 @@ export default function HomePageClient({ content, globalSettings }: HomePageClie
 
         {/* Testimonials */}
         {testimonials?.items?.length > 0 && (
-            <section id="section-testimonials" className="py-32 overflow-hidden relative" style={{ backgroundColor: testimonialsStyle.backgroundColor || '#111827' }}>
+            <section id="section-testimonials" className="py-32 overflow-hidden relative" style={{ backgroundColor: testimonialsStyle.backgroundColor || '#1e1b3a' }}>
                 <div className="absolute top-0 left-0 w-full h-full opacity-10">
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white rounded-full blur-[120px]" />
                 </div>
-                
+
                 <div className="max-w-4xl mx-auto px-4 relative z-10 text-center">
-                    <h2 className="text-3xl font-black mb-20 uppercase tracking-widest text-indigo-300">Student Success Stories</h2>
+                    <h2 className="font-display text-3xl font-black mb-20 uppercase tracking-widest text-indigo-300">Student Success Stories</h2>
                     
                     <div className="relative min-h-[400px]">
                         <AnimatePresence mode="wait">
@@ -214,12 +214,12 @@ export default function HomePageClient({ content, globalSettings }: HomePageClie
         {faq?.items?.length > 0 && (
             <section id="section-faq" className="py-24 bg-white dark:bg-gray-950" style={{ backgroundColor: faqStyle.backgroundColor || '#ffffff' }}>
                 <div className="max-w-3xl mx-auto px-4">
-                    <h2 className="text-3xl font-black text-center text-gray-900 dark:text-white mb-16 uppercase">Frequently Asked Questions</h2>
+                    <h2 className="font-display text-3xl font-black text-center text-gray-900 dark:text-white mb-16 uppercase">Frequently Asked Questions</h2>
                     <div className="space-y-6">
                         {faq.items.map((item: any, i: number) => (
                             <div key={i} className="border-b dark:border-gray-800 pb-6">
-                                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{item.question}</h4>
-                                <p className="text-gray-500 dark:text-gray-400 font-medium">{item.answer}</p>
+                                <h4 className="font-display text-lg font-bold text-gray-900 dark:text-white mb-2">{item.question}</h4>
+                                <p className="font-body text-gray-500 dark:text-gray-400 font-medium">{item.answer}</p>
                             </div>
                         ))}
                     </div>
@@ -230,18 +230,18 @@ export default function HomePageClient({ content, globalSettings }: HomePageClie
         {/* Global Footer CTA */}
         <section className="py-20" style={{ backgroundColor: primaryColor }}>
             <div className="max-w-7xl mx-auto px-4 text-center">
-                <h2 className="text-3xl md:text-5xl font-black text-white mb-10 tracking-tight">Ready to Master Mathematic Concepts?</h2>
-                <Link href="/register" className="inline-block bg-white text-indigo-600 px-12 py-5 rounded-3xl font-black text-xl hover:scale-105 active:scale-95 transition shadow-2xl" style={{ color: primaryColor }}>
+                <h2 className="font-display text-3xl md:text-5xl font-black text-white mb-10 tracking-tight">Ready to Master Mathematic Concepts?</h2>
+                <Link href="/register" className="inline-block bg-white px-12 py-5 rounded-3xl font-black text-xl hover:scale-105 active:scale-95 transition shadow-2xl" style={{ color: primaryColor }}>
                     Join Today
                 </Link>
             </div>
         </section>
 
         {/* Final Branding Footer */}
-        <footer id="section-footer" className="py-12 px-6 border-t border-gray-100 dark:border-gray-900" style={{ backgroundColor: footerStyle.backgroundColor || '#111827', color: footerStyle.textColor || '#ffffff' }}>
+        <footer id="section-footer" className="py-12 px-6 border-t border-gray-100 dark:border-gray-900" style={{ backgroundColor: footerStyle.backgroundColor || '#1e1b3a', color: footerStyle.textColor || '#ffffff' }}>
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
                 <div className="max-w-md">
-                    <h2 className="text-2xl font-black mb-4 tracking-tighter">{instituteName}</h2>
+                    <h2 className="font-display text-2xl font-black mb-4 tracking-tighter">{instituteName}</h2>
                     <p className="text-sm opacity-60 leading-relaxed mb-6">{footer.about}</p>
                     <div className="flex gap-4">
                         {/* Icons could go here */}

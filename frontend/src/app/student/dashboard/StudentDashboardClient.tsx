@@ -149,8 +149,8 @@ export default function StudentDashboardClient({
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-            <div className="max-w-7xl mx-auto text-gray-900">
+        <div className="min-h-screen bg-gray-50 dark:bg-background p-4 md:p-8">
+            <div className="max-w-7xl mx-auto text-gray-900 dark:text-foreground">
 
                 <TodayDashboard
                     role="Student"
@@ -251,7 +251,7 @@ export default function StudentDashboardClient({
                 </div>
 
                 {/* Tab Content */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 min-h-[500px]">
+                <div className="bg-white dark:bg-surface rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-6 md:p-8 min-h-[500px]">
 
                     {activeTab === 'live-classes' && (
                         <div className="animate-in fade-in duration-300">
@@ -322,31 +322,31 @@ export default function StudentDashboardClient({
                                 </div>
                             )}
 
-                            <h2 className="text-xl font-bold text-gray-900 mb-6">Enrolled Batches</h2>
+                            <h2 className="font-display text-xl font-bold text-gray-900 dark:text-white mb-6">Enrolled Batches</h2>
                             {enrolledBatches.length === 0 ? (
-                                <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl">
-                                    <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 font-medium">No batches joined yet.</p>
-                                    <p className="text-gray-400 text-sm">Enter a batch code above to get started.</p>
+                                <div className="text-center py-16 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
+                                    <BookOpen className="w-12 h-12 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+                                    <p className="text-gray-500 dark:text-slate-400 font-medium">No batches joined yet.</p>
+                                    <p className="text-gray-400 dark:text-slate-500 text-sm">Enter a batch code above to get started.</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {enrolledBatches.map((enr) => (
-                                        <div key={enr.id} className="border border-gray-200 rounded-2xl p-6 hover:shadow-md transition group">
+                                        <div key={enr.id} className="border border-gray-200 dark:border-white/10 rounded-2xl p-6 hover:shadow-md transition group">
                                             <div className="flex justify-between items-start mb-4">
-                                                <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold font-mono border border-indigo-100">
+                                                <div className="bg-indigo-50 dark:bg-brand/10 text-indigo-700 dark:text-brand px-3 py-1 rounded-lg text-xs font-bold font-mono border border-indigo-100 dark:border-brand/20">
                                                     {enr.batch?.code}
                                                 </div>
                                                 {enr.status === 'PENDING' ? (
-                                                    <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full"><Loader2 className="w-3 h-3 animate-spin" /> Pending Admission</span>
+                                                    <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-accent-warm bg-amber-50 dark:bg-accent-warm/10 px-2 py-1 rounded-full"><Loader2 className="w-3 h-3 animate-spin" /> Pending Admission</span>
                                                 ) : enr.status === 'SUSPENDED' ? (
-                                                    <span className="flex items-center gap-1.5 text-xs font-medium text-rose-600 bg-rose-50 px-2 py-1 rounded-full"><XCircle className="w-3 h-3" /> Suspended</span>
+                                                    <span className="flex items-center gap-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 px-2 py-1 rounded-full"><XCircle className="w-3 h-3" /> Suspended</span>
                                                 ) : (
-                                                    <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle className="w-3 h-3" /> Enrolled</span>
+                                                    <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-full"><CheckCircle className="w-3 h-3" /> Enrolled</span>
                                                 )}
                                             </div>
-                                            <h3 className="text-lg font-bold text-gray-900 mb-1">{enr.batch?.name}</h3>
-                                            <p className="text-gray-500 text-sm font-medium mb-6">Instructor: {enr.batch?.teacher?.name}</p>
+                                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">{enr.batch?.name}</h3>
+                                            <p className="text-gray-500 dark:text-slate-400 text-sm font-medium mb-6">Instructor: {enr.batch?.teacher?.name}</p>
                                             
                                             {enr.status === 'APPROVED' && enr.batch?.lastMeetingLink && (
                                                 <a 

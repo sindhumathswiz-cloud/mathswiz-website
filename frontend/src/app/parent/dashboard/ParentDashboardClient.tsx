@@ -82,29 +82,29 @@ export default function ParentDashboardClient({ initialStudents = [] }: { initia
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
+        <div className="min-h-screen p-8">
             <div className="max-w-7xl mx-auto">
                 <div className="flex justify-between items-center mb-12">
                     <div>
-                        <h1 className="text-4xl font-black text-gray-900 tracking-tight">Parent Portal</h1>
-                        <p className="text-lg text-gray-500 font-medium">Monitoring track for {(session?.user as any)?.firstName || 'Guardian'}</p>
+                        <h1 className="font-display text-4xl font-black text-gray-900 dark:text-white tracking-tight">Parent Portal</h1>
+                        <p className="font-body text-lg text-gray-500 dark:text-slate-400 font-medium">Monitoring track for {(session?.user as any)?.firstName || 'Guardian'}</p>
                     </div>
-                    <button 
+                    <button
                         onClick={() => setIsLinkModalOpen(true)}
-                        className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition shadow-lg shadow-indigo-600/20"
+                        className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:brightness-105 transition shadow-lg shadow-indigo-600/20 dark:shadow-none"
                     >
                         <Plus className="w-5 h-5" /> Link Student
                     </button>
                 </div>
 
                 {students.length === 0 ? (
-                    <div className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-20 text-center">
-                        <Users className="w-20 h-20 text-gray-100 mx-auto mb-6" />
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Students Linked</h2>
-                        <p className="text-gray-500 mb-8 max-w-sm mx-auto">Link your child's account using their registered email to start monitoring their progress.</p>
-                        <button 
+                    <div className="bg-white dark:bg-surface rounded-3xl border-2 border-dashed border-gray-200 dark:border-white/10 p-20 text-center">
+                        <Users className="w-20 h-20 text-gray-100 dark:text-slate-700 mx-auto mb-6" />
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No Students Linked</h2>
+                        <p className="text-gray-500 dark:text-slate-400 mb-8 max-w-sm mx-auto">Link your child's account using their registered email to start monitoring their progress.</p>
+                        <button
                             onClick={() => setIsLinkModalOpen(true)}
-                            className="text-indigo-600 font-black hover:underline"
+                            className="text-indigo-600 dark:text-brand font-black hover:underline"
                         >
                             Get Started &rarr;
                         </button>
@@ -125,13 +125,13 @@ export default function ParentDashboardClient({ initialStudents = [] }: { initia
                             const actionCards: ActionCard[] | undefined = actionCardsByStudent[student.id];
 
                             return (
-                                <div key={student.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                                    <div className="p-8 border-b border-gray-50 flex justify-between items-start">
+                                <div key={student.id} className="bg-white dark:bg-surface rounded-3xl shadow-sm border border-gray-100 dark:border-white/10 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                                    <div className="p-8 border-b border-gray-50 dark:border-white/10 flex justify-between items-start">
                                         <div>
-                                            <h2 className="text-2xl font-black text-gray-900">{student.firstName} {student.lastName}</h2>
-                                            <p className="text-indigo-600 font-bold text-sm tracking-wider uppercase">{student.class || 'No Class Assigned'}</p>
+                                            <h2 className="font-display text-2xl font-black text-gray-900 dark:text-white">{student.firstName} {student.lastName}</h2>
+                                            <p className="text-indigo-600 dark:text-brand font-bold text-sm tracking-wider uppercase">{student.class || 'No Class Assigned'}</p>
                                         </div>
-                                        <button onClick={() => handleUnlink(student.id)} title="Unlink Student" className="text-gray-300 hover:text-red-500 transition">
+                                        <button onClick={() => handleUnlink(student.id)} title="Unlink Student" className="text-gray-300 dark:text-slate-600 hover:text-red-500 transition">
                                             <LogOut className="w-5 h-5" />
                                         </button>
                                     </div>
@@ -140,7 +140,7 @@ export default function ParentDashboardClient({ initialStudents = [] }: { initia
                                         {/* What can I do this week */}
                                         {actionCards && actionCards.length > 0 && (
                                             <div>
-                                                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-3">This week</h3>
+                                                <h3 className="text-sm font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">This week</h3>
                                                 <div className="space-y-2">
                                                     {actionCards.map((card, i) => (
                                                         <div key={i} className={`rounded-xl border p-4 ${ACTION_TONE_STYLE[card.tone]}`}>
