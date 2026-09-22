@@ -9,6 +9,9 @@ import { joinBatchAction } from "@/actions/studentActions";
 import { setStudentGoalAction } from "@/actions/goalActions";
 import PerformanceAnalytics from "@/components/PerformanceAnalytics";
 import AchieveJourney from "@/components/AchieveJourney";
+import BadgeCollection from "@/components/BadgeCollection";
+import LeaderboardRankSummary from "@/components/LeaderboardRankSummary";
+import PointsSummaryCard from "@/components/PointsSummaryCard";
 import { TodayDashboard } from "@/components/dashboard/TodayDashboard";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Legend } from 'recharts';
 interface Props {
@@ -46,6 +49,36 @@ export default function StudentDashboardClient({
     const [isSavingGoal, setIsSavingGoal] = useState(false);
     const [batchCodeInput, setBatchCodeInput] = useState('');
     const [activePaymentForPDF, setActivePaymentForPDF] = useState<any>(null);
+    const [leaderboardOptIn, setLeaderboardOptIn] = useState(false);
+    const [savingOptIn, setSavingOptIn] = useState(false);
+
+    useEffect(() => {
+        fetch('/api/student/preferences')
+            .then((res) => res.json())
+            .then((data) => setLeaderboardOptIn(Boolean(data.leaderboardOptIn)))
+            .catch(() => {});
+    }, []);
+
+    const handleLeaderboardOptInChange = async (value: boolean) => {
+        setLeaderboardOptIn(value);
+        setSavingOptIn(true);
+        try {
+            const response = await fetch('/api/student/preferences', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ leaderboardOptIn: value }),
+            });
+            if (!response.ok) {
+                setLeaderboardOptIn(!value);
+                toast.error('Could not update your preference');
+            }
+        } catch {
+            setLeaderboardOptIn(!value);
+            toast.error('Could not update your preference');
+        } finally {
+            setSavingOptIn(false);
+        }
+    };
 
     const handleDownloadPDF = async (elementId: string, filename: string) => {
         const html2pdf = (await import('html2pdf.js')).default;
@@ -574,6 +607,12 @@ export default function StudentDashboardClient({
                                 <Star className="w-6 h-6 text-amber-500" /> Achieve — Target Tracker
                             </h2>
 
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <LeaderboardRankSummary />
+                                <PointsSummaryCard />
+                            </div>
+                            <BadgeCollection />
+
                             {!goal ? (
                                 <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-8 border border-amber-200 max-w-md">
                                     <h3 className="text-xl font-black text-gray-900 mb-2 flex items-center gap-2"><Target className="w-5 h-5 text-amber-500" /> Set Your Dream Goal</h3>
@@ -752,6 +791,23 @@ export default function StudentDashboardClient({
                                         <p className="font-bold text-indigo-600">{(session?.user as any)?.class || 'Not set'}</p>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="max-w-xl bg-gray-50 p-6 rounded-2xl border border-gray-100 mt-6">
+                                <h3 className="text-sm font-bold text-gray-900 mb-1">Privacy</h3>
+                                <label className="flex items-start gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={leaderboardOptIn}
+                                        onChange={(e) => handleLeaderboardOptInChange(e.target.checked)}
+                                        disabled={savingOptIn}
+                                        className="mt-1 w-4 h-4 accent-indigo-600"
+                                    />
+                                    <span className="text-sm text-gray-600">
+                                        <span className="font-bold text-gray-900 block">Appear in your batch&apos;s leaderboard</span>
+                                        Shown only if your teacher has turned the leaderboard on for your batch.
+                                    </span>
+                                </label>
                             </div>
                         </div>
                     )}

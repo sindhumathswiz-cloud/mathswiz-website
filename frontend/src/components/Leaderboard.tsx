@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Trophy, Medal, Award, Loader2, TrendingUp, Flame, Star } from 'lucide-react';
+import { Trophy, Medal, Award, Loader2, TrendingUp, Flame, Star, ShieldOff } from 'lucide-react';
 
 interface LeaderboardEntry {
   userId: string;
   name: string;
   image: string | null;
   rank: number;
-  avgTestScore: number;
+  avgAccuracy: number;
   totalPoints: number;
   streak: number;
   testsCompleted: number;
@@ -19,6 +19,8 @@ export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [totalStudents, setTotalStudents] = useState(0);
+  const [enabled, setEnabled] = useState(true);
+  const [optedIn, setOptedIn] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,6 +31,8 @@ export default function Leaderboard() {
           setLeaderboard(data.leaderboard);
           setUserRank(data.userRank);
           setTotalStudents(data.totalStudents);
+          setEnabled(data.enabled);
+          setOptedIn(data.optedIn);
         }
         setLoading(false);
       })
@@ -39,6 +43,24 @@ export default function Leaderboard() {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (!enabled) {
+    return (
+      <div className="text-center p-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+        <ShieldOff className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+        <p className="font-medium text-slate-600">Your teacher hasn&apos;t turned on the batch leaderboard yet.</p>
+      </div>
+    );
+  }
+
+  if (!optedIn) {
+    return (
+      <div className="text-center p-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+        <ShieldOff className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+        <p className="font-medium text-slate-600">You haven&apos;t opted in yet — turn it on from your Profile to appear on the leaderboard.</p>
       </div>
     );
   }

@@ -6,6 +6,7 @@ import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
 import { provenanceApprovalError } from "@/lib/question-provenance";
 import { structuralApprovalError } from "@/lib/question-qa";
 import { figureApprovalError } from "@/lib/question-figures";
+import { snapshotQuestionVersion } from "@/lib/question-version";
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             select: {
                 createdById: true, scope: true, provenance: true, bookId: true, sourcePageStart: true, sourcePageEnd: true, printedNumber: true,
                 content: true, options: true, correctAnswer: true, explanation: true, type: true,
+                difficulty: true, topic: true, subTopic: true, tags: true, currentVersion: true,
             }
         });
 
@@ -106,10 +108,37 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (confidence !== undefined) updateData.confidence = confidence;
         if (reviewNotes !== undefined) updateData.reviewNotes = reviewNotes;
 
-        const question = await prisma.question.update({
-            where: { id: questionId },
-            data: updateData
-        });
+        // Only snapshot when this PATCH actually edits the question's content
+        // -- a status-only or metadata-only PATCH (e.g. approving a question,
+        // or editing reviewNotes) doesn't overwrite anything worth version
+        // history for.
+        const contentFieldsChanged = [content, options, correctAnswer, explanation, type, difficulty, tags]
+            .some((v) => v !== undefined);
+
+        const question = contentFieldsChanged
+            ? await prisma.$transaction(async (tx) => {
+                await snapshotQuestionVersion(tx, {
+                    id: questionId,
+                    currentVersion: existing.currentVersion,
+                    content: existing.content,
+                    options: existing.options,
+                    correctAnswer: existing.correctAnswer,
+                    explanation: existing.explanation,
+                    type: existing.type,
+                    difficulty: existing.difficulty,
+                    topic: existing.topic,
+                    subTopic: existing.subTopic,
+                    tags: existing.tags,
+                }, userId, role === 'ADMIN' ? 'Manual edit' : 'Teacher correction');
+                return tx.question.update({
+                    where: { id: questionId },
+                    data: { ...updateData, currentVersion: { increment: 1 } },
+                });
+            })
+            : await prisma.question.update({
+                where: { id: questionId },
+                data: updateData
+            });
 
         // Handle taxonomy tags: create QuestionTag records + add taxonomy names to tags
         if (taxonomyTagIds && Array.isArray(taxonomyTagIds) && taxonomyTagIds.length > 0) {

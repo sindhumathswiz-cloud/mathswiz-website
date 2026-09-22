@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 import QuestionTags from '@/components/QuestionTags';
+import QuestionTrustBadge from '@/components/QuestionTrustBadge';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseQuestionOptions } from '@/lib/arena-answer';
@@ -765,9 +766,12 @@ function PracticeArenaInner() {
                                         {selectedOption === question.correctAnswer ? <CheckCircle2 className="w-6 h-6 text-emerald-500" /> : <XCircle className="w-6 h-6 text-rose-500" />}
                                     </div>
                                     <div className="space-y-4">
-                                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedOption === question.correctAnswer ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                            Detailed Resolution
-                                        </p>
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedOption === question.correctAnswer ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                Detailed Resolution
+                                            </p>
+                                            <QuestionTrustBadge status={question.status} verificationStatus={question.verificationStatus} />
+                                        </div>
                                         <div className="text-sm font-medium text-slate-800 leading-relaxed">
                                             <MathRenderer content={question.explanation || 'No solution provided. Review the core concepts of this topic.'} />
                                         </div>

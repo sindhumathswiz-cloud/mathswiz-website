@@ -24,6 +24,7 @@ import {
     PartyPopper
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionTrustBadge from '@/components/QuestionTrustBadge';
 import toast from 'react-hot-toast';
 
 export default function PerformanceAnalytics() {
@@ -321,9 +322,12 @@ export default function PerformanceAnalytics() {
 
                                         {!r.isCorrect && (
                                             <div className="bg-indigo-50/50 border border-indigo-100 rounded-3xl p-6">
-                                                <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                    <ArrowUpRight className="w-4 h-4" /> Conceptual Resolution
-                                                </p>
+                                                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                                    <p className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                                                        <ArrowUpRight className="w-4 h-4" /> Conceptual Resolution
+                                                    </p>
+                                                    <QuestionTrustBadge status={r.question.status} verificationStatus={r.question.verificationStatus} />
+                                                </div>
                                                 <div className="text-sm font-medium text-slate-700">
                                                     <MathRenderer content={r.question.explanation || 'Solution not available.'} />
                                                 </div>

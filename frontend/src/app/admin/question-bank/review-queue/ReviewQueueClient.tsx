@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Archive, CheckCircle2, Loader2, Search, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Archive, CheckCircle2, History, Loader2, Search, Sparkles, X } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 
 interface QuestionRow {
@@ -30,6 +30,17 @@ interface BookOption {
   id: string;
   title: string;
   className: string;
+}
+
+interface QuestionVersionRow {
+  id: string;
+  version: number;
+  content: string;
+  correctAnswer: string | null;
+  explanation: string | null;
+  changedBy: string;
+  changeReason: string | null;
+  createdAt: string;
 }
 
 // The latest structured review-note block, so a reviewer sees the most
@@ -80,6 +91,9 @@ export default function ReviewQueueClient() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [historyForId, setHistoryForId] = useState<string | null>(null);
+  const [historyVersions, setHistoryVersions] = useState<QuestionVersionRow[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     fetch('/api/admin/books').then((r) => r.json()).then((d) => setBooks(d.books ?? [])).catch(() => {});
@@ -160,6 +174,23 @@ export default function ReviewQueueClient() {
       setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'Failed to archive' });
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const openHistory = async (id: string) => {
+    setHistoryForId(id);
+    setLoadingHistory(true);
+    setHistoryVersions([]);
+    try {
+      const res = await fetch(`/api/admin/questions/${id}/versions`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load history');
+      setHistoryVersions(data.versions ?? []);
+    } catch (e) {
+      setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'Failed to load history' });
+      setHistoryForId(null);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -275,6 +306,10 @@ export default function ReviewQueueClient() {
                     className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />} Archive
                   </button>
+                  <button onClick={() => void openHistory(q.id)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50">
+                    <History className="h-3.5 w-3.5" /> History
+                  </button>
                 </div>
               </article>
             );
@@ -287,6 +322,40 @@ export default function ReviewQueueClient() {
           <button onClick={() => void loadMore()} disabled={loadingMore} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
             {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Load more
           </button>
+        </div>
+      )}
+
+      {historyForId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2"><History className="h-5 w-5 text-indigo-500" /> Version history</h2>
+              <button onClick={() => setHistoryForId(null)}><X className="h-5 w-5 text-slate-400" /></button>
+            </div>
+
+            {loadingHistory ? (
+              <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+            ) : historyVersions.length === 0 ? (
+              <p className="text-sm text-slate-500">No prior versions — this question has never had a content edit recorded.</p>
+            ) : (
+              <div className="space-y-3">
+                {historyVersions.map((v) => (
+                  <div key={v.id} className="rounded-xl border border-slate-200 p-3">
+                    <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-500">
+                      <span>Version {v.version}{v.changeReason ? ` · ${v.changeReason}` : ''}</span>
+                      <span>{new Date(v.createdAt).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-2.5 text-sm text-slate-800">
+                      <MathRenderer content={v.content} />
+                    </div>
+                    {v.correctAnswer && (
+                      <p className="mt-1.5 text-xs text-slate-500">Answer at this version: <span className="font-bold text-slate-700">{v.correctAnswer}</span></p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </main>

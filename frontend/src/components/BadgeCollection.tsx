@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Award, Star, Flame, Target, Trophy, BookOpen, Zap, Heart, Shield, Crown, Gem } from 'lucide-react';
+import { Loader2, Award, Star, Flame, Target, Trophy, BookOpen, Zap, Heart, Shield, Crown, Gem, Footprints, Sword, MessageCircle } from 'lucide-react';
 
 interface Badge {
   id: string;
@@ -44,17 +44,20 @@ export default function BadgeCollection() {
       crown: <Crown className="w-6 h-6" />,
       gem: <Gem className="w-6 h-6" />,
       award: <Award className="w-6 h-6" />,
+      footprints: <Footprints className="w-6 h-6" />,
+      sword: <Sword className="w-6 h-6" />,
+      'message-circle': <MessageCircle className="w-6 h-6" />,
     };
     return iconMap[iconName] || <Award className="w-6 h-6" />;
   };
 
+  // Matches BADGE_DEFINITIONS' stored category values (gamification.ts):
+  // 'achievement' | 'milestone' | 'special'.
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'ACHIEVEMENT': return 'from-amber-400 to-yellow-500';
-      case 'STREAK': return 'from-orange-400 to-red-500';
-      case 'PRACTICE': return 'from-emerald-400 to-teal-500';
-      case 'TEST': return 'from-indigo-400 to-purple-500';
-      case 'SPECIAL': return 'from-pink-400 to-rose-500';
+      case 'achievement': return 'from-amber-400 to-yellow-500';
+      case 'milestone': return 'from-orange-400 to-red-500';
+      case 'special': return 'from-pink-400 to-rose-500';
       default: return 'from-slate-400 to-slate-500';
     }
   };

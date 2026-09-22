@@ -60,6 +60,9 @@ model User {
   subscription String @default("FREE") // "FREE" or "PREMIUM"
   aiTokens     Int    @default(5) // Refreshed daily via cron or manual script
 
+  // Motivation features -- privacy-sensitive, default OFF
+  leaderboardOptIn Boolean @default(false)
+
   // NextAuth Relations
   accounts Account[]
   sessions Session[]
@@ -78,6 +81,7 @@ model User {
   teacherNotices   Notice[]          @relation("TeacherNotices")
   leads            Lead[]            @relation("TeacherLeads")
   knowledgeFolders KnowledgeFolder[]
+  createdChallenges ClassChallenge[] @relation("ChallengeCreator")
 
   // Gamification & Portals Relations
   challengerOf              PeerChallenge[]     @relation("Challenger")
@@ -145,6 +149,10 @@ model Batch {
   lastMeetingId   String? // MS Graph meeting identity
   createdAt       DateTime  @default(now())
 
+  // Teacher must explicitly turn this on before any student in the batch
+  // can see a leaderboard, regardless of individual opt-in.
+  leaderboardEnabled Boolean @default(false)
+
   teacher       User              @relation("TeacherBatches", fields: [teacherId], references: [id])
   enrollments   BatchEnrollment[]
   assignments   TestAssignment[]
@@ -153,6 +161,43 @@ model Batch {
   notices       Notice[]
   messages      Message[]
   interventions Intervention[]
+  classChallenges ClassChallenge[]
+}
+
+enum ClassChallengeMetric {
+  MOST_PRACTICE // count of practice-arena TestResponse rows in the window
+  MASTERY_GAIN // sum of positive MasteryEvent.delta in the window
+  POINTS_EARNED // sum of PointsTransaction.points in the window
+}
+
+enum ClassChallengeStatus {
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+// A teacher-created, batch-wide, time-boxed competition -- distinct from
+// PeerChallenge, which is strictly 1:1. Ranking is computed live at read
+// time (lib/class-challenge.ts), same pattern as the batch leaderboard --
+// no stored snapshot table, since every metric is a straightforward
+// createdAt-windowed aggregate over a table that already exists.
+model ClassChallenge {
+  id          String               @id @default(cuid())
+  batchId     String
+  title       String
+  metric      ClassChallengeMetric
+  startDate   DateTime
+  endDate     DateTime
+  status      ClassChallengeStatus @default(ACTIVE)
+  createdById String
+  endedAt     DateTime?
+  endedBy     String?
+  createdAt   DateTime             @default(now())
+
+  batch     Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("ChallengeCreator", fields: [createdById], references: [id])
+
+  @@index([batchId, status])
 }
 
 model LiveClass {
@@ -211,6 +256,9 @@ model BatchEnrollment {
   feeStructureId String?
   status         String   @default("PENDING") // PENDING, APPROVED, REJECTED
   createdAt      DateTime @default(now())
+  // Teacher-set: hide this student's entry from batch-wide rankings
+  // (leaderboard and class challenges) without unenrolling them.
+  excludedFromRankings Boolean @default(false)
 
   batch        Batch           @relation(fields: [batchId], references: [id])
   student      User            @relation(fields: [studentId], references: [id])

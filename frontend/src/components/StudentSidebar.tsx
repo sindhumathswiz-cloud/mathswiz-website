@@ -21,7 +21,8 @@ import {
     Bookmark,
     Layers,
     Trophy,
-    CalendarClock
+    CalendarClock,
+    Swords
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -64,6 +65,8 @@ export default function StudentSidebar({ active }: { active?: string }) {
         { href: '/student/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
         { href: '/student/tests', icon: <ClipboardList size={18} />, label: 'My Tests' },
         { href: '/student/mock-tests', icon: <Trophy size={18} />, label: 'Mock Exams' },
+        { href: '/student/leaderboard', icon: <Trophy size={18} />, label: 'Leaderboard' },
+        { href: '/student/challenges/class', icon: <Swords size={18} />, label: 'Class Challenge' },
         { href: '/student/practice', icon: <Target size={18} />, label: 'Practice Arena' },
         { href: '/student/materials', icon: <FileText size={18} />, label: 'Study Materials' },
         { href: '/student/performance', icon: <BarChart3 size={18} />, label: 'Performance' },

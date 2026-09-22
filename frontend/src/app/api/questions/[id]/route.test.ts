@@ -11,6 +11,8 @@ const mockPrisma = {
   questionTag: { deleteMany: vi.fn(), create: vi.fn(), findMany: vi.fn() },
   tagTaxonomy: { findMany: vi.fn() },
   pageFigure: { findMany: vi.fn() },
+  questionVersion: { create: vi.fn() },
+  $transaction: vi.fn(),
 };
 vi.mock('@/lib/prisma', () => ({ default: mockPrisma }));
 
@@ -39,6 +41,8 @@ describe('PATCH /api/questions/[id] -- provenance acceptance gate', () => {
     vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as any);
     mockPrisma.questionTag.findMany.mockResolvedValue([]);
     mockPrisma.pageFigure.findMany.mockResolvedValue([]);
+    mockPrisma.questionVersion.create.mockResolvedValue({ id: 'v-1' });
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockPrisma));
   });
 
   it('approves a BOOK_SOURCED question that has its source page and printed number', async () => {
@@ -99,6 +103,8 @@ describe('PATCH /api/questions/[id] -- structural QA gate', () => {
     vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as any);
     mockPrisma.questionTag.findMany.mockResolvedValue([]);
     mockPrisma.pageFigure.findMany.mockResolvedValue([]);
+    mockPrisma.questionVersion.create.mockResolvedValue({ id: 'v-1' });
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockPrisma));
   });
 
   it('blocks approval of a question with duplicate options, without writing', async () => {
@@ -143,6 +149,8 @@ describe('PATCH /api/questions/[id] -- figure gate', () => {
     vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as any);
     mockPrisma.questionTag.findMany.mockResolvedValue([]);
     mockPrisma.pageFigure.findMany.mockResolvedValue([]);
+    mockPrisma.questionVersion.create.mockResolvedValue({ id: 'v-1' });
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockPrisma));
   });
 
   it('blocks approval of a figure-referencing question with no retained figure asset', async () => {
@@ -193,6 +201,67 @@ describe('PATCH /api/questions/[id] -- figure gate', () => {
     expect(response.status).toBe(200);
     expect(mockPrisma.question.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: 'APPROVED' }),
+    }));
+  });
+});
+
+describe('PATCH /api/questions/[id] -- version history snapshot', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { getServerSession } = await import('next-auth');
+    vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as any);
+    mockPrisma.questionTag.findMany.mockResolvedValue([]);
+    mockPrisma.pageFigure.findMany.mockResolvedValue([]);
+    mockPrisma.questionVersion.create.mockResolvedValue({ id: 'v-1' });
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockPrisma));
+    mockPrisma.question.findUnique.mockResolvedValue({ ...bookSourced, difficulty: 'MEDIUM', topic: 'Algebra', subTopic: null, tags: ['math'], currentVersion: 3 });
+    mockPrisma.question.update.mockResolvedValue({ id: 'q-1', content: 'What is 3 + 3?' });
+  });
+
+  it('creates no version row for a status-only PATCH', async () => {
+    const { PATCH } = await import('./route');
+    await PATCH(patch({ reviewNotes: 'looks fine' }) as any, { params: params() });
+    expect(mockPrisma.questionVersion.create).not.toHaveBeenCalled();
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('creates exactly one version row, carrying the PRIOR content, for a content-editing PATCH', async () => {
+    const { PATCH } = await import('./route');
+    await PATCH(patch({ content: 'What is 3 + 3?' }) as any, { params: params() });
+
+    expect(mockPrisma.questionVersion.create).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.questionVersion.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        questionId: 'q-1',
+        version: 3,
+        content: bookSourced.content, // the OLD content, not the new one
+        changedBy: 'admin-1',
+        changeReason: 'Manual edit',
+      }),
+    }));
+  });
+
+  it('increments currentVersion on the question row alongside the content update', async () => {
+    const { PATCH } = await import('./route');
+    await PATCH(patch({ content: 'What is 3 + 3?' }) as any, { params: params() });
+
+    expect(mockPrisma.question.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ content: 'What is 3 + 3?', currentVersion: { increment: 1 } }),
+    }));
+  });
+
+  it('labels the change reason "Teacher correction" for a teacher-authored edit', async () => {
+    const { getServerSession } = await import('next-auth');
+    vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } } as any);
+    mockPrisma.question.findUnique.mockResolvedValue({
+      ...bookSourced, scope: 'TEACHER_PRIVATE', createdById: 'teacher-1',
+      difficulty: 'MEDIUM', topic: 'Algebra', subTopic: null, tags: ['math'], currentVersion: 1,
+    });
+    const { PATCH } = await import('./route');
+    await PATCH(patch({ explanation: 'Updated explanation' }) as any, { params: params() });
+
+    expect(mockPrisma.questionVersion.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ changeReason: 'Teacher correction' }),
     }));
   });
 });

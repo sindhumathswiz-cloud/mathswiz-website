@@ -2,18 +2,35 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { Printer, ArrowUpRight, Ban, RefreshCw, Users, CreditCard, Receipt, Tag, Plus, Bell, CheckCircle2, ChevronRight, Loader2, X, Check, DollarSign, ClipboardList, Calendar, Trash2, Edit2, BarChart3, Clock } from 'lucide-react';
+import { Printer, ArrowUpRight, Ban, RefreshCw, Users, CreditCard, Receipt, Tag, Plus, Bell, CheckCircle2, ChevronRight, Loader2, X, Check, DollarSign, ClipboardList, Calendar, Trash2, Edit2, BarChart3, Clock, Trophy, EyeOff, Eye, Swords } from 'lucide-react';
 import { assignTestToBatchAction } from '@/actions/testActions';
 import { assignFeeToStudentAction, assignCustomFeeToStudentAction, markPaymentPaidAction, deleteFeeStructureAction, updateFeeStructureAction, updatePaymentDueDateAction, suspendStudentAccessAction, reinstateStudentAccessAction } from '@/actions/feeActions';
 import PrintLetterhead from '@/components/PrintLetterhead';
 import toast from 'react-hot-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Cell } from 'recharts';
+
+const CHALLENGE_METRIC_LABEL = {
+    MOST_PRACTICE: 'Most practice questions',
+    MASTERY_GAIN: 'Most mastery gained',
+    POINTS_EARNED: 'Most points earned',
+};
+
 export default function ManageBatchClient({ batch, availableTests, initialAttempts }: { batch: any, availableTests: any[], initialAttempts: any[] }) {
     const { data: session } = useSession();
-    const [activeTab, setActiveTab] = useState<'students' | 'fees' | 'ledger' | 'discounts' | 'assignments' | 'analytics'>('students');
-    
+    const [activeTab, setActiveTab] = useState<'students' | 'fees' | 'ledger' | 'discounts' | 'assignments' | 'analytics' | 'leaderboard'>('students');
+
     // Server-fetched relations available directly on `batch`
-    const enrollments = batch.enrollments || [];
+    const [enrollments, setEnrollments] = useState<any[]>(batch.enrollments || []);
+    const [leaderboardEnabled, setLeaderboardEnabled] = useState<boolean>(Boolean(batch.leaderboardEnabled));
+    const [savingLeaderboardToggle, setSavingLeaderboardToggle] = useState(false);
+    const [savingExclusionFor, setSavingExclusionFor] = useState<string | null>(null);
+    const [challenges, setChallenges] = useState<any[]>([]);
+    const [challengesLoaded, setChallengesLoaded] = useState(false);
+    const [loadingChallenges, setLoadingChallenges] = useState(false);
+    const [showChallengeForm, setShowChallengeForm] = useState(false);
+    const [challengeForm, setChallengeForm] = useState({ title: '', metric: 'MOST_PRACTICE', startDate: '', endDate: '' });
+    const [creatingChallenge, setCreatingChallenge] = useState(false);
+    const [endingChallengeId, setEndingChallengeId] = useState<string | null>(null);
     const assignments = batch.assignments || [];
     const [attempts, setAttempts] = useState<any[]>(initialAttempts || []);
 
@@ -253,6 +270,117 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
         }
     };
 
+    const handleToggleLeaderboard = async (value: boolean) => {
+        setLeaderboardEnabled(value);
+        setSavingLeaderboardToggle(true);
+        try {
+            const res = await fetch(`/api/teacher/batches/${batch.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ leaderboardEnabled: value }),
+            });
+            if (!res.ok) {
+                setLeaderboardEnabled(!value);
+                toast.error('Could not update the leaderboard setting');
+            } else {
+                toast.success(value ? 'Leaderboard enabled for this batch' : 'Leaderboard disabled for this batch');
+            }
+        } catch {
+            setLeaderboardEnabled(!value);
+            toast.error('Could not update the leaderboard setting');
+        } finally {
+            setSavingLeaderboardToggle(false);
+        }
+    };
+
+    const handleToggleExclusion = async (studentId: string, excludedFromRankings: boolean) => {
+        setSavingExclusionFor(studentId);
+        try {
+            const res = await fetch(`/api/teacher/batches/${batch.id}/rankings-moderation`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ studentId, excludedFromRankings }),
+            });
+            if (!res.ok) {
+                toast.error('Could not update this student\'s ranking visibility');
+                return;
+            }
+            setEnrollments((prev) => prev.map((e: any) => (e.studentId === studentId ? { ...e, excludedFromRankings } : e)));
+        } catch {
+            toast.error('Could not update this student\'s ranking visibility');
+        } finally {
+            setSavingExclusionFor(null);
+        }
+    };
+
+    const fetchChallenges = useCallback(async () => {
+        setLoadingChallenges(true);
+        try {
+            const res = await fetch(`/api/teacher/batches/${batch.id}/challenges`);
+            if (res.ok) {
+                const data = await res.json();
+                setChallenges(data.challenges || []);
+            }
+        } catch {
+            // leave the previous list in place on a transient failure
+        } finally {
+            setLoadingChallenges(false);
+            setChallengesLoaded(true);
+        }
+    }, [batch.id]);
+
+    useEffect(() => {
+        if (activeTab === 'leaderboard' && !challengesLoaded) {
+            fetchChallenges();
+        }
+    }, [activeTab, challengesLoaded, fetchChallenges]);
+
+    const handleCreateChallenge = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setCreatingChallenge(true);
+        try {
+            const res = await fetch(`/api/teacher/batches/${batch.id}/challenges`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(challengeForm),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                toast.error(data.error || 'Could not create the challenge');
+                return;
+            }
+            toast.success('Challenge created!');
+            setShowChallengeForm(false);
+            setChallengeForm({ title: '', metric: 'MOST_PRACTICE', startDate: '', endDate: '' });
+            fetchChallenges();
+        } catch {
+            toast.error('Could not create the challenge');
+        } finally {
+            setCreatingChallenge(false);
+        }
+    };
+
+    const handleEndChallenge = async (challengeId: string) => {
+        setEndingChallengeId(challengeId);
+        try {
+            const res = await fetch(`/api/teacher/batches/${batch.id}/challenges/${challengeId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'ENDED' }),
+            });
+            if (!res.ok) {
+                toast.error('Could not end the challenge');
+                return;
+            }
+            toast.success('Challenge ended');
+            fetchChallenges();
+        } catch {
+            toast.error('Could not end the challenge');
+        } finally {
+            setEndingChallengeId(null);
+        }
+    };
+
     // Dynamic Overdue Logic & Filtering (Task 17 Refinement)
     const now = new Date();
     const processedLedger = paymentLedger.map(p => {
@@ -311,7 +439,8 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                         { id: 'ledger', label: 'Payment Ledger', icon: Receipt },
                         { id: 'discounts', label: 'Discounts', icon: Tag },
                         { id: 'assignments', label: 'Assignments', icon: ClipboardList },
-                        { id: 'analytics', label: 'Analytics', icon: BarChart3 }
+                        { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+                        { id: 'leaderboard', label: 'Leaderboard', icon: Trophy }
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -500,6 +629,134 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                                                 </div>
                                             </div>
                                         )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {/* LEADERBOARD TAB */}
+                    {activeTab === 'leaderboard' && (() => {
+                        const activeStudents = enrollments.filter((e: any) => e.status === 'APPROVED');
+                        return (
+                            <div className="animate-in fade-in duration-300">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Trophy className="w-5 h-5 text-indigo-500" /> Batch Leaderboard</h2>
+                                </div>
+
+                                <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-2xl p-6 mb-8">
+                                    <div>
+                                        <p className="font-bold text-gray-900">Leaderboard for this batch</p>
+                                        <p className="text-sm text-gray-500 mt-1">Students who opt in appear ranked by accuracy, improvement, consistency, and effort — not raw marks.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleToggleLeaderboard(!leaderboardEnabled)}
+                                        disabled={savingLeaderboardToggle}
+                                        className={`px-5 py-2.5 rounded-xl font-bold text-sm transition disabled:opacity-50 ${
+                                            leaderboardEnabled ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {leaderboardEnabled ? 'Enabled — Turn Off' : 'Turn On'}
+                                    </button>
+                                </div>
+
+                                <h3 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-4">Ranking visibility per student</h3>
+                                {activeStudents.length === 0 ? (
+                                    <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl">
+                                        <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                        <p className="text-gray-500 font-medium">No active students yet.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-hidden rounded-xl border border-gray-200 divide-y divide-gray-100 bg-white">
+                                        {activeStudents.map((enr: any) => (
+                                            <div key={enr.id} className="p-4 flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-xs uppercase border border-indigo-200">
+                                                        {enr.student?.firstName?.[0] || '?'}{enr.student?.lastName?.[0] || '?'}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-900 text-sm">{enr.student?.firstName} {enr.student?.lastName}</p>
+                                                        {enr.excludedFromRankings && (
+                                                            <p className="text-[10px] text-rose-600 font-bold uppercase tracking-tight">Hidden from rankings</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleToggleExclusion(enr.studentId, !enr.excludedFromRankings)}
+                                                    disabled={savingExclusionFor === enr.studentId}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition disabled:opacity-50 ${
+                                                        enr.excludedFromRankings ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                                    }`}
+                                                    title={enr.excludedFromRankings ? 'Restore to rankings' : 'Hide from rankings'}
+                                                >
+                                                    {enr.excludedFromRankings ? <><EyeOff className="w-3.5 h-3.5" /> Hidden</> : <><Eye className="w-3.5 h-3.5" /> Visible</>}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between items-center mt-10 mb-4">
+                                    <h3 className="font-bold text-sm text-gray-500 uppercase tracking-widest flex items-center gap-2"><Swords className="w-4 h-4" /> Class challenge</h3>
+                                    {!challenges.some((c: any) => c.status === 'ACTIVE') && (
+                                        <button
+                                            onClick={() => setShowChallengeForm(true)}
+                                            className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-medium hover:bg-indigo-100 transition text-sm"
+                                        >
+                                            <Plus className="w-4 h-4" /> New Challenge
+                                        </button>
+                                    )}
+                                </div>
+
+                                {loadingChallenges ? (
+                                    <div className="flex items-center justify-center py-10">
+                                        <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                                    </div>
+                                ) : challenges.length === 0 ? (
+                                    <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl">
+                                        <Swords className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                        <p className="text-gray-500 font-medium">No challenges yet for this batch.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {challenges.map((c: any) => (
+                                            <div key={c.id} className="rounded-xl border border-gray-200 bg-white p-5">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-bold text-gray-900">{c.title}</p>
+                                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                                                c.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : c.status === 'ENDED' ? 'bg-gray-100 text-gray-500' : 'bg-rose-100 text-rose-600'
+                                                            }`}>{c.status}</span>
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            {CHALLENGE_METRIC_LABEL[c.metric as keyof typeof CHALLENGE_METRIC_LABEL]} · {new Date(c.startDate).toLocaleDateString('en-IN')} – {new Date(c.endDate).toLocaleDateString('en-IN')}
+                                                        </p>
+                                                    </div>
+                                                    {c.status === 'ACTIVE' && (
+                                                        <button
+                                                            onClick={() => handleEndChallenge(c.id)}
+                                                            disabled={endingChallengeId === c.id}
+                                                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition disabled:opacity-50"
+                                                        >
+                                                            {endingChallengeId === c.id ? 'Ending…' : 'End Challenge'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {c.ranking.length === 0 ? (
+                                                    <p className="text-xs text-gray-400">No activity yet.</p>
+                                                ) : (
+                                                    <div className="space-y-1">
+                                                        {c.ranking.slice(0, 5).map((entry: any) => (
+                                                            <div key={entry.userId} className="flex items-center justify-between text-sm py-1">
+                                                                <span className="text-gray-700">#{entry.rank} {entry.name}</span>
+                                                                <span className="font-bold text-gray-900">{entry.value}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </div>
@@ -1068,6 +1325,65 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                             </div>
                             <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl transition shadow-lg shadow-emerald-200 mt-4">
                                 Confirm & Mark Paid
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* NEW CLASS CHALLENGE MODAL */}
+            {showChallengeForm && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-gray-900">New Class Challenge</h3>
+                            <button onClick={() => setShowChallengeForm(false)}><X className="w-5 h-5 text-gray-400" /></button>
+                        </div>
+                        <form onSubmit={handleCreateChallenge} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                <input
+                                    type="text" required value={challengeForm.title}
+                                    onChange={(e) => setChallengeForm((f) => ({ ...f, title: e.target.value }))}
+                                    placeholder="e.g. Weekend Practice Sprint"
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Ranked by</label>
+                                <select
+                                    value={challengeForm.metric}
+                                    onChange={(e) => setChallengeForm((f) => ({ ...f, metric: e.target.value }))}
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    {Object.entries(CHALLENGE_METRIC_LABEL).map(([value, label]) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Starts</label>
+                                    <input
+                                        type="date" required value={challengeForm.startDate}
+                                        onChange={(e) => setChallengeForm((f) => ({ ...f, startDate: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Ends</label>
+                                    <input
+                                        type="date" required value={challengeForm.endDate}
+                                        onChange={(e) => setChallengeForm((f) => ({ ...f, endDate: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                type="submit" disabled={creatingChallenge}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-2xl transition shadow-lg shadow-indigo-200 mt-4 disabled:opacity-50"
+                            >
+                                {creatingChallenge ? 'Creating…' : 'Start Challenge'}
                             </button>
                         </form>
                     </div>

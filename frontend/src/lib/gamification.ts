@@ -1,4 +1,6 @@
 import prisma from "@/lib/prisma";
+import { computePlatformStreak } from "@/lib/streak";
+import { computeBatchLeaderboard } from "@/lib/leaderboard";
 
 // Points rules for different actions
 export const POINTS_RULES = {
@@ -71,7 +73,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "First Steps",
     description: "Completed your first test",
-    icon: "Footprints",
+    icon: "footprints",
     category: "achievement",
     points: 10,
     criteria: { type: "TEST_COMPLETED", count: 1 },
@@ -79,8 +81,8 @@ const BADGE_DEFINITIONS = [
   },
   {
     name: "Perfect Score",
-    description: "Scored 100% on a test",
-    icon: "Target",
+    description: "Scored full marks on a test",
+    icon: "target",
     category: "achievement",
     points: 25,
     criteria: { type: "PERFECT_SCORE" },
@@ -89,7 +91,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "7-Day Streak",
     description: "Practiced for 7 consecutive days",
-    icon: "Flame",
+    icon: "flame",
     category: "milestone",
     points: 50,
     criteria: { type: "STREAK", count: 7 },
@@ -98,7 +100,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "30-Day Warrior",
     description: "Practiced for 30 consecutive days",
-    icon: "Sword",
+    icon: "sword",
     category: "milestone",
     points: 200,
     criteria: { type: "STREAK", count: 30 },
@@ -107,7 +109,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "Batch Topper",
     description: "Ranked #1 in your batch",
-    icon: "Trophy",
+    icon: "trophy",
     category: "achievement",
     points: 100,
     criteria: { type: "TOP_SCORER" },
@@ -116,7 +118,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "Bookworm",
     description: "Completed 50 practice questions",
-    icon: "BookOpen",
+    icon: "book",
     category: "milestone",
     points: 30,
     criteria: { type: "PRACTICE_COUNT", count: 50 },
@@ -125,7 +127,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "Doubt Crusher",
     description: "Asked 10 doubts",
-    icon: "MessageCircle",
+    icon: "message-circle",
     category: "achievement",
     points: 15,
     criteria: { type: "DOUBT_COUNT", count: 10 },
@@ -134,7 +136,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "Century Club",
     description: "Earned 100+ points",
-    icon: "Zap",
+    icon: "zap",
     category: "special",
     points: 0,
     criteria: { type: "POINTS_TOTAL", count: 100 },
@@ -143,7 +145,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "Point Master",
     description: "Earned 500+ points",
-    icon: "Crown",
+    icon: "crown",
     category: "special",
     points: 0,
     criteria: { type: "POINTS_TOTAL", count: 500 },
@@ -152,7 +154,7 @@ const BADGE_DEFINITIONS = [
   {
     name: "Legend",
     description: "Earned 1000+ points",
-    icon: "Star",
+    icon: "star",
     category: "special",
     points: 0,
     criteria: { type: "POINTS_TOTAL", count: 1000 },
@@ -200,18 +202,25 @@ async function checkBadgeUnlocks(userId: string) {
           break;
         }
         case "PERFECT_SCORE": {
-          const perfectTests = await (prisma as any).testAttempt.count({
-            where: { userId, totalScore: 100 },
+          // totalScore is raw marks, not a percentage -- comparing it to a
+          // literal 100 is meaningless for both real tests (raw marks, e.g.
+          // up to 300-400) and practice-arena attempts (always 0 or 1).
+          // "Perfect" means full marks on a real test: totalScore equals
+          // that test's own totalMarks.
+          const realAttempts = await (prisma as any).testAttempt.findMany({
+            where: { userId, testId: { not: null } },
+            select: { totalScore: true, test: { select: { totalMarks: true } } },
           });
-          shouldUnlock = perfectTests > 0;
+          shouldUnlock = realAttempts.some(
+            (a: any) => a.test?.totalMarks > 0 && a.totalScore === a.test.totalMarks
+          );
           break;
         }
         case "STREAK": {
-          const progress = await (prisma as any).studentProgress.findFirst({
-            where: { userId },
-            orderBy: { currentStreak: 'desc' },
-          });
-          shouldUnlock = (progress?.currentStreak || 0) >= (def.criteria.count || 0);
+          // The platform-level streak a student actually sees (StreakCalendar),
+          // not the unrelated per-topic StudentProgress.currentStreak.
+          const { currentStreak } = await computePlatformStreak(prisma as any, userId);
+          shouldUnlock = currentStreak >= (def.criteria.count || 0);
           break;
         }
         case "PRACTICE_COUNT": {
@@ -234,8 +243,22 @@ async function checkBadgeUnlocks(userId: string) {
           break;
         }
         case "TOP_SCORER": {
-          // This needs batch context, will be checked separately
-          shouldUnlock = false;
+          // Eligibility, not visibility: includeOptedOut bypasses the
+          // public-leaderboard opt-in filter so a student who reasonably
+          // opted out of public ranking can still earn this achievement.
+          // A teacher's excludedFromRankings moderation decision is never
+          // bypassed, though (computeBatchLeaderboard always applies it).
+          const enrollments = await (prisma as any).batchEnrollment.findMany({
+            where: { studentId: userId, status: "APPROVED" },
+            select: { batchId: true },
+          });
+          for (const { batchId } of enrollments) {
+            const { leaderboard } = await computeBatchLeaderboard(prisma as any, batchId, { includeOptedOut: true });
+            if (leaderboard[0]?.userId === userId) {
+              shouldUnlock = true;
+              break;
+            }
+          }
           break;
         }
       }
@@ -245,6 +268,23 @@ async function checkBadgeUnlocks(userId: string) {
           data: { userId, badgeId },
           include: { badge: true },
         });
+
+        // POINTS_RULES.PRACTICE_STREAK_7/30 were defined but never awarded
+        // anywhere -- award them the first time each threshold is crossed,
+        // using this same shouldUnlock/alreadyEarned gate as the natural
+        // once-only dedup (a direct pointsTransaction.create, not
+        // awardPoints(), to avoid recursively re-entering checkBadgeUnlocks
+        // mid-iteration).
+        if (def.criteria.type === "STREAK") {
+          const bonus = def.criteria.count === 30 ? POINTS_RULES.PRACTICE_STREAK_30
+            : def.criteria.count === 7 ? POINTS_RULES.PRACTICE_STREAK_7
+            : null;
+          if (bonus) {
+            await (prisma as any).pointsTransaction.create({
+              data: { userId, points: bonus, reason: `${def.criteria.count}-day streak bonus` },
+            });
+          }
+        }
 
         // Create notification for badge unlock
         await (prisma as any).notification.create({
