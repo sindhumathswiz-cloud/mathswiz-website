@@ -120,6 +120,81 @@ export async function reconcileExercise(bookId: string, section: Pick<ConfirmedS
   return { extractedQuestionCount, matchedQuestionCount, unresolvedQuestionCount, reconciledAt };
 }
 
+export function summarizeReconciliation(rows: ExerciseReconciliationRow[]) {
+  return {
+    exerciseCount: rows.length,
+    discrepantCount: rows.filter((r) => r.discrepancies.length > 0).length,
+    totalExpected: rows.reduce((sum, r) => sum + (r.expectedQuestionCount ?? 0), 0),
+    totalExtracted: rows.reduce((sum, r) => sum + r.extractedQuestionCount, 0),
+    totalMatched: rows.reduce((sum, r) => sum + r.matchedQuestionCount, 0),
+    totalUnresolved: rows.reduce((sum, r) => sum + r.unresolvedQuestionCount, 0),
+  };
+}
+
+export interface BookCoverageSummary {
+  bookId: string;
+  bookTitle: string;
+  className: string;
+  subject: string;
+  exerciseCount: number;
+  discrepantCount: number;
+  totalExpected: number;
+  totalExtracted: number;
+  totalMatched: number;
+  totalUnresolved: number;
+}
+
+/**
+ * Cross-book curriculum coverage rollup for the admin reporting view.
+ * Reads already-persisted BookExercise counts directly (the same ones
+ * bookReconciliationReport() reads for one book) rather than triggering a
+ * live recompute per book -- cheap, safe to call on every admin page load,
+ * same reasoning as this file's own GET route above.
+ */
+export async function crossBookReconciliationSummary(): Promise<{ books: BookCoverageSummary[]; platform: ReturnType<typeof summarizeReconciliation> }> {
+  const exercises = await prisma.bookExercise.findMany({
+    where: {
+      chapter: { manifestConfirmedAt: { not: null } },
+      OR: [{ sectionType: null }, { sectionType: { notIn: [...NON_QUESTION_SECTIONS] } }],
+    },
+    select: {
+      expectedQuestionCount: true,
+      extractedQuestionCount: true,
+      matchedQuestionCount: true,
+      unresolvedQuestionCount: true,
+      chapter: { select: { bookId: true, book: { select: { title: true, className: true, subject: true } } } },
+    },
+  });
+
+  const byBook = new Map<string, { title: string; className: string; subject: string; rows: ExerciseReconciliationRow[] }>();
+  for (const ex of exercises) {
+    const bookId = ex.chapter.bookId;
+    const entry = byBook.get(bookId) ?? { title: ex.chapter.book.title, className: ex.chapter.book.className, subject: ex.chapter.book.subject, rows: [] };
+    entry.rows.push({
+      exerciseId: '', chapterId: '', chapterName: '', code: null, title: null, sectionType: null, startPage: null, endPage: null,
+      expectedQuestionCount: ex.expectedQuestionCount,
+      extractedQuestionCount: ex.extractedQuestionCount,
+      matchedQuestionCount: ex.matchedQuestionCount,
+      unresolvedQuestionCount: ex.unresolvedQuestionCount,
+      reconciledAt: null,
+      discrepancies: exerciseDiscrepancies(ex),
+    });
+    byBook.set(bookId, entry);
+  }
+
+  const books: BookCoverageSummary[] = [...byBook.entries()].map(([bookId, entry]) => ({
+    bookId,
+    bookTitle: entry.title,
+    className: entry.className,
+    subject: entry.subject,
+    ...summarizeReconciliation(entry.rows),
+  }));
+
+  const platform = summarizeReconciliation([...byBook.values()].flatMap((e) => e.rows));
+
+  return { books, platform };
+}
+
 /** Read-only: the report as of the last reconciliation, no recompute. */
 export async function bookReconciliationReport(bookId: string): Promise<ExerciseReconciliationRow[]> {
   const chapters = await loadConfirmedChapters(bookId);

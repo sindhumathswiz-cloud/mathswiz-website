@@ -60,11 +60,6 @@ model User {
   subscription String @default("FREE") // "FREE" or "PREMIUM"
   aiTokens     Int    @default(5) // Refreshed daily via cron or manual script
 
-  // Parent-Student Relationship
-  parentId String?
-  parent   User?   @relation("ParentChildren", fields: [parentId], references: [id])
-  children User[]  @relation("ParentChildren")
-
   // NextAuth Relations
   accounts Account[]
   sessions Session[]

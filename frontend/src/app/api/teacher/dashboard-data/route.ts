@@ -28,14 +28,16 @@ export async function GET(req: Request) {
                 include: { student: true, batch: true }
             }),
             prisma.user.findMany({
-                where: { 
-                    role: 'PARENT', 
+                where: {
+                    role: 'PARENT',
                     accountStatus: 'PENDING',
-                    children: {
+                    parentLinks: {
                         some: {
-                            enrollments: {
-                                some: {
-                                    batch: { teacherId: userId }
+                            student: {
+                                enrollments: {
+                                    some: {
+                                        batch: { teacherId: userId }
+                                    }
                                 }
                             }
                         }

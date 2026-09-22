@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const question = { findMany: vi.fn() };
-const bookExercise = { update: vi.fn() };
+const bookExercise = { update: vi.fn(), findMany: vi.fn() };
 vi.mock('./prisma', () => ({ default: { question, bookExercise } }));
 
 const loadConfirmedChapters = vi.fn();
@@ -148,5 +148,59 @@ describe('reconcileBook / bookReconciliationReport', () => {
     expect(question.findMany).not.toHaveBeenCalled();
     expect(bookExercise.update).not.toHaveBeenCalled();
     expect(rows[0]).toMatchObject({ extractedQuestionCount: 10, matchedQuestionCount: 10, unresolvedQuestionCount: 0, discrepancies: [] });
+  });
+});
+
+describe('crossBookReconciliationSummary', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const exerciseRow = (overrides: Partial<{ expectedQuestionCount: number | null; extractedQuestionCount: number; matchedQuestionCount: number; unresolvedQuestionCount: number; bookId: string; title: string }>) => ({
+    expectedQuestionCount: 10,
+    extractedQuestionCount: 10,
+    matchedQuestionCount: 10,
+    unresolvedQuestionCount: 0,
+    chapter: {
+      bookId: overrides.bookId ?? 'book-1',
+      book: { title: overrides.title ?? 'RS Aggarwal', className: 'Class 11', subject: 'Mathematics' },
+    },
+    ...overrides,
+  });
+
+  it('groups exercises by book and totals a platform-wide summary', async () => {
+    bookExercise.findMany.mockResolvedValue([
+      exerciseRow({ bookId: 'book-1', title: 'Book A' }),
+      exerciseRow({ bookId: 'book-1', title: 'Book A', extractedQuestionCount: 5, matchedQuestionCount: 3, unresolvedQuestionCount: 2 }),
+      exerciseRow({ bookId: 'book-2', title: 'Book B' }),
+    ]);
+    const { crossBookReconciliationSummary } = await import('./exercise-reconciliation');
+    const { books, platform } = await crossBookReconciliationSummary();
+
+    expect(books).toHaveLength(2);
+    const bookA = books.find((b) => b.bookId === 'book-1')!;
+    expect(bookA.exerciseCount).toBe(2);
+    expect(bookA.totalUnresolved).toBe(2);
+    expect(bookA.discrepantCount).toBe(1);
+    expect(platform.exerciseCount).toBe(3);
+    expect(platform.totalUnresolved).toBe(2);
+  });
+
+  it('scopes to confirmed chapters and question-bearing section types only', async () => {
+    const { crossBookReconciliationSummary } = await import('./exercise-reconciliation');
+    await crossBookReconciliationSummary();
+
+    expect(bookExercise.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        chapter: { manifestConfirmedAt: { not: null } },
+        OR: [{ sectionType: null }, { sectionType: { notIn: ['THEORY'] } }],
+      }),
+    }));
+  });
+
+  it('returns empty results when nothing has been reconciled anywhere', async () => {
+    bookExercise.findMany.mockResolvedValue([]);
+    const { crossBookReconciliationSummary } = await import('./exercise-reconciliation');
+    const { books, platform } = await crossBookReconciliationSummary();
+    expect(books).toEqual([]);
+    expect(platform.exerciseCount).toBe(0);
   });
 });

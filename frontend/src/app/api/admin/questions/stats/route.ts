@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { assessQuestionsRisk } from "@/lib/question-risk";
+
+// Same bound the review queue itself uses (question-risk.ts does per-question
+// figure lookups) -- running it over the entire question bank on every
+// admin page load would be expensive, so this scopes to the pool that
+// actually needs a risk score: questions not yet approved.
+const RISK_POOL_CAP = 500;
 
 export const dynamic = 'force-dynamic';
 
@@ -125,6 +132,52 @@ export async function GET(request: NextRequest) {
       if (row.subTopic) bySubTopic[row.subTopic] = row._count;
     }
 
+    // Content quality: verification-status breakdown (headline flagged %)
+    // plus a composite risk score over the open (not-yet-approved) pool,
+    // reusing the same three approval gates the review queue already scores
+    // by -- not re-deriving new thresholds here.
+    const byVerificationRaw = await prisma.question.groupBy({
+      by: ["verificationStatus"],
+      _count: true,
+    });
+    const byVerificationStatus: Record<string, number> = {};
+    for (const row of byVerificationRaw) {
+      byVerificationStatus[row.verificationStatus] = row._count;
+    }
+    const needsReviewCount = byVerificationStatus["NEEDS_REVIEW"] ?? 0;
+    const flaggedPercent = total > 0 ? Math.round((needsReviewCount / total) * 1000) / 10 : 0;
+
+    const openPool = await prisma.question.findMany({
+      where: { status: { in: ["DRAFT", "REPORTED", "PENDING_REVIEW"] } },
+      take: RISK_POOL_CAP,
+      select: {
+        id: true, content: true, options: true, correctAnswer: true, explanation: true, type: true,
+        provenance: true, bookId: true, sourcePageStart: true, sourcePageEnd: true, printedNumber: true, confidence: true,
+        book: { select: { title: true } },
+      },
+    });
+    const riskById = await assessQuestionsRisk(openPool.map((q) => ({
+      ...q,
+      options: Array.isArray(q.options) ? (q.options as string[]) : undefined,
+    })));
+    const riskByBook: Record<string, { blockedCount: number; avgScore: number }> = {};
+    const byBookAccum = new Map<string, number[]>();
+    for (const q of openPool) {
+      const risk = riskById.get(q.id)!;
+      const bookTitle = q.book?.title ?? "Manually authored";
+      const scores = byBookAccum.get(bookTitle) ?? [];
+      scores.push(risk.score);
+      byBookAccum.set(bookTitle, scores);
+      if (risk.blockers.length > 0) {
+        riskByBook[bookTitle] = riskByBook[bookTitle] ?? { blockedCount: 0, avgScore: 0 };
+        riskByBook[bookTitle].blockedCount += 1;
+      }
+    }
+    for (const [bookTitle, scores] of byBookAccum) {
+      const avg = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
+      riskByBook[bookTitle] = { blockedCount: riskByBook[bookTitle]?.blockedCount ?? 0, avgScore: avg };
+    }
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -140,6 +193,11 @@ export async function GET(request: NextRequest) {
         byType,
         byDifficulty,
         byExamType,
+        byVerificationStatus,
+        flaggedPercent,
+        riskByBook,
+        riskPoolSize: openPool.length,
+        riskPoolCapped: openPool.length >= RISK_POOL_CAP,
       },
     });
   } catch (error: unknown) {

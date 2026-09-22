@@ -65,6 +65,7 @@ import QuestionBankStats from "@/components/admin/QuestionBankStats";
 import { TestEngineCreator } from "@/components/admin/TestEngineCreator";
 import { LeadCRM } from "@/components/admin/LeadCRM";
 import { ReportsExport } from "@/components/admin/ReportsExport";
+import { AdminReportingPanel } from "@/components/admin/AdminReportingPanel";
 import { SystemFeatures } from "@/components/admin/SystemFeatures";
 import { FeeManagement } from "@/components/admin/FeeManagement";
 import { FeeStructureGenerator } from "@/components/admin/FeeStructureGenerator";
@@ -544,7 +545,12 @@ export default function AdminDashboardClient({
 
                     {/* CRM & Features Tabs */}
                     {activeTab === 'Lead CRM' && <div className="animate-in fade-in duration-500"><LeadCRM leads={leads} /></div>}
-                    {activeTab === 'Reports & Export' && <div className="animate-in fade-in duration-500"><ReportsExport stats={stats} users={users} leads={leads} payments={payments} /></div>}
+                    {activeTab === 'Reports & Export' && (
+                        <div className="animate-in fade-in duration-500 space-y-10">
+                            <ReportsExport stats={stats} users={users} leads={leads} payments={payments} />
+                            <AdminReportingPanel />
+                        </div>
+                    )}
                     {activeTab === 'Approvals' && <ApprovalsTab />}
                     {activeTab === 'System Features' && (
                         <div className="animate-in fade-in duration-500">

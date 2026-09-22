@@ -16,7 +16,7 @@ export async function linkStudentAction(parentId: string, studentEmail: string) 
         throw new Error("Unauthorized");
     }
 
-    const student = await (prisma as any).user.findFirst({
+    const student = await prisma.user.findFirst({
         where: { email: studentEmail, role: 'STUDENT' }
     });
 
@@ -24,13 +24,15 @@ export async function linkStudentAction(parentId: string, studentEmail: string) 
         throw new Error("Student with this email not found. Please ensure the email is correct and the student has an account.");
     }
 
-    if (student.parentId) {
+    const existingLink = await prisma.parentLink.findFirst({
+        where: { studentId: student.id }
+    });
+    if (existingLink) {
         throw new Error("This student is already linked to a parent account.");
     }
 
-    await (prisma as any).user.update({
-        where: { id: student.id },
-        data: { parentId: session.user.id }
+    await prisma.parentLink.create({
+        data: { parentId: session.user.id, studentId: student.id }
     });
 
     await recordAuditLog({
@@ -49,9 +51,8 @@ export async function unlinkStudentAction(studentId: string) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id || session.user.role !== "PARENT") throw new Error("Unauthorized");
     
-    const result = await (prisma as any).user.updateMany({
-        where: { id: studentId, parentId: session.user.id },
-        data: { parentId: null }
+    const result = await prisma.parentLink.deleteMany({
+        where: { studentId, parentId: session.user.id }
     });
 
     if (result.count === 0) throw new Error("Student is not linked to your account.");

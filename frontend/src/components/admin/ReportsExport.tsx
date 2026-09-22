@@ -1,17 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-    FileText, 
-    Download, 
-    Calendar, 
-    Filter, 
-    BarChart3, 
-    PieChart, 
-    CheckCircle2, 
-    AlertCircle, 
-    ArrowRight,
-    FileJson,
+import {
+    FileText,
+    Download,
+    Calendar,
+    Filter,
+    BarChart3,
+    CheckCircle2,
     Sheet
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -23,10 +19,64 @@ interface ReportsExportProps {
     payments: any[];
 }
 
+function groupCounts<T>(items: T[], keyFn: (item: T) => string): [string, number][] {
+    const counts: Record<string, number> = {};
+    for (const item of items) {
+        const key = keyFn(item) || 'UNKNOWN';
+        counts[key] = (counts[key] || 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+}
+
+// Real summary tiles + status breakdown computed from the props already
+// passed into this component -- no fabricated numbers, no second fetch.
+function computeEntitySummary(entity: string, payments: any[], users: any[], leads: any[]) {
+    if (entity === 'Financials') {
+        const total = payments.length;
+        const paid = payments.filter((p) => p.status === 'PAID').length;
+        const overdue = payments.filter((p) => p.status === 'OVERDUE').length;
+        return {
+            tiles: [
+                { label: 'Total Records', value: total.toLocaleString('en-IN') },
+                { label: 'Paid Rate', value: total > 0 ? `${Math.round((paid / total) * 100)}%` : '—' },
+                { label: 'Overdue', value: overdue.toLocaleString('en-IN') },
+            ],
+            breakdown: groupCounts(payments, (p) => p.status),
+        };
+    }
+    if (entity === 'User Registrations') {
+        const total = users.length;
+        const approved = users.filter((u) => u.accountStatus === 'APPROVED').length;
+        const pending = users.filter((u) => u.accountStatus === 'PENDING').length;
+        return {
+            tiles: [
+                { label: 'Total Records', value: total.toLocaleString('en-IN') },
+                { label: 'Approved Rate', value: total > 0 ? `${Math.round((approved / total) * 100)}%` : '—' },
+                { label: 'Pending', value: pending.toLocaleString('en-IN') },
+            ],
+            breakdown: groupCounts(users, (u) => u.role),
+        };
+    }
+    // Lead CRM
+    const total = leads.length;
+    const converted = leads.filter((l) => l.status === 'CONVERTED').length;
+    const newLeads = leads.filter((l) => l.status === 'NEW').length;
+    return {
+        tiles: [
+            { label: 'Total Records', value: total.toLocaleString('en-IN') },
+            { label: 'Converted Rate', value: total > 0 ? `${Math.round((converted / total) * 100)}%` : '—' },
+            { label: 'New', value: newLeads.toLocaleString('en-IN') },
+        ],
+        breakdown: groupCounts(leads, (l) => l.status),
+    };
+}
+
 export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportProps) => {
     const [entity, setEntity] = useState('Financials');
     const [dateRange, setDateRange] = useState('Last 30 Days');
     const [isGenerating, setIsGenerating] = useState(false);
+    const summary = computeEntitySummary(entity, payments, users, leads);
+    const maxBreakdownCount = Math.max(1, ...summary.breakdown.map(([, count]) => count));
 
     const handleExport = async (format: 'CSV' | 'PDF') => {
         setIsGenerating(true);
@@ -52,17 +102,6 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                     csvContent = "ID,Name,Phone,Email,Status,Source,Notes,Created At\n";
                     leads.forEach(l => {
                         csvContent += `${l.id},"${l.name}","${l.phone}","${l.email || ''}",${l.status},"${l.source || ''}","${(l.notes || '').replace(/"/g, '""')}",${l.createdAt}\n`;
-                    });
-                } else if (entity === 'Test Performance') {
-                    csvContent = "ID,Student,Test,Score,Correct,Incorrect,Skipped,Status,Date\n";
-                    // Assuming stats contains a flattened array or passed via props
-                    (stats.testAttempts || []).forEach((a: any) => {
-                        csvContent += `${a.id},"${a.user?.firstName} ${a.user?.lastName}","${a.test?.title}",${a.totalScore},${a.totalCorrect},${a.totalIncorrect},${a.totalSkipped},${a.status},${a.startTime}\n`;
-                    });
-                } else if (entity === 'Practice Arena Stats') {
-                    csvContent = "ID,Student,Topic,Mastery,Streak,Last Practiced\n";
-                    (stats.studentProgress || []).forEach((s: any) => {
-                        csvContent += `${s.id},"${s.user?.firstName} ${s.user?.lastName}",${s.topic},${s.masteryScore},${s.currentStreak},${s.lastPracticedAt}\n`;
                     });
                 }
 
@@ -184,7 +223,7 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                         <div className="space-y-4">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Select Data Entity</label>
                             <div className="grid grid-cols-1 gap-2">
-                                {['Financials', 'User Registrations', 'Test Performance', 'Practice Arena Stats', 'Lead CRM'].map(item => (
+                                {['Financials', 'User Registrations', 'Lead CRM'].map(item => (
                                     <button 
                                         key={item}
                                         onClick={() => setEntity(item)}
@@ -278,24 +317,15 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                                 <span className="text-[10px] font-black uppercase tracking-widest">Intelligence Preview</span>
                             </div>
                             <h3 className="text-3xl font-black mb-2">{entity} Executive Summary</h3>
-                            <p className="text-indigo-200 font-medium text-sm max-w-md">Snapshot of the {entity.toLowerCase()} vectors for the {dateRange.toLowerCase()} period.</p>
-                            
+                            <p className="text-indigo-200 font-medium text-sm max-w-md">Real counts from the currently loaded {entity.toLowerCase()} records (reporting period filter: {dateRange.toLowerCase()}, not yet applied server-side).</p>
+
                             <div className="grid grid-cols-3 gap-6 mt-8">
-                                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-                                    <p className="text-[10px] font-black text-indigo-300 uppercase mb-1">Total Volume</p>
-                                    <p className="text-2xl font-black">2,482</p>
-                                    <p className="text-[10px] text-emerald-400 font-bold mt-1">+14.2% ↑</p>
-                                </div>
-                                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-                                    <p className="text-[10px] font-black text-indigo-300 uppercase mb-1">Avg Accuracy</p>
-                                    <p className="text-2xl font-black">76.4%</p>
-                                    <p className="text-[10px] text-indigo-300 font-bold mt-1">Stable</p>
-                                </div>
-                                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-                                    <p className="text-[10px] font-black text-indigo-300 uppercase mb-1">Health Score</p>
-                                    <p className="text-2xl font-black">A+</p>
-                                    <p className="text-[10px] text-emerald-400 font-bold mt-1">Optimized</p>
-                                </div>
+                                {summary.tiles.map((tile) => (
+                                    <div key={tile.label} className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                                        <p className="text-[10px] font-black text-indigo-300 uppercase mb-1">{tile.label}</p>
+                                        <p className="text-2xl font-black">{tile.value}</p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-indigo-500 rounded-full blur-[100px] opacity-20"></div>
@@ -309,25 +339,27 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                     <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
                         <div className="flex items-center justify-between mb-8">
                             <h4 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
-                                <Calendar className="w-5 h-5 text-indigo-600" /> Granular Breakdown
+                                <Calendar className="w-5 h-5 text-indigo-600" /> Status Breakdown
                             </h4>
-                            <div className="flex items-center gap-1">
-                                <span className="w-3 h-3 bg-indigo-600 rounded-full"></span>
-                                <span className="text-[10px] font-bold text-gray-500 mr-4 uppercase">Actual</span>
-                                <span className="w-3 h-3 bg-indigo-200 rounded-full"></span>
-                                <span className="text-[10px] font-bold text-gray-500 uppercase">Target</span>
-                            </div>
                         </div>
-                        
-                        {/* Placeholder for a chart */}
-                        <div className="h-64 w-full bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center flex-col gap-4">
-                            <div className="flex items-end gap-3 h-32">
-                                {[40, 70, 45, 90, 65, 80, 50, 85].map((h, i) => (
-                                    <div key={i} className="w-8 bg-indigo-600 rounded-t-lg transition-all duration-500 hover:bg-indigo-700" style={{ height: `${h}%` }}></div>
+
+                        {summary.breakdown.length === 0 ? (
+                            <div className="h-32 w-full bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center">
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No records loaded for {entity}</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {summary.breakdown.map(([label, count]) => (
+                                    <div key={label} className="flex items-center gap-4">
+                                        <span className="w-32 shrink-0 text-xs font-bold text-gray-600 truncate">{label}</span>
+                                        <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${(count / maxBreakdownCount) * 100}%` }}></div>
+                                        </div>
+                                        <span className="w-10 shrink-0 text-right text-xs font-black text-gray-900">{count}</span>
+                                    </div>
                                 ))}
                             </div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-4">Telemetry Visualization Loop</p>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>

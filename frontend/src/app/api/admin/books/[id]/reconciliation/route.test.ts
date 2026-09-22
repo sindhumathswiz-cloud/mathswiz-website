@@ -11,7 +11,10 @@ vi.mock('@/lib/prisma', () => ({ default: mockPrisma }));
 
 const bookReconciliationReport = vi.fn();
 const reconcileBook = vi.fn();
-vi.mock('@/lib/exercise-reconciliation', () => ({ bookReconciliationReport, reconcileBook }));
+vi.mock('@/lib/exercise-reconciliation', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/exercise-reconciliation')>('@/lib/exercise-reconciliation');
+  return { ...actual, bookReconciliationReport, reconcileBook };
+});
 
 function get() {
   return new Request('http://localhost/api/admin/books/book-1/reconciliation');

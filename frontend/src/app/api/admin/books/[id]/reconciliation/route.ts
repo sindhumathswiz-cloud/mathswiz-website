@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
-import { bookReconciliationReport, reconcileBook, type ExerciseReconciliationRow } from '@/lib/exercise-reconciliation';
+import { bookReconciliationReport, reconcileBook, summarizeReconciliation } from '@/lib/exercise-reconciliation';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -23,16 +23,7 @@ export const maxDuration = 120;
  *          normally read off the printed book/table of contents by a human.
  */
 
-function summarize(rows: ExerciseReconciliationRow[]) {
-  return {
-    exerciseCount: rows.length,
-    discrepantCount: rows.filter((r) => r.discrepancies.length > 0).length,
-    totalExpected: rows.reduce((sum, r) => sum + (r.expectedQuestionCount ?? 0), 0),
-    totalExtracted: rows.reduce((sum, r) => sum + r.extractedQuestionCount, 0),
-    totalMatched: rows.reduce((sum, r) => sum + r.matchedQuestionCount, 0),
-    totalUnresolved: rows.reduce((sum, r) => sum + r.unresolvedQuestionCount, 0),
-  };
-}
+const summarize = summarizeReconciliation;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await getAuthenticatedUser(['ADMIN']);

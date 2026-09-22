@@ -1,17 +1,59 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Users, TrendingUp, CreditCard, Target, Plus, XCircle, LogOut } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Users, TrendingUp, CreditCard, Target, Plus, XCircle, LogOut, Clock, CheckCircle2, ShieldAlert, MessageSquare, Flame, Award, CalendarCheck } from 'lucide-react';
 import { linkStudentAction, unlinkStudentAction } from "@/actions/parentActions";
 import { toast } from "react-hot-toast";
 import { useSession } from 'next-auth/react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+type ActionCard = { title: string; detail: string; tone: 'attention' | 'neutral' | 'success'; href: string };
+
+const ACTION_TONE_STYLE: Record<ActionCard['tone'], string> = {
+    attention: 'bg-rose-50 border-rose-100 text-rose-900',
+    neutral: 'bg-indigo-50 border-indigo-100 text-indigo-900',
+    success: 'bg-emerald-50 border-emerald-100 text-emerald-900',
+};
+
+type DashboardStats = {
+    weeklyTimeSpentMinutes: number;
+    completedThisWeek: number;
+    strengths: string[];
+    risks: string[];
+    developing: string[];
+    masteryAverage: number;
+    teacherComments: { id: string; source: 'test' | 'intervention'; title: string; comment: string; at: string | null }[];
+    attendancePercent: number | null;
+    currentStreak: number;
+    globalRank: number | null;
+    recentScores: { test: string; score: number; avg: number; date: string }[];
+};
 
 export default function ParentDashboardClient({ initialStudents = [] }: { initialStudents: any[] }) {
     const { data: session } = useSession();
     const [students, setStudents] = useState(initialStudents);
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [studentEmail, setStudentEmail] = useState('');
+    const [statsByStudent, setStatsByStudent] = useState<Record<string, DashboardStats>>({});
+    const [actionCardsByStudent, setActionCardsByStudent] = useState<Record<string, ActionCard[]>>({});
+
+    useEffect(() => {
+        students.forEach((student: any) => {
+            fetch(`/api/parent/dashboard?studentId=${student.id}`)
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data.success) setStatsByStudent((prev) => ({ ...prev, [student.id]: data.stats }));
+                })
+                .catch(() => {});
+            fetch(`/api/parent/action-cards?studentId=${student.id}`)
+                .then((res) => res.json())
+                .then((data) => {
+                    if (Array.isArray(data.cards)) setActionCardsByStudent((prev) => ({ ...prev, [student.id]: data.cards }));
+                })
+                .catch(() => {});
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [students.map((s: any) => s.id).join(',')]);
 
     const handleLinkStudent = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -79,6 +121,9 @@ export default function ParentDashboardClient({ initialStudents = [] }: { initia
                                 return sum + enr.payments.filter((p: any) => p.status !== 'PAID').reduce((s: number, p: any) => s + p.amount, 0);
                             }, 0);
 
+                            const stats: DashboardStats | undefined = statsByStudent[student.id];
+                            const actionCards: ActionCard[] | undefined = actionCardsByStudent[student.id];
+
                             return (
                                 <div key={student.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
                                     <div className="p-8 border-b border-gray-50 flex justify-between items-start">
@@ -92,6 +137,21 @@ export default function ParentDashboardClient({ initialStudents = [] }: { initia
                                     </div>
 
                                     <div className="p-8 space-y-8">
+                                        {/* What can I do this week */}
+                                        {actionCards && actionCards.length > 0 && (
+                                            <div>
+                                                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-3">This week</h3>
+                                                <div className="space-y-2">
+                                                    {actionCards.map((card, i) => (
+                                                        <div key={i} className={`rounded-xl border p-4 ${ACTION_TONE_STYLE[card.tone]}`}>
+                                                            <p className="text-xs font-black">{card.title}</p>
+                                                            <p className="text-sm mt-0.5 opacity-90">{card.detail}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Performance Section */}
                                         <div>
                                             <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
@@ -135,6 +195,78 @@ export default function ParentDashboardClient({ initialStudents = [] }: { initia
                                                 </p>
                                             </div>
                                         </div>
+
+                                        {stats && (
+                                            <>
+                                                {/* Weekly activity */}
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div className="bg-gray-50 rounded-2xl p-5 text-center">
+                                                        <Clock className="w-4 h-4 text-indigo-500 mx-auto mb-2" />
+                                                        <p className="text-lg font-black text-gray-900">{stats.weeklyTimeSpentMinutes}m</p>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">This week</p>
+                                                    </div>
+                                                    <div className="bg-gray-50 rounded-2xl p-5 text-center">
+                                                        <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto mb-2" />
+                                                        <p className="text-lg font-black text-gray-900">{stats.completedThisWeek}</p>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Completed</p>
+                                                    </div>
+                                                    <div className="bg-gray-50 rounded-2xl p-5 text-center">
+                                                        <Flame className="w-4 h-4 text-amber-500 mx-auto mb-2" />
+                                                        <p className="text-lg font-black text-gray-900">{stats.currentStreak}d</p>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Streak</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="bg-gray-50 rounded-2xl p-5 text-center">
+                                                        <CalendarCheck className="w-4 h-4 text-blue-500 mx-auto mb-2" />
+                                                        <p className="text-lg font-black text-gray-900">{stats.attendancePercent ?? '—'}{stats.attendancePercent != null ? '%' : ''}</p>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Attendance</p>
+                                                    </div>
+                                                    <div className="bg-gray-50 rounded-2xl p-5 text-center">
+                                                        <Award className="w-4 h-4 text-purple-500 mx-auto mb-2" />
+                                                        <p className="text-lg font-black text-gray-900">{stats.globalRank != null ? `Top ${stats.globalRank}%` : '—'}</p>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Batch rank</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Strengths & risks */}
+                                                {(stats.strengths.length > 0 || stats.risks.length > 0) && (
+                                                    <div>
+                                                        <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-3">Strengths &amp; risks</h3>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {stats.strengths.map((topic) => (
+                                                                <span key={`s-${topic}`} className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full">
+                                                                    <CheckCircle2 className="w-3 h-3" /> {topic}
+                                                                </span>
+                                                            ))}
+                                                            {stats.risks.map((topic) => (
+                                                                <span key={`r-${topic}`} className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 text-xs font-bold px-3 py-1.5 rounded-full">
+                                                                    <ShieldAlert className="w-3 h-3" /> {topic}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Teacher comments */}
+                                                {stats.teacherComments.length > 0 && (
+                                                    <div>
+                                                        <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                            <MessageSquare className="w-4 h-4 text-indigo-500" /> Teacher comments
+                                                        </h3>
+                                                        <div className="space-y-2">
+                                                            {stats.teacherComments.slice(0, 3).map((c) => (
+                                                                <div key={c.id} className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4">
+                                                                    <p className="text-xs font-black text-indigo-900">{c.title}</p>
+                                                                    <p className="text-sm text-gray-700 mt-1">{c.comment}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             );
