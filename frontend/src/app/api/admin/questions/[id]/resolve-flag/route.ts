@@ -27,7 +27,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     body.note ? String(body.note).slice(0, 2000) : 'Flag cleared after manual confirmation.',
   ].join('\n');
 
-  const nextTags = question.tags.filter((t) => t !== 'Second-Review: Flagged' && t !== 'AI-Verified: Flagged');
+  const nextTags = question.tags.filter((t) => t !== 'Second-Review: Flagged' && t !== 'AI-Verified: Flagged' && t !== 'Gate-Swept: Flagged');
 
   const updated = await prisma.question.update({
     where: { id },

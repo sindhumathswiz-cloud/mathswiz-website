@@ -1,5 +1,5 @@
 import katex from 'katex';
-import { sanitizeLatex } from '@/components/MathRenderer';
+import { sanitizeLatex } from '@/lib/latex-sanitize';
 
 /**
  * Deterministic QA checks for extracted questions — flags broken LaTeX, missing

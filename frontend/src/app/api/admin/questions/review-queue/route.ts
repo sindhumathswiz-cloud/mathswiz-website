@@ -15,7 +15,7 @@ const PAGE_SIZE = 24;
 // truncated.
 const POOL_CAP = 500;
 
-const FLAG_TAGS = ['Second-Review: Flagged', 'AI-Verified: Flagged'];
+const FLAG_TAGS = ['Second-Review: Flagged', 'AI-Verified: Flagged', 'Gate-Swept: Flagged'];
 
 /**
  * The human review queue: every open (DRAFT/REPORTED/PENDING_REVIEW)
@@ -32,6 +32,15 @@ const FLAG_TAGS = ['Second-Review: Flagged', 'AI-Verified: Flagged'];
  * exactly where the approval gates land a question they downgrade (see
  * api/questions/route.ts and bulk-approve/route.ts) -- before this, those
  * downgraded rows had no review surface at all.
+ *
+ * Also includes APPROVED questions carrying the 'Gate-Swept: Flagged' tag --
+ * the gates only ever blocked *future* transitions into APPROVED, so a
+ * question approved before a gate existed (or before its own figure/answer
+ * was retroactively invalidated) had no review surface at all. A one-time
+ * sweep (scripts/sweep-approved-gates.ts) tags any already-live APPROVED
+ * question that wouldn't pass today's gates; this is deliberately scoped to
+ * that tag rather than re-risk-assessing every APPROVED row on every page
+ * load, which would flood the queue with the full live question bank.
  */
 export async function GET(request: Request) {
   const auth = await getAuthenticatedUser(['ADMIN']);
@@ -43,7 +52,10 @@ export async function GET(request: Request) {
   const cursor = params.get('cursor') || undefined;
 
   const where: Prisma.QuestionWhereInput = {
-    status: { in: ['DRAFT', 'REPORTED', 'PENDING_REVIEW'] },
+    OR: [
+      { status: { in: ['DRAFT', 'REPORTED', 'PENDING_REVIEW'] } },
+      { status: 'APPROVED', tags: { has: 'Gate-Swept: Flagged' } },
+    ],
     ...(bookId ? { bookId } : {}),
     ...(search ? { content: { contains: search, mode: 'insensitive' } } : {}),
   };

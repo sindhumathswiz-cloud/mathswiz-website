@@ -47,7 +47,7 @@ interface QuestionVersionRow {
 // recent evidence/verdict first rather than the full accumulated history.
 function latestNote(reviewNotes: string | null): string | null {
   if (!reviewNotes) return null;
-  const markers = ['[Second Review --', '[AI-Verified --', '[Resolved --'];
+  const markers = ['[Second Review --', '[AI-Verified --', '[Gate-Swept --', '[Resolved --'];
   let lastIndex = -1;
   for (const marker of markers) {
     const idx = reviewNotes.lastIndexOf(marker);

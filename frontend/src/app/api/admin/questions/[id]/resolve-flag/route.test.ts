@@ -62,6 +62,18 @@ describe('PATCH /api/admin/questions/[id]/resolve-flag', () => {
     expect(recordAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: 'QUESTION_REVIEW_RESOLVED', entityType: 'Question', entityId: 'q-1' }));
   });
 
+  it('also strips a Gate-Swept: Flagged tag (from the retroactive gate sweep)', async () => {
+    question.findUnique.mockResolvedValue({ tags: ['Gate-Swept: Flagged', 'Some Other Tag'], reviewNotes: null });
+    question.update.mockResolvedValue({ id: 'q-1', verificationStatus: 'VERIFIED', tags: ['Some Other Tag'], reviewNotes: 'note' });
+
+    const { PATCH } = await import('./route');
+    await PATCH(patch({ action: 'resolve' }), { params });
+
+    expect(question.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ tags: ['Some Other Tag'] }),
+    }));
+  });
+
   it('never hard-deletes -- only tags/status/reviewNotes are written', async () => {
     question.findUnique.mockResolvedValue({ tags: ['Second-Review: Flagged'], reviewNotes: null });
     question.update.mockResolvedValue({ id: 'q-1', verificationStatus: 'VERIFIED', tags: [], reviewNotes: 'note' });

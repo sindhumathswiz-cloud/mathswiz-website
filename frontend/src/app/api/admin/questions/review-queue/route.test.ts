@@ -35,14 +35,27 @@ describe('GET /api/admin/questions/review-queue', () => {
     expect(response.status).toBe(403);
   });
 
-  it('queries DRAFT/REPORTED/PENDING_REVIEW candidates, unfiltered by tag/verificationStatus at the DB level', async () => {
+  it('queries DRAFT/REPORTED/PENDING_REVIEW candidates plus Gate-Swept-tagged APPROVED ones, unfiltered by other tags/verificationStatus at the DB level', async () => {
     const { GET } = await import('./route');
     await GET(get(''));
 
     expect(question.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { status: { in: ['DRAFT', 'REPORTED', 'PENDING_REVIEW'] } },
+      where: {
+        OR: [
+          { status: { in: ['DRAFT', 'REPORTED', 'PENDING_REVIEW'] } },
+          { status: 'APPROVED', tags: { has: 'Gate-Swept: Flagged' } },
+        ],
+      },
       take: 500,
     }));
+  });
+
+  it('keeps an APPROVED question tagged Gate-Swept: Flagged even with a clean live risk score', async () => {
+    question.findMany.mockResolvedValue([{ ...baseQuestion, id: 'q-1', status: 'APPROVED', tags: ['Gate-Swept: Flagged'] }]);
+    assessQuestionsRisk.mockResolvedValue(new Map([['q-1', { score: 90, blockers: [] }]]));
+    const { GET } = await import('./route');
+    const data = await ((await GET(get(''))) as Response).json();
+    expect(data.questions).toHaveLength(1);
   });
 
   it('applies an optional bookId and search filter', async () => {
