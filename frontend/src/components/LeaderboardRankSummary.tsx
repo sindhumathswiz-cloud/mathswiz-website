@@ -21,7 +21,7 @@ export default function LeaderboardRankSummary() {
     return (
         <Link
             href="/student/leaderboard"
-            className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl p-5 hover:shadow-lg transition-shadow"
+            className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-brand dark:to-brand-violet text-white rounded-2xl p-5 hover:shadow-lg transition-shadow"
         >
             <div className="flex items-center gap-3">
                 <Trophy className="w-8 h-8 text-indigo-100" />

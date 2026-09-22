@@ -137,21 +137,21 @@ export default function TestAssignPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="bg-white border-b border-slate-200 px-8 py-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-background">
+      <div className="bg-white dark:bg-surface border-b border-slate-200 dark:border-white/10 px-8 py-6">
         <div className="max-w-5xl mx-auto">
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-2 font-medium">
-            <Link href="/teacher/tests" className="hover:text-indigo-600 transition-colors">Test Ledger</Link>
+          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">
+            <Link href="/teacher/tests" className="hover:text-indigo-600 dark:hover:text-brand transition-colors">Test Ledger</Link>
             <ChevronRight className="w-4 h-4" />
-            <span className="text-slate-800">Publish &amp; Assign</span>
+            <span className="text-slate-800 dark:text-white">Publish &amp; Assign</span>
           </div>
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-black text-slate-900">Publish &amp; Assign</h1>
+            <h1 className="font-display text-3xl font-black text-slate-900 dark:text-white">Publish &amp; Assign</h1>
             <button
               onClick={togglePublish}
               disabled={togglingPublish || isPublished === null}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 ${
-                isPublished ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white'
+                isPublished ? 'bg-emerald-600 dark:bg-emerald-500 hover:bg-emerald-500 dark:hover:bg-emerald-400 text-white' : 'bg-slate-800 dark:bg-white/10 hover:bg-slate-700 dark:hover:bg-white/20 text-white'
               }`}
             >
               {togglingPublish ? <Loader2 className="w-4 h-4 animate-spin" /> : isPublished ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
@@ -162,26 +162,26 @@ export default function TestAssignPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-indigo-500" /> Assign to</h2>
+        <div className="bg-white dark:bg-surface rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm p-6">
+          <h2 className="font-display text-lg font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-indigo-500 dark:text-brand" /> Assign to</h2>
 
           <div className="flex gap-2 mb-4">
-            <button onClick={() => setTargetMode('batch')} className={`px-4 py-2 rounded-lg text-sm font-bold ${targetMode === 'batch' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Whole batch</button>
-            <button onClick={() => setTargetMode('students')} className={`px-4 py-2 rounded-lg text-sm font-bold ${targetMode === 'students' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Individual students</button>
+            <button onClick={() => setTargetMode('batch')} className={`px-4 py-2 rounded-lg text-sm font-bold ${targetMode === 'batch' ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400'}`}>Whole batch</button>
+            <button onClick={() => setTargetMode('students')} className={`px-4 py-2 rounded-lg text-sm font-bold ${targetMode === 'students' ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400'}`}>Individual students</button>
           </div>
 
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Batch</label>
-          <select data-testid="assign-batch-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm mb-4 outline-none focus:border-indigo-400">
+          <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Batch</label>
+          <select data-testid="assign-batch-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)} className="w-full border dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg p-2.5 text-sm mb-4 outline-none focus:border-indigo-400 dark:focus:border-brand">
             <option value="">Select a batch…</option>
             {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
 
           {targetMode === 'students' && (
-            <div className="mb-4 max-h-48 overflow-y-auto border rounded-lg divide-y">
+            <div className="mb-4 max-h-48 overflow-y-auto border dark:border-white/10 rounded-lg divide-y dark:divide-white/10">
               {batchStudents.length === 0 ? (
-                <p className="p-3 text-xs text-slate-400">Select a batch above to see its students.</p>
+                <p className="p-3 text-xs text-slate-400 dark:text-slate-500">Select a batch above to see its students.</p>
               ) : batchStudents.map((s) => (
-                <label key={s.id} className="flex items-center gap-2 p-2.5 text-sm cursor-pointer hover:bg-slate-50">
+                <label key={s.id} className="flex items-center gap-2 p-2.5 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 dark:text-slate-200">
                   <input type="checkbox" checked={selectedStudentIds.includes(s.id)} onChange={() => toggleStudent(s.id)} />
                   {s.firstName} {s.lastName}
                 </label>
@@ -191,49 +191,49 @@ export default function TestAssignPage() {
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Kind</label>
-              <select value={kind} onChange={(e) => setKind(e.target.value as 'TEST' | 'HOMEWORK')} className="w-full border rounded-lg p-2.5 text-sm outline-none focus:border-indigo-400">
+              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Kind</label>
+              <select value={kind} onChange={(e) => setKind(e.target.value as 'TEST' | 'HOMEWORK')} className="w-full border dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-400 dark:focus:border-brand">
                 <option value="TEST">Test</option>
                 <option value="HOMEWORK">Homework</option>
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Max attempts</label>
-              <input type="number" min={1} max={10} value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm outline-none focus:border-indigo-400" />
+              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Max attempts</label>
+              <input type="number" min={1} max={10} value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} className="w-full border dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-400 dark:focus:border-brand" />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Opens</label>
-              <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm outline-none focus:border-indigo-400" />
+              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Opens</label>
+              <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} className="w-full border dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-400 dark:focus:border-brand" />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Deadline</label>
-              <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm outline-none focus:border-indigo-400" />
+              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Deadline</label>
+              <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full border dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-400 dark:focus:border-brand" />
             </div>
           </div>
 
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Instructions</label>
-          <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2} className="w-full border rounded-lg p-2.5 text-sm mb-4 outline-none focus:border-indigo-400" placeholder="Optional instructions for students…" />
+          <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Instructions</label>
+          <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2} className="w-full border dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg p-2.5 text-sm mb-4 outline-none focus:border-indigo-400 dark:focus:border-brand" placeholder="Optional instructions for students…" />
 
-          <button onClick={submitAssignment} disabled={assigning} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+          <button onClick={submitAssignment} disabled={assigning} className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 disabled:opacity-50 text-white px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2">
             {assigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Assign
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-lg font-black text-slate-800 mb-4">Existing assignments</h2>
+        <div className="bg-white dark:bg-surface rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm p-6">
+          <h2 className="font-display text-lg font-black text-slate-800 dark:text-white mb-4">Existing assignments</h2>
           {loadingAssignments ? (
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mx-auto my-8" />
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-500 dark:text-brand mx-auto my-8" />
           ) : assignments.length === 0 ? (
-            <p className="text-sm text-slate-400">Not assigned to anyone yet.</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500">Not assigned to anyone yet.</p>
           ) : (
             <div className="space-y-3">
               {assignments.map((a) => (
-                <div key={a.id} className="border rounded-lg p-3 text-sm">
-                  <p className="font-bold text-slate-800">
+                <div key={a.id} className="border dark:border-white/10 rounded-lg p-3 text-sm">
+                  <p className="font-bold text-slate-800 dark:text-white">
                     {a.batch ? a.batch.name : `${a.student?.firstName} ${a.student?.lastName}`}
-                    <span className="ml-2 text-[10px] font-black uppercase tracking-widest text-indigo-600">{a.kind}</span>
+                    <span className="ml-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-brand">{a.kind}</span>
                   </p>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                     {a.deadline ? `Due ${new Date(a.deadline).toLocaleString('en-IN')}` : 'No deadline'} · {a.maxAttempts} attempt{a.maxAttempts === 1 ? '' : 's'}
                   </p>
                 </div>

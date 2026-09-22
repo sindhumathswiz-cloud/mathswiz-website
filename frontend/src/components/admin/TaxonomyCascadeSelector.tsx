@@ -221,7 +221,7 @@ export default function TaxonomyCascadeSelector({
                         </div>
                     )}
                 </div>
-                <div className="text-[10px] font-black text-indigo-500/50 uppercase tracking-tighter">Taxonomy Selector v1.0</div>
+                <div className="text-[10px] font-black text-indigo-500/50 uppercase tracking-tighter dark:text-brand">Taxonomy Selector v1.0</div>
             </div>
 
             <div className="space-y-8">
@@ -231,7 +231,7 @@ export default function TaxonomyCascadeSelector({
                         <div className="w-6 h-6 bg-indigo-500/20 rounded-lg flex items-center justify-center text-indigo-400 border border-indigo-500/30">
                             <span className="text-[10px] font-black italic">01</span>
                         </div>
-                        <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">Select Board</label>
+                        <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">Select Board</label>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {BOARDS.map(board => (
@@ -239,8 +239,8 @@ export default function TaxonomyCascadeSelector({
                                 key={board}
                                 onClick={() => handleBoardChange(board)}
                                 className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all border ${
-                                    selBoard === board 
-                                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40 scale-105' 
+                                    selBoard === board
+                                    ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet border-indigo-500 text-white shadow-lg shadow-indigo-900/40 scale-105'
                                     : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white'
                                 }`}
                             >
@@ -258,13 +258,13 @@ export default function TaxonomyCascadeSelector({
                                 <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-400 border border-purple-500/30">
                                     <span className="text-[10px] font-black italic">02</span>
                                 </div>
-                                <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">Select Class</label>
+                                <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">Select Class</label>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {loadingClasses ? (
-                                    <span className="text-xs text-slate-500">Loading...</span>
+                                    <span className="text-xs text-slate-500 dark:text-slate-400">Loading...</span>
                                 ) : classes.length === 0 ? (
-                                    <span className="text-xs text-slate-500">No classes found for this board</span>
+                                    <span className="text-xs text-slate-500 dark:text-slate-400">No classes found for this board</span>
                                 ) : (
                                     classes.map(cls => (
                                         <button
@@ -294,13 +294,13 @@ export default function TaxonomyCascadeSelector({
                                 <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-400 border border-emerald-500/30">
                                     <span className="text-[10px] font-black italic">03</span>
                                 </div>
-                                <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">Select Subject</label>
+                                <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">Select Subject</label>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 {loadingSubjects ? (
-                                    <span className="text-xs text-slate-500 col-span-full">Loading...</span>
+                                    <span className="text-xs text-slate-500 col-span-full dark:text-slate-400">Loading...</span>
                                 ) : subjects.length === 0 ? (
-                                    <span className="text-xs text-slate-500 col-span-full">No subjects found</span>
+                                    <span className="text-xs text-slate-500 col-span-full dark:text-slate-400">No subjects found</span>
                                 ) : (
                                     subjects.map(sub => (
                                         <button
@@ -331,7 +331,7 @@ export default function TaxonomyCascadeSelector({
                                     <div className="w-6 h-6 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-400 border border-amber-500/30">
                                         <span className="text-[10px] font-black italic">04</span>
                                     </div>
-                                    <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">
+                                    <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">
                                         Select Topics <span className="text-[9px] text-amber-400 normal-case">(multi-select)</span>
                                     </label>
                                 </div>
@@ -347,9 +347,9 @@ export default function TaxonomyCascadeSelector({
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {loadingTopics ? (
-                                    <span className="text-xs text-slate-500 col-span-full">Loading...</span>
+                                    <span className="text-xs text-slate-500 col-span-full dark:text-slate-400">Loading...</span>
                                 ) : topics.length === 0 ? (
-                                    <div className="col-span-2 py-8 text-center border-2 border-dashed border-slate-800/50 rounded-2xl italic text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                                    <div className="col-span-2 py-8 text-center border-2 border-dashed border-slate-800/50 rounded-2xl italic text-slate-600 text-[10px] font-black uppercase tracking-widest dark:text-slate-400">
                                         No Topics Found for this Subject
                                     </div>
                                 ) : (
@@ -371,12 +371,12 @@ export default function TaxonomyCascadeSelector({
                                                 ) : (
                                                     isItemSelected(topic.id) 
                                                         ? <CheckSquare className="w-4 h-4 text-white shrink-0" />
-                                                        : <Square className="w-4 h-4 text-slate-500 shrink-0" />
+                                                        : <Square className="w-4 h-4 text-slate-500 shrink-0 dark:text-slate-400" />
                                                 )}
                                                 <span className="truncate">{topic.name}</span>
                                             </div>
                                             {topic._count && topic._count.questionTags > 0 && (
-                                                <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">{topic._count.questionTags} Qs</span>
+                                                <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full dark:text-slate-500">{topic._count.questionTags} Qs</span>
                                             )}
                                         </button>
                                     ))
@@ -395,7 +395,7 @@ export default function TaxonomyCascadeSelector({
                                     <div className="w-6 h-6 bg-cyan-500/20 rounded-lg flex items-center justify-center text-cyan-400 border border-cyan-500/30">
                                         <span className="text-[10px] font-black italic">05</span>
                                     </div>
-                                    <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">
+                                    <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">
                                         Select Sub-Topics <span className="text-[9px] text-cyan-400 normal-case">(multi-select)</span>
                                     </label>
                                 </div>
@@ -403,9 +403,9 @@ export default function TaxonomyCascadeSelector({
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-8">
                                 {loadingSubtopics ? (
-                                    <span className="text-xs text-slate-500 col-span-full">Loading...</span>
+                                    <span className="text-xs text-slate-500 col-span-full dark:text-slate-400">Loading...</span>
                                 ) : subtopics.length === 0 ? (
-                                    <div className="col-span-2 py-4 text-center border-2 border-dashed border-slate-800/50 rounded-2xl text-[10px] font-black text-slate-600 uppercase">
+                                    <div className="col-span-2 py-4 text-center border-2 border-dashed border-slate-800/50 rounded-2xl text-[10px] font-black text-slate-600 uppercase dark:text-slate-400">
                                         No subtopics yet.
                                     </div>
                                 ) : (
@@ -422,12 +422,12 @@ export default function TaxonomyCascadeSelector({
                                             <div className="flex items-center gap-3 min-w-0">
                                                 {isItemSelected(subtopic.id) 
                                                     ? <CheckSquare className="w-4 h-4 text-white shrink-0" />
-                                                    : <Square className="w-4 h-4 text-slate-500 shrink-0" />
+                                                    : <Square className="w-4 h-4 text-slate-500 shrink-0 dark:text-slate-400" />
                                                 }
                                                 <span className="truncate">{subtopic.name}</span>
                                             </div>
                                             {subtopic._count && subtopic._count.questionTags > 0 && (
-                                                <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">{subtopic._count.questionTags} Qs</span>
+                                                <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full dark:text-slate-500">{subtopic._count.questionTags} Qs</span>
                                             )}
                                         </button>
                                     ))

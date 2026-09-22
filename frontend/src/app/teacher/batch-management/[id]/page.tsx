@@ -29,7 +29,7 @@ export default async function ManageBatchPage({ params }: { params: Promise<{ id
     });
 
     if (!batch) {
-        return <div className="p-10 text-center text-red-500">Batch not found or deleted.</div>;
+        return <div className="p-10 text-center text-red-500 dark:text-rose-400">Batch not found or deleted.</div>;
     }
 
     // Fetch tests to allow assigning them

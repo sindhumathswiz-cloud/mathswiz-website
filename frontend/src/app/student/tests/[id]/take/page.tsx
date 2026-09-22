@@ -332,12 +332,12 @@ export default function TestTakingUI() {
 
     const getColorForStatus = (status: QuestionStatus) => {
         switch (status) {
-            case 'ANSWERED': return 'bg-emerald-500 text-white border-emerald-600 shadow-emerald-200';
-            case 'NOT_ANSWERED': return 'bg-rose-500 text-white border-rose-600 shadow-rose-200';
-            case 'NOT_VISITED': return 'bg-white text-gray-500 border-gray-200';
-            case 'MARKED_FOR_REVIEW': return 'bg-indigo-600 text-white border-indigo-700 shadow-indigo-200';
-            case 'ANSWERED_AND_MARKED': return 'bg-indigo-600 text-white border-indigo-700 relative shadow-indigo-200';
-            default: return 'bg-white text-gray-500 border-gray-200';
+            case 'ANSWERED': return 'bg-emerald-500 text-white border-emerald-600 shadow-emerald-200 dark:shadow-none';
+            case 'NOT_ANSWERED': return 'bg-rose-500 text-white border-rose-600 shadow-rose-200 dark:shadow-none';
+            case 'NOT_VISITED': return 'bg-white dark:bg-surface text-gray-500 dark:text-slate-400 border-gray-200 dark:border-white/10';
+            case 'MARKED_FOR_REVIEW': return 'bg-indigo-600 text-white border-indigo-700 shadow-indigo-200 dark:shadow-none';
+            case 'ANSWERED_AND_MARKED': return 'bg-indigo-600 text-white border-indigo-700 relative shadow-indigo-200 dark:shadow-none';
+            default: return 'bg-white dark:bg-surface text-gray-500 dark:text-slate-400 border-gray-200 dark:border-white/10';
         }
     };
 
@@ -371,15 +371,15 @@ export default function TestTakingUI() {
 
     if (!testData || allQuestions.length === 0) {
         return (
-            <div className="h-screen w-full flex flex-col items-center justify-center bg-white">
-                <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mb-4" />
-                <p className="text-gray-500 font-bold animate-pulse uppercase tracking-[0.2em]">Synchronizing Secure Environment</p>
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-white dark:bg-background">
+                <Loader2 className="w-12 h-12 animate-spin text-indigo-600 dark:text-brand mb-4" />
+                <p className="text-gray-500 dark:text-slate-400 font-bold animate-pulse uppercase tracking-[0.2em]">Synchronizing Secure Environment</p>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-screen bg-[#F8FAFC] font-sans select-none overflow-hidden text-gray-900">
+        <div className="flex flex-col h-screen bg-[#F8FAFC] dark:bg-background font-sans select-none overflow-hidden text-gray-900 dark:text-foreground">
             {/* INSTRUCTIONS OVERLAY */}
             <AnimatePresence>
                 {showInstructions && (
@@ -387,35 +387,35 @@ export default function TestTakingUI() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center p-6"
+                        className="fixed inset-0 z-[100] bg-white dark:bg-background flex flex-col items-center justify-center p-6"
                     >
                         <div className="max-w-2xl w-full">
                             <div className="text-center mb-10">
-                                <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                                    <BookText className="w-10 h-10 text-indigo-600" />
+                                <div className="w-20 h-20 bg-indigo-50 dark:bg-brand/15 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                                    <BookText className="w-10 h-10 text-indigo-600 dark:text-brand" />
                                 </div>
-                                <h2 className="text-3xl font-black mb-2 tracking-tight">Exam Instructions</h2>
-                                <p className="text-gray-500 font-bold uppercase text-xs tracking-widest">{testData.title}</p>
+                                <h2 className="font-display text-3xl font-black mb-2 tracking-tight dark:text-white">Exam Instructions</h2>
+                                <p className="text-gray-500 dark:text-slate-400 font-bold uppercase text-xs tracking-widest">{testData.title}</p>
                             </div>
-                            
-                            <div className="bg-gray-50 rounded-3xl p-8 border border-gray-100 space-y-4 mb-10 shadow-sm">
+
+                            <div className="bg-gray-50 dark:bg-surface-muted rounded-3xl p-8 border border-gray-100 dark:border-white/10 space-y-4 mb-10 shadow-sm">
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black shrink-0">1</div>
-                                    <p className="text-sm font-bold text-gray-700 leading-relaxed">This is a STRICT mode exam. Switching tabs or minimizing the browser will lead to automatic disqualification after 3 warnings.</p>
+                                    <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-brand/15 text-indigo-600 dark:text-brand flex items-center justify-center text-xs font-black shrink-0">1</div>
+                                    <p className="text-sm font-bold text-gray-700 dark:text-slate-300 leading-relaxed">This is a STRICT mode exam. Switching tabs or minimizing the browser will lead to automatic disqualification after 3 warnings.</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black shrink-0">2</div>
-                                    <p className="text-sm font-bold text-gray-700 leading-relaxed">Progress is saved locally. If you lose connection, stay on the page; your timer and answers will persist.</p>
+                                    <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-brand/15 text-indigo-600 dark:text-brand flex items-center justify-center text-xs font-black shrink-0">2</div>
+                                    <p className="text-sm font-bold text-gray-700 dark:text-slate-300 leading-relaxed">Progress is saved locally. If you lose connection, stay on the page; your timer and answers will persist.</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black shrink-0">3</div>
-                                    <p className="text-sm font-bold text-gray-700 leading-relaxed">Ensure you have <strong>{testData.duration} minutes</strong> of uninterrupted time.</p>
+                                    <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-brand/15 text-indigo-600 dark:text-brand flex items-center justify-center text-xs font-black shrink-0">3</div>
+                                    <p className="text-sm font-bold text-gray-700 dark:text-slate-300 leading-relaxed">Ensure you have <strong>{testData.duration} minutes</strong> of uninterrupted time.</p>
                                 </div>
                             </div>
 
-                            <button 
+                            <button
                                 onClick={handleStartTest}
-                                className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 text-lg uppercase tracking-widest"
+                                className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white font-black py-5 rounded-2xl hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 dark:shadow-none flex items-center justify-center gap-3 text-lg uppercase tracking-widest"
                             >
                                 <PlayCircle className="w-6 h-6" /> Start Examination
                             </button>
@@ -425,29 +425,29 @@ export default function TestTakingUI() {
             </AnimatePresence>
 
             {/* TOP HEADER */}
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center z-50 shrink-0">
+            <header className="bg-white dark:bg-surface border-b border-slate-200 dark:border-white/10 px-6 py-4 flex justify-between items-center z-50 shrink-0">
                 <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100 dark:shadow-none">
                         <Activity className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h1 className="font-black text-lg tracking-tight text-slate-900 leading-none">{testData.title}</h1>
+                        <h1 className="font-display font-black text-lg tracking-tight text-slate-900 dark:text-white leading-none">{testData.title}</h1>
                         <div className="flex items-center gap-2 mt-1.5">
-                            <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded tracking-tighter">Section {currentIndex + 1} of {allQuestions.length}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">&bull; ID: {testId.slice(-6)}</span>
+                            <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-brand bg-indigo-50 dark:bg-brand/15 px-2 py-0.5 rounded tracking-tighter">Section {currentIndex + 1} of {allQuestions.length}</span>
+                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">&bull; ID: {testId.slice(-6)}</span>
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 pl-4 pr-1 py-1 rounded-2xl">
+                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-surface-muted border border-slate-200 dark:border-white/10 pl-4 pr-1 py-1 rounded-2xl">
                         <div className="flex flex-col items-end">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Time Left</span>
-                            <span className={`text-xl font-black font-mono leading-none ${timeLeftRemaining < 300 ? 'text-rose-600 animate-pulse' : 'text-slate-900'}`}>
+                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter">Time Left</span>
+                            <span className={`text-xl font-black font-mono leading-none ${timeLeftRemaining < 300 ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-slate-900 dark:text-white'}`}>
                                 {formatTime(timeLeftRemaining)}
                             </span>
                         </div>
-                        <div className={`p-3 rounded-xl ${timeLeftRemaining < 300 ? 'bg-rose-600' : 'bg-slate-900'} text-white shadow-lg`}>
+                        <div className={`p-3 rounded-xl ${timeLeftRemaining < 300 ? 'bg-rose-600 dark:bg-rose-500' : 'bg-slate-900 dark:bg-slate-700'} text-white shadow-lg`}>
                             <Clock className="w-5 h-5" />
                         </div>
                     </div>
@@ -455,7 +455,7 @@ export default function TestTakingUI() {
             </header>
 
             {/* SECTION TABS (NTA Style) */}
-            <div className="bg-[#E2E8F0] px-6 py-2 flex items-center gap-1 border-b border-slate-300">
+            <div className="bg-[#E2E8F0] dark:bg-surface-muted px-6 py-2 flex items-center gap-1 border-b border-slate-300 dark:border-white/10">
                 {testData.sections.map((section: any) => {
                     const isActive = activeSectionId === section.id;
                     return (
@@ -469,9 +469,9 @@ export default function TestTakingUI() {
                                 }
                             }}
                             className={`px-6 py-2 rounded-t-lg font-black text-xs uppercase tracking-widest transition-all ${
-                                isActive 
-                                    ? 'bg-white text-indigo-700 shadow-[0_-4px_0_0_rgba(79,70,229,1)]' 
-                                    : 'text-slate-500 hover:bg-slate-200'
+                                isActive
+                                    ? 'bg-white dark:bg-surface text-indigo-700 dark:text-brand shadow-[0_-4px_0_0_rgba(79,70,229,1)]'
+                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/5'
                             }`}
                         >
                             {section.title}
@@ -484,16 +484,16 @@ export default function TestTakingUI() {
             <main className="flex flex-1 overflow-hidden">
                 
                 {/* QUESTION CANVAS (Scrollable) */}
-                <div className="flex-1 flex flex-col bg-white overflow-hidden border-r border-slate-200">
-                    <div className="px-8 py-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center shrink-0">
+                <div className="flex-1 flex flex-col bg-white dark:bg-surface overflow-hidden border-r border-slate-200 dark:border-white/10">
+                    <div className="px-8 py-4 bg-slate-50/50 dark:bg-surface-muted border-b border-slate-100 dark:border-white/10 flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-indigo-900 text-white flex items-center justify-center font-black text-sm">
                                 {currentIndex + 1}
                             </div>
-                            <span className="text-sm font-bold text-slate-700">Question Item</span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Question Item</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button className="p-2 text-slate-400 hover:bg-slate-200 rounded-lg transition"><Info className="w-4 h-4" /></button>
+                            <button className="p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-white/5 rounded-lg transition"><Info className="w-4 h-4" /></button>
                         </div>
                     </div>
 
@@ -507,7 +507,7 @@ export default function TestTakingUI() {
                                 transition={{ duration: 0.2 }}
                                 className="max-w-4xl mx-auto"
                             >
-                                <div className="text-xl font-bold text-slate-900 leading-relaxed mb-4">
+                                <div className="text-xl font-bold text-slate-900 dark:text-white leading-relaxed mb-4">
                                     <MathRenderer content={currentQ.content} />
                                 </div>
                                 <QuestionTags tags={currentQ.tags} className="mb-10" />
@@ -524,19 +524,19 @@ export default function TestTakingUI() {
                                                 whileTap={{ scale: 0.99 }}
                                                 onClick={() => handleOptionSelect(currentQ.id, optObj.originalLetter)}
                                                 className={`group flex items-center gap-6 p-5 rounded-2xl border-2 transition-all cursor-pointer shadow-sm ${
-                                                    isSelected 
-                                                        ? 'border-indigo-600 bg-indigo-50/30' 
-                                                        : 'border-slate-100 hover:border-indigo-300 hover:bg-slate-50/50'
+                                                    isSelected
+                                                        ? 'border-indigo-600 dark:border-brand bg-indigo-50/30 dark:bg-brand/10'
+                                                        : 'border-slate-100 dark:border-white/10 hover:border-indigo-300 dark:hover:border-brand/50 hover:bg-slate-50/50 dark:hover:bg-white/5'
                                                 }`}
                                             >
                                                 <div className={`shrink-0 w-10 h-10 rounded-xl border-2 flex items-center justify-center font-black text-sm transition-colors ${
-                                                    isSelected 
-                                                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
-                                                        : 'border-slate-200 bg-white text-slate-400 group-hover:border-indigo-300 group-hover:text-indigo-600'
+                                                    isSelected
+                                                        ? 'border-indigo-600 dark:border-brand bg-indigo-600 dark:bg-brand text-white shadow-lg shadow-indigo-100 dark:shadow-none'
+                                                        : 'border-slate-200 dark:border-white/10 bg-white dark:bg-surface text-slate-400 dark:text-slate-500 group-hover:border-indigo-300 dark:group-hover:border-brand/50 group-hover:text-indigo-600 dark:group-hover:text-brand'
                                                 }`}>
                                                     {displayLetter}
                                                 </div>
-                                                <div className="text-lg font-bold text-slate-700">
+                                                <div className="text-lg font-bold text-slate-700 dark:text-slate-300">
                                                     <MathRenderer content={optObj.text} />
                                                 </div>
                                             </motion.div>
@@ -548,39 +548,39 @@ export default function TestTakingUI() {
                     </div>
 
                     {/* BOTTOM NAV BAR */}
-                    <div className="bg-white p-6 border-t border-slate-200 flex flex-wrap justify-between items-center gap-4 shrink-0">
+                    <div className="bg-white dark:bg-surface p-6 border-t border-slate-200 dark:border-white/10 flex flex-wrap justify-between items-center gap-4 shrink-0">
                         <div className="flex gap-4">
-                            <button 
+                            <button
                                 onClick={handleMarkForReview}
-                                className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center gap-2 border border-indigo-200 shadow-sm"
+                                className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all bg-indigo-50 dark:bg-brand/10 text-indigo-700 dark:text-brand hover:bg-indigo-100 dark:hover:bg-brand/15 flex items-center gap-2 border border-indigo-200 dark:border-brand/30 shadow-sm"
                             >
                                 <Flag className="w-4 h-4" /> Mark for Review & Next
                             </button>
-                            <button 
+                            <button
                                 onClick={handleSaveAndMarkForReview}
-                                className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center gap-2 border border-emerald-200 shadow-sm"
+                                className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/15 flex items-center gap-2 border border-emerald-200 dark:border-emerald-500/30 shadow-sm"
                             >
                                 <CheckCircle className="w-4 h-4" /> Save & Mark for Review
                             </button>
-                            <button 
+                            <button
                                 onClick={handleClearResponse}
-                                className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all text-slate-500 hover:bg-slate-50 flex items-center gap-2 border border-slate-200"
+                                className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-2 border border-slate-200 dark:border-white/10"
                             >
                                 <XCircle className="w-4 h-4" /> Clear Response
                             </button>
                         </div>
-                        
+
                         <div className="flex gap-4">
-                            <button 
-                                onClick={() => goToQuestion(currentIndex - 1)} 
+                            <button
+                                onClick={() => goToQuestion(currentIndex - 1)}
                                 disabled={currentIndex === 0}
-                                className="px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all border-2 border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent"
+                                className="px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all border-2 border-slate-200 dark:border-white/10 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent"
                             >
                                 Previous
                             </button>
-                            <button 
+                            <button
                                 onClick={handleSaveAndNext}
-                                className="px-10 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200 flex items-center gap-2"
+                                className="px-10 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all bg-slate-900 dark:bg-slate-700 text-white hover:bg-slate-800 dark:hover:bg-slate-600 shadow-xl shadow-slate-200 dark:shadow-none flex items-center gap-2"
                             >
                                 {currentIndex === allQuestions.length - 1 ? 'Finish Section' : 'Save & Continue'}
                                 <ChevronRight className="w-4 h-4" />
@@ -590,18 +590,18 @@ export default function TestTakingUI() {
                 </div>
 
                 {/* SIDE PALETTE */}
-                <aside className="w-[380px] bg-slate-50 flex flex-col shrink-0 border-l border-slate-200 relative">
-                    <div className="p-8 border-b border-slate-200 bg-white">
+                <aside className="w-[380px] bg-slate-50 dark:bg-surface-muted flex flex-col shrink-0 border-l border-slate-200 dark:border-white/10 relative">
+                    <div className="p-8 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-surface">
                         <div className="flex items-center justify-between mb-8">
-                            <h3 className="font-black text-slate-400 text-[10px] tracking-[0.2em] uppercase">Status Palette</h3>
-                            <button className="text-[10px] font-black text-indigo-600 hover:underline">Full Overview</button>
+                            <h3 className="font-black text-slate-400 dark:text-slate-500 text-[10px] tracking-[0.2em] uppercase">Status Palette</h3>
+                            <button className="text-[10px] font-black text-indigo-600 dark:text-brand hover:underline">Full Overview</button>
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-[10px] font-black text-slate-500 uppercase tracking-tighter">
-                            <div className="flex items-center gap-2.5"><div className="w-4 h-4 rounded-md bg-emerald-500 shadow-lg shadow-emerald-100"></div> Solved</div>
-                            <div className="flex items-center gap-2.5"><div className="w-4 h-4 rounded-md bg-rose-500 shadow-lg shadow-rose-100"></div> Skipped</div>
-                            <div className="flex items-center gap-2.5"><div className="w-4 h-4 rounded-md bg-white border-2 border-slate-200"></div> Untouched</div>
-                            <div className="flex items-center gap-2.5"><div className="w-4 h-4 rounded-md bg-indigo-600 shadow-lg shadow-indigo-100"></div> Review</div>
+
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tighter">
+                            <div className="flex items-center gap-2.5"><div className="w-4 h-4 rounded-md bg-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-none"></div> Solved</div>
+                            <div className="flex items-center gap-2.5"><div className="w-4 h-4 rounded-md bg-rose-500 shadow-lg shadow-rose-100 dark:shadow-none"></div> Skipped</div>
+                            <div className="flex items-center gap-2.5"><div className="w-4 h-4 rounded-md bg-white dark:bg-surface border-2 border-slate-200 dark:border-white/10"></div> Untouched</div>
+                            <div className="flex items-center gap-2.5"><div className="w-4 h-4 rounded-md bg-indigo-600 shadow-lg shadow-indigo-100 dark:shadow-none"></div> Review</div>
                         </div>
                     </div>
 
@@ -616,7 +616,7 @@ export default function TestTakingUI() {
                                         key={q.id}
                                         onClick={() => goToQuestion(idx)}
                                         className={`w-full aspect-square rounded-xl border-2 font-black text-xs transition-all flex items-center justify-center shadow-sm hover:scale-105 ${colorClass} ${
-                                            isCurrent ? 'ring-2 ring-offset-4 ring-indigo-600 scale-110 shadow-xl' : 'border-opacity-50'
+                                            isCurrent ? 'ring-2 ring-offset-4 ring-indigo-600 dark:ring-offset-surface-muted scale-110 shadow-xl' : 'border-opacity-50'
                                         }`}
                                     >
                                         {idx + 1}
@@ -629,15 +629,15 @@ export default function TestTakingUI() {
                         </div>
                     </div>
 
-                    <div className="p-8 bg-white border-t border-slate-200">
-                        <button 
+                    <div className="p-8 bg-white dark:bg-surface border-t border-slate-200 dark:border-white/10">
+                        <button
                             onClick={() => {
                                 if(confirm("Are you sure you want to finalize and submit? You cannot change your answers after submission.")) {
                                     autoSubmitTest();
                                 }
-                            }} 
+                            }}
                             disabled={isSubmitting}
-                            className="w-full bg-rose-600 text-white font-black py-5 rounded-2xl hover:bg-rose-700 transition-all shadow-xl shadow-rose-100 flex items-center justify-center gap-3 text-sm uppercase tracking-widest disabled:opacity-50"
+                            className="w-full bg-rose-600 text-white font-black py-5 rounded-2xl hover:bg-rose-700 transition-all shadow-xl shadow-rose-100 dark:shadow-none flex items-center justify-center gap-3 text-sm uppercase tracking-widest disabled:opacity-50"
                         >
                             {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldAlert className="w-5 h-5" />}
                             Terminate & Submit
@@ -651,7 +651,7 @@ export default function TestTakingUI() {
                 <div className="fixed inset-0 z-[200] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-6 text-center">
                     <div className="max-w-md">
                         <ShieldAlert className="w-20 h-20 text-rose-500 mx-auto mb-6" />
-                        <h2 className="text-2xl font-black text-white mb-2">Security Violation Detection</h2>
+                        <h2 className="font-display text-2xl font-black text-white mb-2">Security Violation Detection</h2>
                         <p className="text-slate-400 font-bold text-sm mb-8 leading-relaxed">The examination environment MUST stay in fullscreen mode. Continuing outside fullscreen will trigger automatic termination.</p>
                         <button 
                             onClick={requestFullscreen}
@@ -666,35 +666,35 @@ export default function TestTakingUI() {
             {/* RESULTS OVERLAY */}
             {testResult && (
                 <div className="fixed inset-0 z-[300] bg-[#0F172A]/95 backdrop-blur-xl flex items-center justify-center p-6">
-                    <div className="bg-white rounded-[40px] max-w-lg w-full p-12 text-center shadow-2xl relative overflow-hidden">
+                    <div className="bg-white dark:bg-surface rounded-[40px] max-w-lg w-full p-12 text-center shadow-2xl relative overflow-hidden">
                         <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500"></div>
-                        <div className="w-24 h-24 bg-emerald-50 rounded-[30px] flex items-center justify-center mx-auto mb-8 shadow-inner">
-                            <CheckCircle className="w-12 h-12 text-emerald-600" />
+                        <div className="w-24 h-24 bg-emerald-50 dark:bg-emerald-500/10 rounded-[30px] flex items-center justify-center mx-auto mb-8 shadow-inner">
+                            <CheckCircle className="w-12 h-12 text-emerald-600 dark:text-emerald-400" />
                         </div>
-                        <h2 className="text-4xl font-black text-slate-900 mb-2 tracking-tight">Submission Finalized</h2>
-                        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.3em] mb-10">Preliminary Performance Vectors</p>
-                        
+                        <h2 className="font-display text-4xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Submission Finalized</h2>
+                        <p className="text-slate-400 dark:text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em] mb-10">Preliminary Performance Vectors</p>
+
                         <div className="grid grid-cols-2 gap-4 mb-10">
-                            <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Accuracy Rate</p>
-                                <p className="text-4xl font-black text-indigo-600">{testResult.totalCorrect + testResult.totalIncorrect > 0 ? Math.round((testResult.totalCorrect / (testResult.totalCorrect + testResult.totalIncorrect)) * 100) : 0}%</p>
+                            <div className="bg-slate-50 dark:bg-surface-muted rounded-3xl p-6 border border-slate-100 dark:border-white/10">
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Accuracy Rate</p>
+                                <p className="text-4xl font-black text-indigo-600 dark:text-brand">{testResult.totalCorrect + testResult.totalIncorrect > 0 ? Math.round((testResult.totalCorrect / (testResult.totalCorrect + testResult.totalIncorrect)) * 100) : 0}%</p>
                             </div>
-                            <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Net Score</p>
-                                <p className="text-4xl font-black text-emerald-600">{testResult.totalScore}</p>
+                            <div className="bg-slate-50 dark:bg-surface-muted rounded-3xl p-6 border border-slate-100 dark:border-white/10">
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Net Score</p>
+                                <p className="text-4xl font-black text-emerald-600 dark:text-emerald-400">{testResult.totalScore}</p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3">
                             <button
                                 onClick={() => router.push(`/student/performance/${testResult.id}`)}
-                                className="w-full bg-indigo-600 text-white font-black py-5 rounded-[20px] hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 text-sm uppercase tracking-[0.2em]"
+                                className="w-full bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white font-black py-5 rounded-[20px] hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 dark:shadow-none text-sm uppercase tracking-[0.2em]"
                             >
                                 View Full Report
                             </button>
                             <button
                                 onClick={() => router.push('/student/dashboard')}
-                                className="w-full bg-slate-900 text-white font-black py-5 rounded-[20px] hover:bg-slate-800 transition shadow-xl shadow-slate-200 text-sm uppercase tracking-[0.2em]"
+                                className="w-full bg-slate-900 dark:bg-slate-700 text-white font-black py-5 rounded-[20px] hover:bg-slate-800 dark:hover:bg-slate-600 transition shadow-xl shadow-slate-200 dark:shadow-none text-sm uppercase tracking-[0.2em]"
                             >
                                 Return to Command Center
                             </button>

@@ -23,42 +23,42 @@ export default function StudentLiveClassesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+      <div className="flex items-center justify-center min-h-screen dark:bg-background">
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-600 dark:text-brand" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-8 max-w-6xl mx-auto">
+    <div className="p-6 space-y-8 max-w-6xl mx-auto dark:bg-background dark:text-foreground min-h-screen">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Live Classes</h1>
-        <p className="text-slate-500 mt-1">Join your scheduled classes and watch recordings</p>
+        <h1 className="font-display text-3xl font-bold text-slate-900 dark:text-white">Live Classes</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">Join your scheduled classes and watch recordings</p>
       </div>
 
       <section>
-        <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-indigo-600" />
+        <h2 className="font-display text-xl font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-indigo-600 dark:text-brand" />
           Upcoming Classes
         </h2>
         {upcoming.length === 0 ? (
-          <p className="text-slate-500 bg-white p-6 rounded-lg border">No upcoming classes scheduled.</p>
+          <p className="text-slate-500 dark:text-slate-400 bg-white dark:bg-surface p-6 rounded-lg border dark:border-white/10">No upcoming classes scheduled.</p>
         ) : (
           <div className="grid gap-4">
             {upcoming.map((cls: any) => (
-              <div key={cls.id} className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+              <div key={cls.id} className="bg-white dark:bg-surface p-6 rounded-xl shadow-sm border dark:border-white/10 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold text-lg text-slate-900">{cls.title}</h3>
-                    <p className="text-sm text-slate-500">{cls.batch?.name}</p>
-                    <div className="flex items-center gap-4 text-sm text-slate-500 mt-2">
+                    <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{cls.title}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{cls.batch?.name}</p>
+                    <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 mt-2">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
                         {new Date(cls.startTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
-                        {new Date(cls.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} - 
+                        {new Date(cls.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} -
                         {new Date(cls.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -67,7 +67,7 @@ export default function StudentLiveClassesPage() {
                     href={cls.meetingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+                    className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:opacity-90 transition-colors"
                   >
                     <Video className="w-4 h-4" />
                     Join Now
@@ -81,18 +81,18 @@ export default function StudentLiveClassesPage() {
 
       {past.length > 0 && (
         <section>
-          <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <PlayCircle className="w-5 h-5 text-emerald-600" />
+          <h2 className="font-display text-xl font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <PlayCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Recordings
           </h2>
           <div className="grid gap-4">
             {past.map((cls: any) => (
-              <div key={cls.id} className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+              <div key={cls.id} className="bg-white dark:bg-surface p-6 rounded-xl shadow-sm border dark:border-white/10 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold text-lg text-slate-900">{cls.title}</h3>
-                    <p className="text-sm text-slate-500">{cls.batch?.name}</p>
-                    <div className="flex items-center gap-4 text-sm text-slate-500 mt-2">
+                    <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{cls.title}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{cls.batch?.name}</p>
+                    <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 mt-2">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
                         {new Date(cls.startTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -108,7 +108,7 @@ export default function StudentLiveClassesPage() {
                       href={cls.recordingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-emerald-700 transition-colors"
+                      className="bg-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-emerald-700 dark:hover:bg-emerald-500/30 transition-colors"
                     >
                       <PlayCircle className="w-4 h-4" />
                       Watch Recording

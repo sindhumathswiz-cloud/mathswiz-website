@@ -402,18 +402,18 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
     const totalUnpaid = filteredLedger.filter(p => p.displayStatus === 'UNPAID').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
+        <div className="min-h-screen bg-gray-50 dark:bg-background p-8">
             <div className="max-w-7xl mx-auto">
                 {/* Breadcrumb */}
-                <div className="mb-8 flex items-center gap-2 text-sm text-gray-500 font-medium print:hidden">
-                    <a href="/teacher/dashboard" className="hover:text-indigo-600">Dashboard</a>
+                <div className="mb-8 flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 font-medium print:hidden">
+                    <a href="/teacher/dashboard" className="hover:text-indigo-600 dark:hover:text-brand">Dashboard</a>
                     <ChevronRight className="w-4 h-4" />
-                    <span className="text-gray-900">{batch.name || 'Batch Management'}</span>
+                    <span className="text-gray-900 dark:text-white">{batch.name || 'Batch Management'}</span>
                 </div>
 
                 {/* Header Card */}
-                <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white rounded-2xl shadow-lg p-8 mb-8 print:hidden">
-                    <h1 className="text-3xl font-extrabold tracking-tight mb-2">{batch.name}</h1>
+                <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 dark:from-brand dark:to-brand-violet text-white rounded-2xl shadow-lg p-8 mb-8 print:hidden">
+                    <h1 className="font-display text-3xl font-extrabold tracking-tight mb-2">{batch.name}</h1>
                     <div className="flex items-center gap-4">
                         <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-white/20 backdrop-blur-sm text-white font-mono font-bold text-sm border border-white/30">
                             Code: {batch.code}
@@ -447,8 +447,8 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                             onClick={() => setActiveTab(tab.id as any)}
                             className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all duration-200 border ${
                                 activeTab === tab.id
-                                    ? 'bg-indigo-900 text-white border-indigo-900 shadow-md'
-                                    : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-200'
+                                    ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white border-transparent shadow-md'
+                                    : 'bg-white dark:bg-surface text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-white/5 border-gray-200 dark:border-white/10'
                             }`}
                         >
                             <tab.icon className="w-4 h-4" /> {tab.label}
@@ -457,7 +457,7 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                 </div>
 
                 {/* Content Panel */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 min-h-[500px]">
+                <div className="bg-white dark:bg-surface rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-8 min-h-[500px]">
 
                     {/* STUDENTS TAB */}
                     {activeTab === 'students' && (() => {
@@ -467,7 +467,7 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                         return (
                             <div className="animate-in fade-in duration-300">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Users className="w-5 h-5 text-indigo-500" /> Batch Roster</h2>
+                                    <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white flex items-center gap-2"><Users className="w-5 h-5 text-indigo-500" /> Batch Roster</h2>
                                 </div>
 
                                 {activeStudents.length === 0 && suspendedStudents.length === 0 ? (
@@ -641,7 +641,7 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                         return (
                             <div className="animate-in fade-in duration-300">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Trophy className="w-5 h-5 text-indigo-500" /> Batch Leaderboard</h2>
+                                    <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white flex items-center gap-2"><Trophy className="w-5 h-5 text-indigo-500" /> Batch Leaderboard</h2>
                                 </div>
 
                                 <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-2xl p-6 mb-8">
@@ -767,7 +767,7 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                     {activeTab === 'fees' && (
                         <div className="animate-in fade-in duration-300">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-500" /> Fee Structures</h2>
+                                <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-500" /> Fee Structures</h2>
                                 <button 
                                     onClick={() => { setEditingFee(null); setFeeFormData({name: '', totalAmount: '', installments: [{ amount: '', description: 'Installment 1', relativeDaysFromJoin: 0 }] }); setShowFeeForm(true); }}
                                     className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-lg font-medium hover:bg-emerald-100 transition text-sm"
@@ -837,7 +837,7 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                         <div className="animate-in fade-in duration-300">
                             <div className="flex justify-between items-center mb-6 print:hidden">
                                 <div className="flex gap-4 items-center">
-                                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Receipt className="w-5 h-5 text-purple-500" /> Payment Ledger</h2>
+                                    <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white flex items-center gap-2"><Receipt className="w-5 h-5 text-purple-500" /> Payment Ledger</h2>
                                     <div className="flex bg-gray-100 p-1 rounded-xl">
                                         <button onClick={() => setActiveTabFilter('all')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${activeTabFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>All Payments</button>
                                         <button onClick={() => setActiveTabFilter('suspended')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${activeTabFilter === 'suspended' ? 'bg-red-600 text-white shadow-sm' : 'text-red-600 hover:bg-red-50'}`}>
@@ -996,7 +996,7 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                     {activeTab === 'discounts' && (
                         <div className="animate-in fade-in duration-300">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Tag className="w-5 h-5 text-purple-500" /> Discount Coupons</h2>
+                                <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white flex items-center gap-2"><Tag className="w-5 h-5 text-purple-500" /> Discount Coupons</h2>
                                 <button onClick={() => setShowCouponForm(true)} className="flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-2 rounded-lg font-medium hover:bg-purple-100 transition text-sm">
                                     <Plus className="w-4 h-4" /> Create Coupon
                                 </button>
@@ -1277,9 +1277,9 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
             {/* MARK PAID MODAL */}
             {showMarkPaidModal && selectedPaymentForMark && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in duration-200">
+                    <div className="bg-white dark:bg-surface rounded-3xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-900">Mark Payment as Paid</h3>
+                            <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white">Mark Payment as Paid</h3>
                             <button onClick={() => setShowMarkPaidModal(false)}><X className="w-5 h-5 text-gray-400" /></button>
                         </div>
                         
@@ -1334,9 +1334,9 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
             {/* NEW CLASS CHALLENGE MODAL */}
             {showChallengeForm && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in duration-200">
+                    <div className="bg-white dark:bg-surface rounded-3xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-900">New Class Challenge</h3>
+                            <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white">New Class Challenge</h3>
                             <button onClick={() => setShowChallengeForm(false)}><X className="w-5 h-5 text-gray-400" /></button>
                         </div>
                         <form onSubmit={handleCreateChallenge} className="space-y-4">
@@ -1393,7 +1393,7 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
             {/* STUDENT PROFILE MODAL (FINANCIAL DRILL-DOWN) */}
             {showStudentProfileModal && selectedStudentForProfile && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col p-8 animate-in slide-in-from-bottom duration-300">
+                    <div className="bg-white dark:bg-surface rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col p-8 animate-in slide-in-from-bottom duration-300">
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h3 className="text-2xl font-black text-gray-900">{selectedStudentForProfile.firstName} {selectedStudentForProfile.lastName}</h3>
@@ -1557,10 +1557,10 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
             {/* CUSTOM ASSIGNMENT MODAL (OVERRIDE) */}
             {showCustomAssignModal && selectedEnrollmentForFee && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col p-8 animate-in zoom-in duration-200">
+                    <div className="bg-white dark:bg-surface rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col p-8 animate-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="text-xl font-bold text-gray-900">Custom Fee Override</h3>
+                                <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white">Custom Fee Override</h3>
                                 <p className="text-sm text-gray-500">Student: {selectedEnrollmentForFee.student?.firstName} {selectedEnrollmentForFee.student?.lastName}</p>
                             </div>
                             <button onClick={() => setShowCustomAssignModal(false)}><X className="w-5 h-5 text-gray-400" /></button>
@@ -1645,10 +1645,10 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
             {showFeeForm && (
                 <div className="fixed inset-0 z-50 flex justify-end no-print">
                     <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={() => { setShowFeeForm(false); setEditingFee(null); }}></div>
-                    <div className="relative w-full max-w-xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-                        <div className="flex justify-between items-center p-6 border-b border-gray-100">
+                    <div className="relative w-full max-w-xl bg-white dark:bg-surface h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                        <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-white/10">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900">{editingFee ? 'Edit Fee Structure' : 'Create Fee Structure'}</h2>
+                                <h2 className="text-xl font-display font-bold text-gray-900 dark:text-white">{editingFee ? 'Edit Fee Structure' : 'Create Fee Structure'}</h2>
                                 <p className="text-xs text-gray-500 font-medium">Define smart installments for your students.</p>
                             </div>
                             <button onClick={() => { setShowFeeForm(false); setEditingFee(null); }} className="text-gray-400 hover:text-gray-900 transition"><X className="w-6 h-6" /></button>

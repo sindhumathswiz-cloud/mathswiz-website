@@ -96,19 +96,19 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
     const outstanding = totalFees - totalPaid;
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-20">
+        <div className="min-h-screen bg-gray-50 pb-20 dark:bg-background">
             {/* Header Section */}
-            <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+            <div className="bg-white border-b border-gray-200 sticky top-0 z-10 dark:bg-surface dark:border-white/10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center gap-4">
-                        <Link href="/admin/dashboard" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                            <ChevronLeft className="w-5 h-5 text-gray-500" />
+                        <Link href="/admin/dashboard" className="p-2 hover:bg-gray-100 rounded-full transition-colors hover:dark:bg-white/5">
+                            <ChevronLeft className="w-5 h-5 text-gray-500 dark:text-slate-400" />
                         </Link>
                         <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xl uppercase">
                             {user.firstName?.[0]}{user.lastName?.[0]}
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-gray-900">{user.firstName} {user.lastName}</h1>
+                            <h1 className="font-display text-xl font-bold text-gray-900 dark:text-white">{user.firstName} {user.lastName}</h1>
                             <div className="flex items-center gap-2 mt-0.5">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                                     user.accountStatus === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 
@@ -116,7 +116,7 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                 }`}>
                                     {user.accountStatus}
                                 </span>
-                                <span className="text-xs text-gray-400" suppressHydrationWarning>&bull; {user.role} &bull; Joined {new Date(user.createdAt).toLocaleDateString()}</span>
+                                <span className="text-xs text-gray-400 dark:text-slate-500" suppressHydrationWarning>&bull; {user.role} &bull; Joined {new Date(user.createdAt).toLocaleDateString()}</span>
                             </div>
                         </div>
                     </div>
@@ -128,7 +128,7 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                     
                     {/* Left Sidebar: Nav & Stats */}
                     <div className="lg:col-span-1 space-y-6">
-                        <nav className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <nav className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden dark:bg-surface dark:border-white/10">
                             {[
                                 { id: 'details', label: 'Personal Details', icon: UserIcon },
                                 { id: 'financial', label: 'Financial History', icon: DollarSign },
@@ -153,7 +153,7 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                         {/* Quick Metrics */}
                         <div className="bg-indigo-900 rounded-2xl p-6 text-white shadow-lg overflow-hidden relative">
                             <div className="absolute top-0 right-0 p-4 opacity-10"><Activity className="w-20 h-20" /></div>
-                            <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-4">Lifecycle Stats</h3>
+                            <h3 className="font-display text-xs font-bold text-indigo-300 uppercase tracking-widest mb-4">Lifecycle Stats</h3>
                             <div className="space-y-4 relative z-10">
                                 <div>
                                     <p className="text-2xl font-black">{user.testAttempts.length}</p>
@@ -178,61 +178,61 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                         
                         {/* Tab Content: Details */}
                         {activeTab === 'details' && (
-                            <form onSubmit={handleUpdateDetails} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-                                <div className="p-8 border-b border-gray-100 flex justify-between items-center">
-                                    <h2 className="text-xl font-bold text-gray-900">Personal Details</h2>
+                            <form onSubmit={handleUpdateDetails} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 dark:bg-surface dark:border-white/10">
+                                <div className="p-8 border-b border-gray-100 flex justify-between items-center dark:border-white/10">
+                                    <h2 className="font-display text-xl font-bold text-gray-900 dark:text-white">Personal Details</h2>
                                     <button 
                                         type="submit" 
                                         disabled={isSaving}
-                                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 disabled:opacity-50"
+                                        className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2 disabled:opacity-50"
                                     >
                                         {isSaving ? 'Saving...' : <><Save className="w-4 h-4" /> Save Changes</>}
                                     </button>
                                 </div>
                                 <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><UserIcon className="w-3 h-3" /> First Name</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 dark:text-slate-400"><UserIcon className="w-3 h-3" /> First Name</label>
                                         <input 
                                             type="text" 
                                             value={formData.firstName} 
                                             onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition" 
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition dark:border-white/10 dark:bg-surface-muted" 
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><UserIcon className="w-3 h-3" /> Last Name</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 dark:text-slate-400"><UserIcon className="w-3 h-3" /> Last Name</label>
                                         <input 
                                             type="text" 
                                             value={formData.lastName} 
                                             onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition" 
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition dark:border-white/10 dark:bg-surface-muted" 
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><Mail className="w-3 h-3" /> Email Address</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 dark:text-slate-400"><Mail className="w-3 h-3" /> Email Address</label>
                                         <input 
                                             type="email" 
                                             value={formData.email} 
                                             onChange={(e) => setFormData({...formData, email: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition" 
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition dark:border-white/10 dark:bg-surface-muted" 
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><Phone className="w-3 h-3" /> WhatsApp / Phone</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 dark:text-slate-400"><Phone className="w-3 h-3" /> WhatsApp / Phone</label>
                                         <input 
                                             type="text" 
                                             value={formData.phone} 
                                             onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition" 
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition dark:border-white/10 dark:bg-surface-muted" 
                                         />
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><GraduationCap className="w-3 h-3" /> Class / Level</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 dark:text-slate-400"><GraduationCap className="w-3 h-3" /> Class / Level</label>
                                         <select 
                                             value={formData.class} 
                                             onChange={(e) => setFormData({...formData, class: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition dark:border-white/10 dark:bg-surface-muted"
                                         >
                                             <option value="">Select Class</option>
                                             <option value="Class 10">Class 10</option>
@@ -242,11 +242,11 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><ShieldAlert className="w-3 h-3" /> Account Role</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 dark:text-slate-400"><ShieldAlert className="w-3 h-3" /> Account Role</label>
                                         <select 
                                             value={formData.role} 
                                             onChange={(e) => setFormData({...formData, role: e.target.value})}
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition dark:border-white/10 dark:bg-surface-muted"
                                         >
                                             <option value="STUDENT">STUDENT</option>
                                             <option value="TEACHER">TEACHER</option>
@@ -260,12 +260,12 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                         {/* Tab Content: Enrollments */}
                         {activeTab === 'enrollments' && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                                <h2 className="text-xl font-bold text-gray-900 mb-4 px-2">Manage Active Enrollments</h2>
+                                <h2 className="font-display text-xl font-bold text-gray-900 mb-4 px-2 dark:text-white">Manage Active Enrollments</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {user.enrollments.map((en: any) => (
-                                        <div key={en.id} className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition group">
+                                        <div key={en.id} className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition group dark:bg-surface dark:border-white/10">
                                             <div className="flex justify-between items-start mb-6">
-                                                <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-[10px] font-black tracking-widest border border-indigo-100 uppercase">
+                                                <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-[10px] font-black tracking-widest border border-indigo-100 uppercase dark:text-brand dark:bg-brand/10">
                                                     {en.batch.code}
                                                 </div>
                                                 <div className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
@@ -276,8 +276,8 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                                     {en.status}
                                                 </div>
                                             </div>
-                                            <h3 className="text-lg font-black text-gray-900 mb-1">{en.batch.name}</h3>
-                                            <p className="text-xs text-gray-500 font-medium mb-6" suppressHydrationWarning>Joined on {new Date(en.createdAt).toLocaleDateString()}</p>
+                                            <h3 className="font-display text-lg font-black text-gray-900 mb-1 dark:text-white">{en.batch.name}</h3>
+                                            <p className="text-xs text-gray-500 font-medium mb-6 dark:text-slate-400" suppressHydrationWarning>Joined on {new Date(en.createdAt).toLocaleDateString()}</p>
                                             
                                             <div className="flex items-center gap-3">
                                                 <button 
@@ -292,7 +292,7 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                                 </button>
                                                 <Link 
                                                     href={`/admin/batches/${en.batch.id}`}
-                                                    className="p-3 bg-gray-50 border border-gray-100 text-gray-400 hover:text-indigo-600 hover:bg-white hover:border-indigo-100 rounded-2xl transition"
+                                                    className="p-3 bg-gray-50 border border-gray-100 text-gray-400 hover:text-indigo-600 hover:bg-white hover:border-indigo-100 rounded-2xl transition dark:border-white/10 dark:text-slate-500 dark:bg-surface-muted hover:dark:bg-surface hover:dark:text-brand"
                                                 >
                                                     <ArrowUpRight className="w-4 h-4" />
                                                 </Link>
@@ -300,9 +300,9 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                         </div>
                                     ))}
                                     {user.enrollments.length === 0 && (
-                                        <div className="col-span-full py-16 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                                        <div className="col-span-full py-16 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-white/10 dark:bg-surface-muted">
                                             <GraduationCap className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                            <p className="text-gray-500 font-bold">No batch enrollments found.</p>
+                                            <p className="text-gray-500 font-bold dark:text-slate-400">No batch enrollments found.</p>
                                         </div>
                                     )}
                                 </div>
@@ -313,30 +313,30 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                         {activeTab === 'financial' && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Fee Ledger</p>
-                                        <p className="text-3xl font-black text-gray-900" suppressHydrationWarning>₹ {totalFees.toLocaleString('en-IN')}</p>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-surface dark:border-white/10">
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 dark:text-slate-500">Total Fee Ledger</p>
+                                        <p className="text-3xl font-black text-gray-900 dark:text-white" suppressHydrationWarning>₹ {totalFees.toLocaleString('en-IN')}</p>
                                     </div>
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 bg-emerald-50/30">
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 bg-emerald-50/30 dark:bg-surface dark:bg-emerald-500/10">
                                         <p className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-1">Total Received</p>
-                                        <p className="text-3xl font-black text-emerald-700" suppressHydrationWarning>₹ {totalPaid.toLocaleString('en-IN')}</p>
+                                        <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400" suppressHydrationWarning>₹ {totalPaid.toLocaleString('en-IN')}</p>
                                     </div>
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-rose-100 bg-rose-50/30">
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-rose-100 bg-rose-50/30 dark:bg-surface dark:bg-rose-500/10">
                                         <p className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Outstanding</p>
-                                        <p className="text-3xl font-black text-rose-700" suppressHydrationWarning>₹ {outstanding.toLocaleString('en-IN')}</p>
+                                        <p className="text-3xl font-black text-rose-700 dark:text-rose-400" suppressHydrationWarning>₹ {outstanding.toLocaleString('en-IN')}</p>
                                     </div>
                                 </div>
 
-                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                    <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                                        <h3 className="text-lg font-bold text-gray-900">Consolidated Fee History</h3>
-                                        <button className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition flex items-center gap-2">
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden dark:bg-surface dark:border-white/10">
+                                    <div className="p-6 border-b border-gray-100 flex justify-between items-center dark:border-white/10">
+                                        <h3 className="font-display text-lg font-bold text-gray-900 dark:text-white">Consolidated Fee History</h3>
+                                        <button className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition flex items-center gap-2 dark:text-brand dark:bg-brand/10 hover:dark:bg-brand/15">
                                             <ArrowUpRight className="w-3 h-3" /> Download Full Statement
                                         </button>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                            <thead className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider dark:text-slate-400 dark:bg-surface-muted">
                                                 <tr>
                                                     <th className="px-6 py-4 text-left">Batch / Description</th>
                                                     <th className="px-6 py-4 text-left">Amount</th>
@@ -345,44 +345,44 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                                     <th className="px-6 py-4 text-right">Receipt</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-gray-100 bg-white">
+                                            <tbody className="divide-y divide-gray-100 bg-white dark:bg-surface">
                                                 {user.enrollments.flatMap((en: any) => 
                                                     en.payments.map((p: any) => (
-                                                        <tr key={p.id} className="hover:bg-gray-50 transition">
+                                                        <tr key={p.id} className="hover:bg-gray-50 transition hover:dark:bg-surface-muted">
                                                             <td className="px-6 py-4">
-                                                                <div className="text-sm font-bold text-gray-900">{en.batch.name}</div>
-                                                                <div className="text-[10px] text-gray-400 font-medium italic">{p.description}</div>
+                                                                <div className="text-sm font-bold text-gray-900 dark:text-white">{en.batch.name}</div>
+                                                                <div className="text-[10px] text-gray-400 font-medium italic dark:text-slate-500">{p.description}</div>
                                                             </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-gray-900" suppressHydrationWarning>₹ {p.amount.toLocaleString('en-IN')}</td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-gray-900 dark:text-white" suppressHydrationWarning>₹ {p.amount.toLocaleString('en-IN')}</td>
                                                             <td className="px-6 py-4 whitespace-nowrap">
                                                                 {p.status === 'PAID' ? (
-                                                                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1 w-fit"><CheckCircle2 className="w-3 h-3" /> PAID</span>
+                                                                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1 w-fit dark:text-emerald-400 dark:bg-emerald-500/10"><CheckCircle2 className="w-3 h-3" /> PAID</span>
                                                                 ) : p.status === 'UPCOMING' ? (
-                                                                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> UPCOMING</span>
+                                                                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1 w-fit dark:text-blue-400 dark:bg-blue-500/10"><Clock className="w-3 h-3" /> UPCOMING</span>
                                                                 ) : (
-                                                                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> OVERDUE</span>
+                                                                    <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1 w-fit dark:text-amber-400 dark:bg-amber-500/10"><Clock className="w-3 h-3" /> OVERDUE</span>
                                                                 )}
                                                             </td>
                                                             <td className="px-6 py-4 whitespace-nowrap">
                                                                 {p.paidAt ? (
                                                                     <div className="flex flex-col">
-                                                                        <span className="text-xs font-bold text-gray-700" suppressHydrationWarning>{new Date(p.paidAt).toLocaleDateString()}</span>
-                                                                        <span className="text-[10px] text-gray-400 italic">via {p.paymentMode || 'N/A'}</span>
+                                                                        <span className="text-xs font-bold text-gray-700 dark:text-slate-300" suppressHydrationWarning>{new Date(p.paidAt).toLocaleDateString()}</span>
+                                                                        <span className="text-[10px] text-gray-400 italic dark:text-slate-500">via {p.paymentMode || 'N/A'}</span>
                                                                     </div>
                                                                 ) : (
-                                                                    <span className="text-xs text-gray-400 font-medium italic">Pending</span>
+                                                                    <span className="text-xs text-gray-400 font-medium italic dark:text-slate-500">Pending</span>
                                                                 )}
                                                             </td>
                                                             <td className="px-6 py-4 text-right">
                                                                 {p.status === 'PAID' && (
-                                                                    <button className="text-[10px] font-bold text-indigo-600 hover:underline">Download</button>
+                                                                    <button className="text-[10px] font-bold text-indigo-600 hover:underline dark:text-brand">Download</button>
                                                                 )}
                                                             </td>
                                                         </tr>
                                                     ))
                                                 )}
                                                 {user.enrollments.length === 0 && (
-                                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 font-medium">No financial records found.</td></tr>
+                                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 font-medium dark:text-slate-400">No financial records found.</td></tr>
                                                 )}
                                             </tbody>
                                         </table>
@@ -393,15 +393,15 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
 
                         {/* Tab Content: Academic */}
                         {activeTab === 'academic' && (
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-                                <div className="p-8 border-b border-gray-100 flex justify-between items-center">
-                                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 dark:bg-surface dark:border-white/10">
+                                <div className="p-8 border-b border-gray-100 flex justify-between items-center dark:border-white/10">
+                                    <h2 className="font-display text-xl font-bold text-gray-900 flex items-center gap-3 dark:text-white">
                                         <Activity className="w-6 h-6 text-emerald-500" /> Academic Performance Ledger
                                     </h2>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                        <thead className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-widest dark:text-slate-400 dark:bg-surface-muted">
                                             <tr>
                                                 <th className="px-6 py-4 text-left">Test Title</th>
                                                 <th className="px-6 py-4 text-left">Date & Time</th>
@@ -410,29 +410,29 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                                 <th className="px-6 py-4 text-right">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-100 bg-white">
+                                        <tbody className="divide-y divide-gray-100 bg-white dark:bg-surface">
                                             {user.testAttempts.map((attempt: any) => (
-                                                <tr key={attempt.id} className="hover:bg-gray-50 transition">
+                                                <tr key={attempt.id} className="hover:bg-gray-50 transition hover:dark:bg-surface-muted">
                                                     <td className="px-6 py-4">
-                                                        <div className="text-sm font-bold text-gray-900">{attempt.test?.title || (attempt.isPracticeArena ? 'Adaptive Practice session' : 'Unknown Test')}</div>
-                                                        <div className="text-[10px] text-gray-400 flex items-center gap-1">
-                                                            {attempt.isPracticeArena ? <span className="text-emerald-500 font-bold">PRACTICE ARENA</span> : <span className="text-indigo-500 font-bold">FORMAL TEST</span>}
+                                                        <div className="text-sm font-bold text-gray-900 dark:text-white">{attempt.test?.title || (attempt.isPracticeArena ? 'Adaptive Practice session' : 'Unknown Test')}</div>
+                                                        <div className="text-[10px] text-gray-400 flex items-center gap-1 dark:text-slate-500">
+                                                            {attempt.isPracticeArena ? <span className="text-emerald-500 font-bold">PRACTICE ARENA</span> : <span className="text-indigo-500 font-bold dark:text-brand">FORMAL TEST</span>}
                                                             &bull; {attempt.status}
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs font-bold text-gray-700 flex items-center gap-1" suppressHydrationWarning><Calendar className="w-3 h-3 text-gray-400" /> {new Date(attempt.startTime).toLocaleDateString()}</span>
-                                                            <span className="text-[10px] text-gray-400 italic" suppressHydrationWarning>{new Date(attempt.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                            <span className="text-xs font-bold text-gray-700 flex items-center gap-1 dark:text-slate-300" suppressHydrationWarning><Calendar className="w-3 h-3 text-gray-400 dark:text-slate-500" /> {new Date(attempt.startTime).toLocaleDateString()}</span>
+                                                            <span className="text-[10px] text-gray-400 italic dark:text-slate-500" suppressHydrationWarning>{new Date(attempt.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col">
-                                                            <div className="text-sm font-black text-gray-900">{attempt.totalScore} <span className="text-xs text-gray-400 font-medium italic">Marks</span></div>
+                                                            <div className="text-sm font-black text-gray-900 dark:text-white">{attempt.totalScore} <span className="text-xs text-gray-400 font-medium italic dark:text-slate-500">Marks</span></div>
                                                             <div className="flex items-center gap-1 text-[10px]">
-                                                                <span className="text-emerald-600 font-bold">+{attempt.totalCorrect}</span>
+                                                                <span className="text-emerald-600 font-bold dark:text-emerald-400">+{attempt.totalCorrect}</span>
                                                                 <span className="text-red-500 font-bold">-{attempt.totalIncorrect}</span>
-                                                                <span className="text-gray-400">skipped {attempt.totalSkipped}</span>
+                                                                <span className="text-gray-400 dark:text-slate-500">skipped {attempt.totalSkipped}</span>
                                                             </div>
                                                         </div>
                                                     </td>
@@ -440,27 +440,27 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                                         {attempt.totalCorrect + attempt.totalIncorrect > 0 ? (
                                                             <div className="flex flex-col gap-1 w-24">
                                                                 <div className="flex justify-between text-[10px] font-bold">
-                                                                    <span className="text-gray-500">ACCURACY</span>
-                                                                    <span className="text-indigo-600">{Math.round((attempt.totalCorrect / (attempt.totalCorrect + attempt.totalIncorrect)) * 100)}%</span>
+                                                                    <span className="text-gray-500 dark:text-slate-400">ACCURACY</span>
+                                                                    <span className="text-indigo-600 dark:text-brand">{Math.round((attempt.totalCorrect / (attempt.totalCorrect + attempt.totalIncorrect)) * 100)}%</span>
                                                                 </div>
-                                                                <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                                                <div className="h-1 bg-gray-100 rounded-full overflow-hidden dark:bg-white/5">
                                                                     <div 
                                                                         className="h-full bg-indigo-500 rounded-full" 
                                                                         style={{ width: `${(attempt.totalCorrect / (attempt.totalCorrect + attempt.totalIncorrect)) * 100}%` }}
                                                                     ></div>
                                                                 </div>
                                                             </div>
-                                                        ) : <span className="text-xs text-gray-400 font-medium italic">N/A</span>}
+                                                        ) : <span className="text-xs text-gray-400 font-medium italic dark:text-slate-500">N/A</span>}
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <Link href={`/student/performance/${attempt.id}`} className="p-2 text-gray-400 hover:text-indigo-600 transition inline-block">
+                                                        <Link href={`/student/performance/${attempt.id}`} className="p-2 text-gray-400 hover:text-indigo-600 transition inline-block dark:text-slate-500 hover:dark:text-brand">
                                                             <FileText className="w-4 h-4" />
                                                         </Link>
                                                     </td>
                                                 </tr>
                                             ))}
                                             {user.testAttempts.length === 0 && (
-                                                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 font-medium">No test attempts recorded.</td></tr>
+                                                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 font-medium dark:text-slate-400">No test attempts recorded.</td></tr>
                                             )}
                                         </tbody>
                                     </table>
@@ -471,28 +471,28 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                         {/* Tab Content: Actions */}
                         {activeTab === 'actions' && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                    <div className="p-8 border-b border-gray-100 bg-red-50/30">
-                                        <h2 className="text-xl font-black text-red-900 flex items-center gap-2">
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden dark:bg-surface dark:border-white/10">
+                                    <div className="p-8 border-b border-gray-100 bg-red-50/30 dark:border-white/10 dark:bg-red-500/10">
+                                        <h2 className="font-display text-xl font-black text-red-900 flex items-center gap-2">
                                             <ShieldAlert className="w-6 h-6" /> Danger Zone & Platform Access
                                         </h2>
-                                        <p className="text-sm text-red-700 mt-1">Critical account management operations. Use with caution.</p>
+                                        <p className="text-sm text-red-700 mt-1 dark:text-red-400">Critical account management operations. Use with caution.</p>
                                     </div>
                                     <div className="p-8 space-y-6">
-                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-6 rounded-2xl border border-gray-100 dark:border-white/10 dark:bg-surface-muted">
                                             <div>
-                                                <h3 className="font-bold text-gray-900 flex items-center gap-2"><Key className="w-4 h-4 text-amber-500" /> Force Password Reset</h3>
-                                                <p className="text-xs text-gray-500 mt-1">This will immediately update their password to <code className="bg-amber-100 px-1 rounded text-amber-800">Mathswiz@123</code></p>
+                                                <h3 className="font-display font-bold text-gray-900 flex items-center gap-2 dark:text-white"><Key className="w-4 h-4 text-amber-500" /> Force Password Reset</h3>
+                                                <p className="text-xs text-gray-500 mt-1 dark:text-slate-400">This will immediately update their password to <code className="bg-amber-100 px-1 rounded text-amber-800 dark:bg-amber-500/10">Mathswiz@123</code></p>
                                             </div>
                                             <button onClick={() => updateUserDetailsAction(user.id, { password: 'Mathswiz@123' }).then(() => toast.success("Password Reset!"))} className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition shadow-sm">Reset Password</button>
                                         </div>
 
-                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-6 rounded-2xl border border-gray-100 dark:border-white/10 dark:bg-surface-muted">
                                             <div>
-                                                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                                                <h3 className="font-display font-bold text-gray-900 flex items-center gap-2 dark:text-white">
                                                     {user.accountStatus === 'BLOCKED' ? <><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Unblock Account Access</> : <><XCircle className="w-4 h-4 text-red-500" /> Suspend Platform Access</>}
                                                 </h3>
-                                                <p className="text-xs text-gray-500 mt-1">
+                                                <p className="text-xs text-gray-500 mt-1 dark:text-slate-400">
                                                     {user.accountStatus === 'BLOCKED' ? "Restore full platform access for this user." : "Prevents the user from logging in or accessing any content."}
                                                 </p>
                                             </div>
@@ -506,10 +506,10 @@ export default function UserProfileClient({ user }: UserProfileClientProps) {
                                             </button>
                                         </div>
 
-                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-red-50/50 p-6 rounded-2xl border border-red-100">
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-red-50/50 p-6 rounded-2xl border border-red-100 dark:bg-red-500/10">
                                             <div>
-                                                <h3 className="font-bold text-red-900 flex items-center gap-2"><Trash2 className="w-4 h-4" /> Permanently Delete Account</h3>
-                                                <p className="text-xs text-red-700 mt-1">This will scrub all personal data, financial history, and performance logs. This is IRREVERSIBLE.</p>
+                                                <h3 className="font-display font-bold text-red-900 flex items-center gap-2"><Trash2 className="w-4 h-4" /> Permanently Delete Account</h3>
+                                                <p className="text-xs text-red-700 mt-1 dark:text-red-400">This will scrub all personal data, financial history, and performance logs. This is IRREVERSIBLE.</p>
                                             </div>
                                             <button onClick={handleDeleteUser} className="px-6 py-2.5 bg-red-800 hover:bg-red-900 text-white font-bold rounded-xl text-xs transition shadow-sm">Delete Forever</button>
                                         </div>

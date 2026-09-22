@@ -187,12 +187,12 @@ export default function CascadingFolderSelector({
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={handleRefreshSync}
-                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-all border border-slate-700"
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-all border border-slate-700 dark:text-slate-500"
                         title="Force Refresh"
                     >
                         <RefreshCw className="w-3 h-3" />
                     </button>
-                    <div className="text-[10px] font-black text-indigo-500/50 uppercase tracking-tighter">Topic Explorer v2.4</div>
+                    <div className="text-[10px] font-black text-indigo-500/50 uppercase tracking-tighter dark:text-brand">Topic Explorer v2.4</div>
                 </div>
             </div>
 
@@ -203,7 +203,7 @@ export default function CascadingFolderSelector({
                         <div className="w-6 h-6 bg-indigo-500/20 rounded-lg flex items-center justify-center text-indigo-400 border border-indigo-500/30">
                             <span className="text-[10px] font-black italic">01</span>
                         </div>
-                        <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">Target Class / Goal</label>
+                        <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">Target Class / Goal</label>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {CLASSES.map(cls => (
@@ -211,8 +211,8 @@ export default function CascadingFolderSelector({
                                 key={cls}
                                 onClick={() => { setSelClass(cls); setSelSub(null); setSelTopicId(null); if (multiSelect) onSelectMultiple?.([]); else onSelect?.(''); }}
                                 className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all border ${
-                                    selClass === cls 
-                                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40 scale-105' 
+                                    selClass === cls
+                                    ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet border-indigo-500 text-white shadow-lg shadow-indigo-900/40 scale-105'
                                     : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white'
                                 }`}
                             >
@@ -230,7 +230,7 @@ export default function CascadingFolderSelector({
                                 <div className="w-6 h-6 bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-400 border border-purple-500/30">
                                     <span className="text-[10px] font-black italic">02</span>
                                 </div>
-                                <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">Select Subject</label>
+                                <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">Select Subject</label>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 {SUBJECTS.map(sub => (
@@ -261,7 +261,7 @@ export default function CascadingFolderSelector({
                                     <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-400 border border-emerald-500/30">
                                         <span className="text-[10px] font-black italic">03</span>
                                     </div>
-                                    <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">
+                                    <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">
                                         Master Topic / Chapter {multiSelect && <span className="text-[9px] text-emerald-400 normal-case">(multi-select)</span>}
                                     </label>
                                 </div>
@@ -290,10 +290,10 @@ export default function CascadingFolderSelector({
                                         value={newTopicName} 
                                         onChange={(e) => setNewTopicName(e.target.value)} 
                                         placeholder="Enter master topic..." 
-                                        className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600 placeholder-gray-500" 
+                                        className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 dark:text-white placeholder-gray-500 dark:bg-surface dark:border-white/10" 
                                     />
                                     <button onClick={handleCreateTopic} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 rounded-2xl transition-colors"><Check className="w-5 h-5" /></button>
-                                    <button onClick={() => setIsCreatingTopic(false)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 rounded-2xl transition-colors">X</button>
+                                    <button onClick={() => setIsCreatingTopic(false)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 rounded-2xl transition-colors dark:text-slate-500">X</button>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -305,10 +305,10 @@ export default function CascadingFolderSelector({
                                                         autoFocus 
                                                         value={newTopicName} 
                                                         onChange={(e) => setNewTopicName(e.target.value)} 
-                                                        className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600 placeholder-gray-500" 
+                                                        className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 dark:text-white placeholder-gray-500 dark:bg-surface dark:border-white/10" 
                                                     />
                                                     <button onClick={() => handleUpdateFolder(topic.id)} className="bg-emerald-600 p-3 rounded-xl"><Check className="w-4 h-4 text-white" /></button>
-                                                    <button onClick={() => setEditingFolderId(null)} className="bg-slate-800 p-3 rounded-xl text-slate-400">X</button>
+                                                    <button onClick={() => setEditingFolderId(null)} className="bg-slate-800 p-3 rounded-xl text-slate-400 dark:text-slate-500">X</button>
                                                 </div>
                                             ) : (
                                                 <button
@@ -323,7 +323,7 @@ export default function CascadingFolderSelector({
                                                         {multiSelect && (
                                                             isTopicSelected(topic.id) 
                                                                 ? <CheckSquare className="w-4 h-4 text-white shrink-0" />
-                                                                : <Square className="w-4 h-4 text-slate-500 shrink-0" />
+                                                                : <Square className="w-4 h-4 text-slate-500 shrink-0 dark:text-slate-400" />
                                                         )}
                                                         <span className="truncate">{topic.topicName}</span>
                                                     </div>
@@ -345,7 +345,7 @@ export default function CascadingFolderSelector({
                                         </div>
                                     ))}
                                     {filteredTopics.length === 0 && (
-                                        <div className="col-span-2 py-8 text-center border-2 border-dashed border-slate-800/50 rounded-2xl italic text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                                        <div className="col-span-2 py-8 text-center border-2 border-dashed border-slate-800/50 rounded-2xl italic text-slate-600 text-[10px] font-black uppercase tracking-widest dark:text-slate-400">
                                             No Master Folders Found for this Subject
                                         </div>
                                     )}
@@ -364,7 +364,7 @@ export default function CascadingFolderSelector({
                                     <div className="w-6 h-6 bg-cyan-500/20 rounded-lg flex items-center justify-center text-cyan-400 border border-cyan-500/30">
                                         <span className="text-[10px] font-black italic">04</span>
                                     </div>
-                                    <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm">
+                                    <label className="text-xs font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest shadow-sm dark:text-white">
                                         Sub-Topic (Precision) {multiSelect && <span className="text-[9px] text-cyan-400 normal-case">(multi-select)</span>}
                                     </label>
                                 </div>
@@ -383,10 +383,10 @@ export default function CascadingFolderSelector({
                                         value={newTopicName} 
                                         onChange={(e) => setNewTopicName(e.target.value)} 
                                         placeholder="Enter sub-topic name..." 
-                                        className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600 placeholder-gray-500" 
+                                        className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 dark:text-white placeholder-gray-500 dark:bg-surface dark:border-white/10" 
                                     />
                                     <button onClick={handleCreateSubtopic} className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 rounded-2xl transition-colors"><Check className="w-5 h-5" /></button>
-                                    <button onClick={() => setIsCreatingSubtopic(false)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 rounded-2xl transition-colors">X</button>
+                                    <button onClick={() => setIsCreatingSubtopic(false)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-4 rounded-2xl transition-colors dark:text-slate-500">X</button>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-8">
@@ -398,10 +398,10 @@ export default function CascadingFolderSelector({
                                                         autoFocus 
                                                         value={newTopicName} 
                                                         onChange={(e) => setNewTopicName(e.target.value)} 
-                                                        className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600 placeholder-gray-500" 
+                                                        className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 dark:text-white placeholder-gray-500 dark:bg-surface dark:border-white/10" 
                                                     />
                                                     <button onClick={() => handleUpdateFolder(subtopic.id)} className="bg-cyan-600 p-3 rounded-xl"><Check className="w-4 h-4 text-white" /></button>
-                                                    <button onClick={() => setEditingFolderId(null)} className="bg-slate-800 p-3 rounded-xl text-slate-400">X</button>
+                                                    <button onClick={() => setEditingFolderId(null)} className="bg-slate-800 p-3 rounded-xl text-slate-400 dark:text-slate-500">X</button>
                                                 </div>
                                             ) : (
                                                 <button
@@ -416,7 +416,7 @@ export default function CascadingFolderSelector({
                                                         {multiSelect && (
                                                             isTopicSelected(subtopic.id) 
                                                                 ? <CheckSquare className="w-4 h-4 text-white shrink-0" />
-                                                                : <Square className="w-4 h-4 text-slate-500 shrink-0" />
+                                                                : <Square className="w-4 h-4 text-slate-500 shrink-0 dark:text-slate-400" />
                                                         )}
                                                         <span className="truncate">{subtopic.topicName}</span>
                                                     </div>
@@ -438,7 +438,7 @@ export default function CascadingFolderSelector({
                                         </div>
                                     ))}
                                     {filteredSubtopics.length === 0 && (
-                                        <div className="col-span-2 py-4 text-center border-2 border-dashed border-slate-800/50 rounded-2xl text-[10px] font-black text-slate-600 uppercase">
+                                        <div className="col-span-2 py-4 text-center border-2 border-dashed border-slate-800/50 rounded-2xl text-[10px] font-black text-slate-600 uppercase dark:text-slate-400">
                                             No subtopics yet.
                                         </div>
                                     )}

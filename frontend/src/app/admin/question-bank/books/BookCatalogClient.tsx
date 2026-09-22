@@ -269,18 +269,18 @@ export default function BookCatalogClient() {
   const anyBusy = renderingBookId !== null || extractingBookId !== null || benchmarkingKey !== null;
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
+    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 dark:bg-surface-muted dark:text-white">
       <div className="mx-auto max-w-7xl space-y-8">
         <header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <Link href="/admin/question-bank" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-indigo-600"><ArrowLeft className="h-4 w-4" /> Question Bank</Link>
-            <h1 className="text-4xl font-black">Book Ingestion Library</h1>
-            <p className="mt-2 text-slate-600">Register each exact edition before uploading its PDF. This preserves question, answer and source-page lineage.</p>
+            <Link href="/admin/question-bank" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-indigo-600 dark:text-brand"><ArrowLeft className="h-4 w-4" /> Question Bank</Link>
+            <h1 className="font-display text-4xl font-black">Book Ingestion Library</h1>
+            <p className="mt-2 text-slate-600 dark:text-slate-400">Register each exact edition before uploading its PDF. This preserves question, answer and source-page lineage.</p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900">Pilot mode: no new paid subscription required yet.</div>
-            <Link href="/admin/question-bank/review-queue" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50">
-              <ClipboardCheck className="h-4 w-4 text-indigo-600" /> Review queue
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/20">Pilot mode: no new paid subscription required yet.</div>
+            <Link href="/admin/question-bank/review-queue" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
+              <ClipboardCheck className="h-4 w-4 text-indigo-600 dark:text-brand" /> Review queue
             </Link>
           </div>
         </header>
@@ -288,94 +288,94 @@ export default function BookCatalogClient() {
         {message && <div className={`rounded-xl border px-4 py-3 font-semibold ${message.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}>{message.text}</div>}
 
         <section className="grid gap-7 lg:grid-cols-[380px_1fr]">
-          <form onSubmit={registerBook} className="h-fit space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="flex items-center gap-2 text-xl font-black"><Plus className="h-5 w-5 text-indigo-600" /> Register a book</h2>
-            <label className="block text-sm font-bold">Title *<input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5" /></label>
+          <form onSubmit={registerBook} className="h-fit space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:bg-surface dark:border-white/10">
+            <h2 className="font-display flex items-center gap-2 text-xl font-black"><Plus className="h-5 w-5 text-indigo-600 dark:text-brand" /> Register a book</h2>
+            <label className="block text-sm font-bold">Title *<input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-white/10" /></label>
             <div className="grid grid-cols-2 gap-3">
-              <label className="block text-sm font-bold">Class *<select value={form.className} onChange={e => setForm({ ...form, className: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5"><option>Class 11</option><option>Class 12</option></select></label>
-              <label className="block text-sm font-bold">Board<input value={form.board} onChange={e => setForm({ ...form, board: e.target.value })} placeholder="CBSE" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5" /></label>
+              <label className="block text-sm font-bold">Class *<select value={form.className} onChange={e => setForm({ ...form, className: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-white/10"><option>Class 11</option><option>Class 12</option></select></label>
+              <label className="block text-sm font-bold">Board<input value={form.board} onChange={e => setForm({ ...form, board: e.target.value })} placeholder="CBSE" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-white/10" /></label>
             </div>
-            {(['author', 'publisher', 'edition', 'isbn'] as const).map(field => <label key={field} className="block text-sm font-bold capitalize">{field}<input value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5" /></label>)}
-            <label className="block text-sm font-bold">Publication year<input type="number" value={form.publicationYear} onChange={e => setForm({ ...form, publicationYear: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5" /></label>
-            <button disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-black text-white disabled:opacity-60">{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <BookOpen className="h-5 w-5" />} Register edition</button>
+            {(['author', 'publisher', 'edition', 'isbn'] as const).map(field => <label key={field} className="block text-sm font-bold capitalize">{field}<input value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-white/10" /></label>)}
+            <label className="block text-sm font-bold">Publication year<input type="number" value={form.publicationYear} onChange={e => setForm({ ...form, publicationYear: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-white/10" /></label>
+            <button disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-4 py-3 font-black text-white disabled:opacity-60">{saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <BookOpen className="h-5 w-5" />} Register edition</button>
           </form>
 
-          <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center gap-3 border-b border-slate-200 p-5">
-              <Search className="h-5 w-5 text-slate-400" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search title, author, publisher or ISBN" className="w-full outline-none" />
+          <div className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:bg-surface dark:border-white/10">
+            <div className="flex items-center gap-3 border-b border-slate-200 p-5 dark:border-white/10">
+              <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search title, author, publisher or ISBN" className="w-full outline-none" />
             </div>
             <div className="divide-y divide-slate-100">
-              {loading && <div className="flex justify-center p-12"><Loader2 className="h-7 w-7 animate-spin text-indigo-600" /></div>}
-              {!loading && books.length === 0 && <div className="p-12 text-center text-slate-500">No books registered yet.</div>}
+              {loading && <div className="flex justify-center p-12"><Loader2 className="h-7 w-7 animate-spin text-indigo-600 dark:text-brand" /></div>}
+              {!loading && books.length === 0 && <div className="p-12 text-center text-slate-500 dark:text-slate-400">No books registered yet.</div>}
               {!loading && books.map(book => (
                 <article key={book.id} className="p-6">
                   <div className="flex flex-col justify-between gap-4 sm:flex-row">
                     <div>
-                      <div className="mb-2 flex flex-wrap gap-2"><span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">{book.className}</span>{book.board && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold">{book.board}</span>}</div>
-                      <h3 className="text-xl font-black">{book.title}</h3>
-                      <p className="mt-1 text-sm text-slate-600">{[book.author, book.publisher, book.edition, book.publicationYear].filter(Boolean).join(' · ') || 'Edition details not supplied'}</p>
-                      {book.isbn && <p className="mt-1 text-xs text-slate-500">ISBN {book.isbn}</p>}
+                      <div className="mb-2 flex flex-wrap gap-2"><span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700 dark:text-brand dark:bg-brand/10">{book.className}</span>{book.board && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold dark:bg-white/5">{book.board}</span>}</div>
+                      <h3 className="font-display text-xl font-black">{book.title}</h3>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{[book.author, book.publisher, book.edition, book.publicationYear].filter(Boolean).join(' · ') || 'Edition details not supplied'}</p>
+                      {book.isbn && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">ISBN {book.isbn}</p>}
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="rounded-xl bg-slate-50 p-3"><strong className="block text-lg">{book._count.chapters}</strong>chapters</div>
-                      <div className="rounded-xl bg-slate-50 p-3"><strong className="block text-lg">{book._count.questions}</strong>questions</div>
-                      <div className="rounded-xl bg-slate-50 p-3"><strong className="block text-lg">{book._count.ingestionRuns}</strong>imports</div>
+                      <div className="rounded-xl bg-slate-50 p-3 dark:bg-surface-muted"><strong className="block text-lg">{book._count.chapters}</strong>chapters</div>
+                      <div className="rounded-xl bg-slate-50 p-3 dark:bg-surface-muted"><strong className="block text-lg">{book._count.questions}</strong>questions</div>
+                      <div className="rounded-xl bg-slate-50 p-3 dark:bg-surface-muted"><strong className="block text-lg">{book._count.ingestionRuns}</strong>imports</div>
                     </div>
                   </div>
                   {book.ingestionRuns[0] && book.ingestionRuns[0].status !== 'FAILED' && (
-                    <div className="mt-4 flex flex-wrap items-center gap-2 text-sm font-semibold text-emerald-700">
+                    <div className="mt-4 flex flex-wrap items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
                       <CheckCircle2 className="h-4 w-4" /> Latest import: {book.ingestionRuns[0].stage.replaceAll('_', ' ')} ({book.ingestionRuns[0].progress}%)
                       {book.ingestionRuns[0].totalPages && <span>· {book.ingestionRuns[0].totalPages} pages</span>}
                       {book.ingestionRuns[0].extractedQuestions > 0 && <span>· {book.ingestionRuns[0].extractedQuestions} draft questions</span>}
-                      {book.ingestionRuns[0].reviewRequired > 0 && <span className="text-amber-700">· {book.ingestionRuns[0].reviewRequired} need review</span>}
+                      {book.ingestionRuns[0].reviewRequired > 0 && <span className="text-amber-700 dark:text-amber-400">· {book.ingestionRuns[0].reviewRequired} need review</span>}
                       {book.ingestionRuns[0].providerConfig?.sourceProfile && <span>· {book.ingestionRuns[0].providerConfig.sourceProfile.replaceAll('_', ' ').toLowerCase()}</span>}
                     </div>
                   )}
                   {book.ingestionRuns[0]?.status === 'FAILED' && !book.ingestionRuns[0].totalPages && (
-                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm">
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm dark:bg-red-500/10 dark:border-red-500/20">
                       <p className="font-black text-red-800">Page inventory failed for the last uploaded PDF.</p>
-                      {book.ingestionRuns[0].errorMessage && <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono text-xs text-red-700">{book.ingestionRuns[0].errorMessage}</p>}
+                      {book.ingestionRuns[0].errorMessage && <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap font-mono text-xs text-red-700 dark:text-red-400">{book.ingestionRuns[0].errorMessage}</p>}
                       <button onClick={() => void retryInventory(book)} disabled={anyBusy || uploadingBookId === book.id} className="mt-2 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-black text-white disabled:opacity-60">
                         {uploadingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Retry page inventory
                       </button>
                     </div>
                   )}
-                  <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-4">
+                  <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-4 dark:border-white/10">
                     <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white ${uploadingBookId ? 'pointer-events-none opacity-60' : ''}`}>
                       {uploadingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                       {uploadingBookId === book.id ? 'Storing PDF…' : 'Upload whole PDF'}
                       <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={event => { void uploadBookPdf(book.id, event.target.files?.[0] || null); event.currentTarget.value = ''; }} />
                     </label>
-                    <span className="text-xs text-slate-500">Private storage · PDF only · maximum 250 MB</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Private storage · PDF only · maximum 250 MB</span>
                   </div>
-                  {book.ingestionRuns[0]?.totalPages && book.ingestionRuns[0].processedPages < book.ingestionRuns[0].totalPages && <button onClick={() => void renderBookPages(book)} disabled={anyBusy} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 disabled:opacity-60">{renderingBookId === book.id && <Loader2 className="h-4 w-4 animate-spin" />}{book.ingestionRuns[0].processedPages ? 'Resume page rendering' : 'Render and analyse pages'} · {book.ingestionRuns[0].processedPages}/{book.ingestionRuns[0].totalPages}</button>}
+                  {book.ingestionRuns[0]?.totalPages && book.ingestionRuns[0].processedPages < book.ingestionRuns[0].totalPages && <button onClick={() => void renderBookPages(book)} disabled={anyBusy} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 disabled:opacity-60 dark:text-brand dark:bg-brand/10 dark:border-brand/20">{renderingBookId === book.id && <Loader2 className="h-4 w-4 animate-spin" />}{book.ingestionRuns[0].processedPages ? 'Resume page rendering' : 'Render and analyse pages'} · {book.ingestionRuns[0].processedPages}/{book.ingestionRuns[0].totalPages}</button>}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
-                    <Link href={`/admin/question-bank/books/${book.id}/manifest`} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white hover:bg-indigo-700">
+                    <Link href={`/admin/question-bank/books/${book.id}/manifest`} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-4 py-2.5 text-sm font-black text-white hover:opacity-90">
                       <ListTree className="h-4 w-4" /> {book.confirmedChapters > 0 ? `Chapter manifest · ${book.confirmedChapters} confirmed` : book._count.chapters > 0 ? `Confirm chapter manifest · ${book._count.chapters} draft` : 'Confirm chapter manifest'}
                     </Link>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && book.confirmedChapters > 0 && (
-                    <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm">
-                      <span className="text-indigo-700">Extract chapter by chapter from the manifest above so questions are filed and matched against confirmed page ranges.</span>
+                    <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm dark:bg-brand/10 dark:border-brand/20">
+                      <span className="text-indigo-700 dark:text-brand">Extract chapter by chapter from the manifest above so questions are filed and matched against confirmed page ranges.</span>
                     </div>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
-                    <button onClick={() => void extractBookQuestions(book)} disabled={anyBusy} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-60 sm:ml-3">
+                    <button onClick={() => void extractBookQuestions(book)} disabled={anyBusy} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-60 sm:ml-3 dark:bg-emerald-500/10">
                       {extractingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                       {book.confirmedChapters > 0 ? 'Extract whole book (ignores manifest)' : 'Extract questions (no manifest confirmed yet)'}
                     </button>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
-                    <Link href={`/admin/question-bank/books/${book.id}/figures`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3">
+                    <Link href={`/admin/question-bank/books/${book.id}/figures`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
                       <ImageIcon className="h-4 w-4" /> Figures
                     </Link>
                   )}
                   {book.confirmedChapters > 0 && (
-                    <Link href={`/admin/question-bank/books/${book.id}/reconciliation`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3">
+                    <Link href={`/admin/question-bank/books/${book.id}/reconciliation`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
                       <ClipboardCheck className="h-4 w-4" /> Reconciliation
                     </Link>
                   )}
-                  {book.ingestionRuns[0]?.processedPages > 0 && <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => void benchmarkBook(book, 'GEMINI_VISION')} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 disabled:opacity-60">{benchmarkingKey === `${book.id}:GEMINI_VISION` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Benchmark Gemini</button><button onClick={() => void benchmarkBook(book, 'MATHPIX_OCR')} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:opacity-60">{benchmarkingKey === `${book.id}:MATHPIX_OCR` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Benchmark Mathpix</button><span className="self-center text-xs text-slate-500">One selected page only; credits are never spent automatically.</span></div>}
+                  {book.ingestionRuns[0]?.processedPages > 0 && <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => void benchmarkBook(book, 'GEMINI_VISION')} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 disabled:opacity-60 dark:text-brand-violet dark:bg-brand-violet/10">{benchmarkingKey === `${book.id}:GEMINI_VISION` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Benchmark Gemini</button><button onClick={() => void benchmarkBook(book, 'MATHPIX_OCR')} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:opacity-60 dark:text-emerald-400 dark:bg-emerald-500/10 dark:border-emerald-500/20">{benchmarkingKey === `${book.id}:MATHPIX_OCR` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Benchmark Mathpix</button><span className="self-center text-xs text-slate-500 dark:text-slate-400">One selected page only; credits are never spent automatically.</span></div>}
                 </article>
               ))}
             </div>

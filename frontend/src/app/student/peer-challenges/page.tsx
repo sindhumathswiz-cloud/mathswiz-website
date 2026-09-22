@@ -88,25 +88,25 @@ export default function PeerChallengesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+      <div className="flex items-center justify-center min-h-screen dark:bg-background">
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-600 dark:text-brand" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-8 max-w-6xl mx-auto">
+    <div className="p-6 space-y-8 max-w-6xl mx-auto dark:bg-background">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-            <Swords className="w-8 h-8 text-indigo-600" />
+          <h1 className="font-display text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+            <Swords className="w-8 h-8 text-indigo-600 dark:text-brand" />
             Peer Challenges
           </h1>
-          <p className="text-slate-500 mt-1">Challenge your classmates and compete to improve</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Challenge your classmates and compete to improve</p>
         </div>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+          className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity"
         >
           <Plus className="w-4 h-4" />
           New Challenge
@@ -114,15 +114,15 @@ export default function PeerChallengesPage() {
       </div>
 
       {showCreateForm && (
-        <div className="bg-white p-6 rounded-xl border shadow-sm">
-          <h2 className="text-lg font-semibold mb-4">Create a Challenge</h2>
+        <div className="bg-white dark:bg-surface p-6 rounded-xl border dark:border-white/10 shadow-sm">
+          <h2 className="font-display text-lg font-semibold mb-4 dark:text-white">Create a Challenge</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Select Opponent</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Select Opponent</label>
               <select
                 value={selectedPeer}
                 onChange={(e) => setSelectedPeer(e.target.value)}
-                className="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full border dark:border-white/10 dark:bg-surface-muted dark:text-white rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-brand focus:border-indigo-500 dark:focus:border-brand"
               >
                 <option value="">Choose a classmate...</option>
                 {peers.map((peer) => (
@@ -133,27 +133,27 @@ export default function PeerChallengesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Topic</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Topic</label>
               <input
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="e.g., Calculus, Trigonometry"
-                className="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full border dark:border-white/10 dark:bg-surface-muted dark:text-white rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-brand focus:border-indigo-500 dark:focus:border-brand"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={handleCreateChallenge}
                 disabled={processing === 'create'}
-                className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white px-5 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
               >
                 {processing === 'create' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Swords className="w-4 h-4" />}
                 Send Challenge
               </button>
               <button
                 onClick={() => setShowCreateForm(false)}
-                className="bg-slate-100 text-slate-700 px-5 py-2 rounded-lg hover:bg-slate-200 transition-colors"
+                className="bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 px-5 py-2 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
@@ -164,20 +164,20 @@ export default function PeerChallengesPage() {
 
       {incoming.length > 0 && (
         <section>
-          <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-amber-600" />
+          <h2 className="font-display text-xl font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-amber-600 dark:text-accent-warm" />
             Incoming Challenges ({incoming.length})
           </h2>
           <div className="grid gap-4">
             {incoming.map((challenge) => (
-              <div key={challenge.id} className="bg-white p-6 rounded-xl border shadow-sm">
+              <div key={challenge.id} className="bg-white dark:bg-surface p-6 rounded-xl border dark:border-white/10 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold text-lg">{challenge.topic}</h3>
-                    <p className="text-sm text-slate-500 mt-1">
+                    <h3 className="font-semibold text-lg dark:text-white">{challenge.topic}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                       From: {challenge.challenger?.firstName || 'Classmate'}
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                       {new Date(challenge.createdAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -185,7 +185,7 @@ export default function PeerChallengesPage() {
                     <button
                       onClick={() => handleAction(challenge.id, 'accept')}
                       disabled={processing === challenge.id}
-                      className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 bg-emerald-600 dark:bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 dark:hover:bg-emerald-400 transition-colors disabled:opacity-50"
                     >
                       <Check className="w-4 h-4" />
                       Accept
@@ -193,7 +193,7 @@ export default function PeerChallengesPage() {
                     <button
                       onClick={() => handleAction(challenge.id, 'decline')}
                       disabled={processing === challenge.id}
-                      className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 bg-rose-600 dark:bg-rose-500 text-white px-4 py-2 rounded-lg hover:bg-rose-700 dark:hover:bg-rose-400 transition-colors disabled:opacity-50"
                     >
                       <X className="w-4 h-4" />
                       Decline
@@ -208,8 +208,8 @@ export default function PeerChallengesPage() {
 
       {active.length > 0 && (
         <section>
-          <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <Swords className="w-5 h-5 text-indigo-600" />
+          <h2 className="font-display text-xl font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <Swords className="w-5 h-5 text-indigo-600 dark:text-brand" />
             Active Challenges
           </h2>
           <div className="grid gap-4">
@@ -217,15 +217,15 @@ export default function PeerChallengesPage() {
               const isChallenger = challenge.challengerId === userId;
               const opponent = isChallenger ? challenge.opponent : challenge.challenger;
               return (
-                <div key={challenge.id} className="bg-white p-6 rounded-xl border shadow-sm">
+                <div key={challenge.id} className="bg-white dark:bg-surface p-6 rounded-xl border dark:border-white/10 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold text-lg">{challenge.topic}</h3>
-                      <p className="text-sm text-slate-500 mt-1">
+                      <h3 className="font-semibold text-lg dark:text-white">{challenge.topic}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                         vs {opponent?.firstName || 'Classmate'}
                       </p>
                     </div>
-                    <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium">
+                    <span className="bg-indigo-100 dark:bg-brand/15 text-indigo-700 dark:text-brand px-3 py-1 rounded-full text-sm font-medium">
                       In Progress
                     </span>
                   </div>
@@ -238,8 +238,8 @@ export default function PeerChallengesPage() {
 
       {completed.length > 0 && (
         <section>
-          <h2 className="text-xl font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-emerald-600" />
+          <h2 className="font-display text-xl font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Completed Challenges
           </h2>
           <div className="grid gap-4">
@@ -248,16 +248,16 @@ export default function PeerChallengesPage() {
               const opponent = isChallenger ? challenge.opponent : challenge.challenger;
               const winner = challenge.winnerId === challenge.challengerId ? challenge.challenger : challenge.opponent;
               return (
-                <div key={challenge.id} className="bg-white p-6 rounded-xl border shadow-sm">
+                <div key={challenge.id} className="bg-white dark:bg-surface p-6 rounded-xl border dark:border-white/10 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold text-lg">{challenge.topic}</h3>
-                      <p className="text-sm text-slate-500 mt-1">
+                      <h3 className="font-semibold text-lg dark:text-white">{challenge.topic}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                         vs {opponent?.firstName || 'Classmate'}
                       </p>
                     </div>
                     {winner && (
-                      <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full">
+                      <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-full">
                         <Trophy className="w-4 h-4" />
                         <span className="text-sm font-medium">
                           Winner: {winner?.firstName || 'Unknown'}
@@ -273,10 +273,10 @@ export default function PeerChallengesPage() {
       )}
 
       {incoming.length === 0 && active.length === 0 && completed.length === 0 && (
-        <div className="bg-white p-12 rounded-xl border text-center">
-          <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-slate-700">No challenges yet</h3>
-          <p className="text-slate-500 mt-1">Create a new challenge to get started!</p>
+        <div className="bg-white dark:bg-surface p-12 rounded-xl border dark:border-white/10 text-center">
+          <Users className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+          <h3 className="font-display text-lg font-semibold text-slate-700 dark:text-white">No challenges yet</h3>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Create a new challenge to get started!</p>
         </div>
       )}
     </div>

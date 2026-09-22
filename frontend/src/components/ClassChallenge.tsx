@@ -71,9 +71,9 @@ export default function ClassChallenge() {
 
   if (!challenge) {
     return (
-      <div className="text-center p-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-        <Swords className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-        <p className="font-medium text-slate-600">No class challenge is running in your batch right now.</p>
+      <div className="text-center p-8 bg-slate-50 dark:bg-white/5 rounded-xl border border-dashed border-slate-200 dark:border-white/10">
+        <Swords className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+        <p className="font-medium text-slate-600 dark:text-slate-400">No class challenge is running in your batch right now.</p>
       </div>
     );
   }
@@ -83,41 +83,41 @@ export default function ClassChallenge() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-xl">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-brand dark:to-brand-violet text-white p-4 rounded-xl">
         <div className="flex items-center gap-2 mb-1">
           <Target className="w-5 h-5" />
-          <h3 className="font-bold">{challenge.title}</h3>
+          <h3 className="font-display font-bold">{challenge.title}</h3>
         </div>
         <p className="text-sm opacity-90">
           Ranked by {METRIC_LABEL[challenge.metric]} · {daysLeft > 0 ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : 'ending soon'}
         </p>
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
-        <div className="p-3 border-b bg-slate-50">
-          <h3 className="font-semibold text-sm text-slate-700">Standings</h3>
+      <div className="bg-white dark:bg-surface rounded-xl border dark:border-white/10 overflow-hidden">
+        <div className="p-3 border-b dark:border-white/10 bg-slate-50 dark:bg-white/5">
+          <h3 className="font-display font-semibold text-sm text-slate-700 dark:text-slate-300">Standings</h3>
         </div>
         {ranking.length === 0 ? (
-          <p className="p-4 text-sm text-slate-500">No activity yet — be the first to make a move.</p>
+          <p className="p-4 text-sm text-slate-500 dark:text-slate-400">No activity yet — be the first to make a move.</p>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y dark:divide-white/10">
             {ranking.map((entry) => (
               <div
                 key={entry.userId}
-                className={`p-3 flex items-center gap-3 ${entry.rank === userRank ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''}`}
+                className={`p-3 flex items-center gap-3 ${entry.rank === userRank ? 'bg-indigo-50 dark:bg-brand/10 border-l-4 border-indigo-500 dark:border-brand' : ''}`}
               >
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${getRankBadge(entry.rank)}`}>
                   {entry.rank <= 3 ? getRankIcon(entry.rank) : entry.rank}
                 </div>
-                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-sm font-medium text-slate-600">
+                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center text-sm font-medium text-slate-600 dark:text-slate-300">
                   {entry.name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{entry.name}</div>
+                  <div className="text-sm font-medium truncate dark:text-white">{entry.name}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-slate-800">{entry.value}</div>
-                  <div className="text-xs text-slate-500">{METRIC_LABEL[challenge.metric]}</div>
+                  <div className="text-sm font-bold text-slate-800 dark:text-white">{entry.value}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{METRIC_LABEL[challenge.metric]}</div>
                 </div>
               </div>
             ))}
@@ -126,8 +126,8 @@ export default function ClassChallenge() {
       </div>
 
       {userRank && (
-        <div className="bg-indigo-600 text-white p-4 rounded-xl text-center">
-          <div className="text-2xl font-bold">#{userRank}</div>
+        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white p-4 rounded-xl text-center">
+          <div className="text-2xl font-bold font-display">#{userRank}</div>
           <div className="text-sm opacity-90">Your rank out of {ranking.length} students</div>
         </div>
       )}

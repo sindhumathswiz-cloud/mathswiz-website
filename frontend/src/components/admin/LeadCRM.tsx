@@ -93,11 +93,11 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
 
     const getStatusColor = (status: string) => {
         switch (status.toUpperCase()) {
-            case 'NEW': return 'bg-blue-100 text-blue-700 border-blue-200';
-            case 'CONTACTED': return 'bg-amber-100 text-amber-700 border-amber-200';
-            case 'CONVERTED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-            case 'LOST': return 'bg-rose-100 text-rose-700 border-rose-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+            case 'NEW': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20';
+            case 'CONTACTED': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20';
+            case 'CONVERTED': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20';
+            case 'LOST': return 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-white/5 dark:text-slate-300 dark:border-white/10';
         }
     };
 
@@ -106,12 +106,12 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
             {/* Header & Stats */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Lead CRM</h2>
-                    <p className="text-gray-500 font-medium text-sm">Nurture and track prospective students through the enrollment funnel.</p>
+                    <h2 className="font-display text-2xl font-black text-gray-900 tracking-tight dark:text-white">Lead CRM</h2>
+                    <p className="text-gray-500 font-medium text-sm dark:text-slate-400">Nurture and track prospective students through the enrollment funnel.</p>
                 </div>
                 <button 
                     onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold transition shadow-lg shadow-indigo-100"
+                    className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white px-5 py-2.5 rounded-xl font-bold transition shadow-lg shadow-indigo-100 dark:shadow-none"
                 >
                     <UserPlus className="w-4 h-4" /> Add New Lead
                 </button>
@@ -127,37 +127,37 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
                     <button 
                         key={i} 
                         onClick={() => setFilterStatus(stat.status)}
-                        className={`bg-white p-4 rounded-2xl border transition-all text-left flex items-center gap-4 hover:shadow-md hover:scale-[1.02] active:scale-100 ${filterStatus === stat.status ? 'border-indigo-600 ring-2 ring-indigo-50' : 'border-gray-100'}`}
+                        className={`bg-white dark:bg-surface p-4 rounded-2xl border transition-all text-left flex items-center gap-4 hover:shadow-md hover:scale-[1.02] active:scale-100 ${filterStatus === stat.status ? 'border-indigo-600 dark:border-brand ring-2 ring-indigo-50 dark:ring-brand/10' : 'border-gray-100 dark:border-white/10'}`}
                     >
                         <div className={`p-3 ${stat.bg} ${stat.color} rounded-xl`}>
                             <stat.icon className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                            <p className="text-xl font-black text-gray-900">{stat.count}</p>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">{stat.label}</p>
+                            <p className="text-xl font-black text-gray-900 dark:text-white">{stat.count}</p>
                         </div>
                     </button>
                 ))}
             </div>
 
             {/* Filters & Search */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden dark:bg-surface dark:border-white/10">
                 <div className="p-4 border-b border-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500" />
                         <input 
                             type="text" 
                             placeholder="Search leads..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm transition"
+                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm transition dark:border-white/10 dark:bg-surface-muted"
                         />
                     </div>
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
                         {filterStatus !== 'ALL' && (
                             <button 
                                 onClick={() => setFilterStatus('ALL')}
-                                className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all shrink-0"
+                                className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all shrink-0 dark:bg-white/5 dark:text-slate-400"
                             >
                                 Clear
                             </button>
@@ -167,9 +167,9 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
                                 key={status}
                                 onClick={() => setFilterStatus(status)}
                                 className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${
-                                    filterStatus === status 
-                                    ? 'bg-indigo-900 text-white shadow-md' 
-                                    : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'
+                                    filterStatus === status
+                                    ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white shadow-md'
+                                    : 'bg-white dark:bg-surface text-gray-500 dark:text-slate-400 border border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5'
                                 }`}
                             >
                                 {status}
@@ -181,31 +181,31 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50/50">
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Lead Details</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Source</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Created At</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                            <tr className="bg-gray-50/50 dark:bg-surface-muted">
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Lead Details</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Source</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Status</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Notes</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Created At</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {filteredLeads.map((lead) => (
-                                <tr key={lead.id} className="hover:bg-gray-50/50 transition-colors group">
+                                <tr key={lead.id} className="hover:bg-gray-50/50 transition-colors group dark:bg-surface-muted">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-600 font-bold">
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-600 font-bold dark:text-brand">
                                                 {lead.name.charAt(0)}
                                             </div>
                                             <div>
-                                                <div className="text-sm font-bold text-gray-900">{lead.name}</div>
+                                                <div className="text-sm font-bold text-gray-900 dark:text-white">{lead.name}</div>
                                                 <div className="flex items-center gap-3 mt-0.5">
-                                                    <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                                    <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-slate-400">
                                                         <Phone className="w-3 h-3" /> {lead.phone}
                                                     </div>
                                                     {lead.email && (
-                                                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-slate-400">
                                                             <Mail className="w-3 h-3" /> {lead.email}
                                                         </div>
                                                     )}
@@ -214,7 +214,7 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-lg">{lead.source || 'Direct'}</span>
+                                        <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-lg dark:bg-white/5 dark:text-slate-400">{lead.source || 'Direct'}</span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="relative inline-block text-left group/status">
@@ -222,12 +222,12 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
                                                 {lead.status}
                                             </span>
                                             <div className="absolute left-0 bottom-full mb-2 hidden group-hover/status:block z-20">
-                                                <div className="bg-white border border-gray-100 rounded-xl shadow-xl py-2 w-40 overflow-hidden">
+                                                <div className="bg-white border border-gray-100 rounded-xl shadow-xl py-2 w-40 overflow-hidden dark:bg-surface dark:border-white/10">
                                                     {['NEW', 'CONTACTED', 'CONVERTED', 'LOST'].map(s => (
                                                         <button 
                                                             key={s}
                                                             onClick={() => handleUpdateStatus(lead.id, s)}
-                                                            className={`block w-full text-left px-4 py-2 text-xs font-bold hover:bg-gray-50 ${lead.status.toUpperCase() === s ? 'text-indigo-600' : 'text-gray-600'}`}
+                                                            className={`block w-full text-left px-4 py-2 text-xs font-bold hover:bg-gray-50 dark:hover:bg-white/5 ${lead.status.toUpperCase() === s ? 'text-indigo-600 dark:text-brand' : 'text-gray-600 dark:text-slate-400'}`}
                                                         >
                                                             Mark as {s}
                                                         </button>
@@ -247,22 +247,22 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
                                                     }
                                                 }}
                                                 placeholder="Add note..."
-                                                className="w-full bg-transparent border-none text-[10px] font-medium text-gray-500 focus:ring-0 placeholder:italic p-0"
+                                                className="w-full bg-transparent border-none text-[10px] font-medium text-gray-500 focus:ring-0 placeholder:italic p-0 dark:text-slate-400"
                                             />
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium" suppressHydrationWarning>
-                                            <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium dark:text-slate-400" suppressHydrationWarning>
+                                            <Calendar className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                                             {new Date(lead.createdAt).toLocaleDateString()}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <button className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all shadow-sm border border-transparent hover:border-indigo-50">
+                                            <button className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all shadow-sm border border-transparent hover:border-indigo-50 dark:text-slate-500 hover:dark:bg-surface hover:dark:text-brand">
                                                 <MessageSquare className="w-4 h-4" />
                                             </button>
-                                            <button className="p-2 text-gray-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all shadow-sm border border-transparent hover:border-rose-50">
+                                            <button className="p-2 text-gray-400 hover:text-rose-600 hover:bg-white rounded-lg transition-all shadow-sm border border-transparent hover:border-rose-50 dark:text-slate-500 hover:dark:bg-surface hover:dark:text-rose-400">
                                                 <MoreHorizontal className="w-4 h-4" />
                                             </button>
                                         </div>
@@ -277,24 +277,24 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
             {/* Modal: Add Lead */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-200 dark:bg-surface dark:border-white/10">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-900 tracking-tight">Add New Live Lead</h3>
-                            <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-900 transition"><XCircle className="w-5 h-5" /></button>
+                            <h3 className="font-display text-xl font-bold text-gray-900 tracking-tight dark:text-white">Add New Live Lead</h3>
+                            <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-900 transition dark:text-slate-500 hover:dark:text-white"><XCircle className="w-5 h-5" /></button>
                         </div>
                         <form onSubmit={handleAddLead} className="space-y-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Full Name</label>
-                                <input required type="text" value={newLead.name} onChange={e => setNewLead({ ...newLead, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition" placeholder="e.g. Rahul Sharma" />
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 dark:text-slate-400">Full Name</label>
+                                <input required type="text" value={newLead.name} onChange={e => setNewLead({ ...newLead, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition dark:border-white/10 dark:bg-surface-muted" placeholder="e.g. Rahul Sharma" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Phone</label>
-                                    <input required type="text" value={newLead.phone} onChange={e => setNewLead({ ...newLead, phone: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition" placeholder="WhatsApp No" />
+                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 dark:text-slate-400">Phone</label>
+                                    <input required type="text" value={newLead.phone} onChange={e => setNewLead({ ...newLead, phone: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition dark:border-white/10 dark:bg-surface-muted" placeholder="WhatsApp No" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Source</label>
-                                    <select value={newLead.source} onChange={e => setNewLead({ ...newLead, source: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition">
+                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 dark:text-slate-400">Source</label>
+                                    <select value={newLead.source} onChange={e => setNewLead({ ...newLead, source: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition dark:border-white/10 dark:bg-surface-muted">
                                         <option>Website</option>
                                         <option>Instagram</option>
                                         <option>Referral</option>
@@ -303,20 +303,20 @@ export const LeadCRM = ({ leads: initialLeads, teacherId }: LeadCRMProps) => {
                                 </div>
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Email Address</label>
-                                <input type="email" value={newLead.email} onChange={e => setNewLead({ ...newLead, email: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition" placeholder="optional@email.com" />
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 dark:text-slate-400">Email Address</label>
+                                <input type="email" value={newLead.email} onChange={e => setNewLead({ ...newLead, email: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition dark:border-white/10 dark:bg-surface-muted" placeholder="optional@email.com" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Course/Batch Interest</label>
-                                <input type="text" value={newLead.courseInterest} onChange={e => setNewLead({ ...newLead, courseInterest: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition" placeholder="e.g. NDA 2026" />
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 dark:text-slate-400">Course/Batch Interest</label>
+                                <input type="text" value={newLead.courseInterest} onChange={e => setNewLead({ ...newLead, courseInterest: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition dark:border-white/10 dark:bg-surface-muted" placeholder="e.g. NDA 2026" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Initial Notes</label>
-                                <textarea rows={2} value={newLead.notes} onChange={e => setNewLead({ ...newLead, notes: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition" placeholder="Add any specific interest or context..." />
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 dark:text-slate-400">Initial Notes</label>
+                                <textarea rows={2} value={newLead.notes} onChange={e => setNewLead({ ...newLead, notes: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition dark:border-white/10 dark:bg-surface-muted" placeholder="Add any specific interest or context..." />
                             </div>
                             <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-6 py-2.5 text-sm text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition">Cancel</button>
-                                <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-xl shadow-indigo-100 transition">Create Lead</button>
+                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-6 py-2.5 text-sm text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition dark:text-slate-400 hover:dark:bg-white/5">Cancel</button>
+                                <button type="submit" className="px-6 py-2.5 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white font-bold rounded-xl text-sm shadow-xl shadow-indigo-100 dark:shadow-none transition">Create Lead</button>
                             </div>
                         </form>
                     </div>

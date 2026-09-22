@@ -201,27 +201,27 @@ export default function ReviewQueueClient() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link href="/admin/question-bank/books" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-indigo-600">
+      <Link href="/admin/question-bank/books" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-indigo-600 dark:text-brand">
         <ArrowLeft className="h-4 w-4" /> Book Ingestion Library
       </Link>
 
       <header className="mb-5">
-        <h1 className="text-2xl font-black text-slate-900">Review queue</h1>
-        <p className="mt-1 text-xs font-bold text-slate-400">
+        <h1 className="font-display text-2xl font-black text-slate-900 dark:text-white">Review queue</h1>
+        <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">
           Every open question the approval gates would reject right now, or that's been flagged by the second review or the automated AI verification pass — riskiest first.
         </p>
       </header>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <select value={bookId} onChange={(e) => setBookId(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+        <select value={bookId} onChange={(e) => setBookId(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-surface dark:border-white/10">
           <option value="">All books</option>
           {books.map((b) => <option key={b.id} value={b.id}>{b.title} · {b.className}</option>)}
         </select>
-        <label className="inline-flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
-          <Search className="h-4 w-4 text-slate-400" />
+        <label className="inline-flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:bg-surface dark:border-white/10">
+          <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search content…" className="w-full min-w-0 outline-none" />
         </label>
-        <button onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+        <button onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Refresh
         </button>
       </div>
@@ -229,22 +229,22 @@ export default function ReviewQueueClient() {
       <div className="mb-5 flex flex-wrap gap-2">
         {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
           <button key={key} onClick={() => setCategory(key)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-black ${category === key ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>
+            className={`rounded-lg px-3 py-1.5 text-xs font-black ${category === key ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'border border-slate-200 dark:border-white/10 bg-white dark:bg-surface text-slate-600 dark:text-slate-400'}`}>
             {label}
           </button>
         ))}
       </div>
 
       {message && (
-        <div className={`mb-5 rounded-xl border px-4 py-3 text-sm font-bold ${message.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
+        <div className={`mb-5 rounded-xl border px-4 py-3 text-sm font-bold ${message.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400' : 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-400'}`}>
           {message.text}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
       ) : filtered.length === 0 ? (
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:bg-surface dark:border-white/10 dark:text-slate-400">
           <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Nothing flagged in this view.
         </div>
       ) : (
@@ -254,29 +254,29 @@ export default function ReviewQueueClient() {
             const busy = busyId === q.id;
             const aiFlagged = q.tags.includes('AI-Verified: Flagged');
             return (
-              <article key={q.id} className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-500">
+              <article key={q.id} className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm dark:bg-surface dark:border-amber-500/30">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
                   <span className="inline-flex items-center gap-1.5">
-                    {aiFlagged ? <Sparkles className="h-3.5 w-3.5 text-indigo-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                    {aiFlagged ? <Sparkles className="h-3.5 w-3.5 text-indigo-500 dark:text-brand" /> : <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                     {q.book ? `${q.book.title} · ` : 'Non-book · '}{q.topic || 'Untopiced'}{q.subTopic ? ` / ${q.subTopic}` : ''}
                     {q.sourcePageStart ? ` · p.${q.sourcePageStart}` : ''}
                   </span>
                   <span className="flex items-center gap-2">
                     {q.risk && (
-                      <span className={`rounded-md px-2 py-0.5 font-black ${q.risk.score < 40 ? 'bg-rose-100 text-rose-700' : q.risk.score < 70 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <span className={`rounded-md px-2 py-0.5 font-black ${q.risk.score < 40 ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' : q.risk.score < 70 ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'}`}>
                         Risk {q.risk.score}
                       </span>
                     )}
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-500">{q.status} · {q.verificationStatus}</span>
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-500 dark:bg-white/5 dark:text-slate-400">{q.status} · {q.verificationStatus}</span>
                   </span>
                 </div>
 
-                <div className="mb-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-800">
+                <div className="mb-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-800 dark:bg-surface-muted dark:text-slate-200">
                   <MathRenderer content={q.content} />
                 </div>
 
                 {q.risk && q.risk.blockers.length > 0 && (
-                  <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+                  <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 dark:bg-rose-500/10 dark:border-rose-500/20">
                     <div className="mb-1 font-black">Would be rejected right now — {q.risk.blockers.length} blocker{q.risk.blockers.length > 1 ? 's' : ''}</div>
                     <ul className="list-disc space-y-1 pl-4">
                       {q.risk.blockers.map((b, i) => <li key={i}>{b}</li>)}
@@ -285,7 +285,7 @@ export default function ReviewQueueClient() {
                 )}
 
                 {note && (
-                  <details className="mb-3 rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs text-amber-900">
+                  <details className="mb-3 rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-500/10">
                     <summary className="cursor-pointer font-black">Evidence &amp; suggested resolution</summary>
                     <pre className="mt-2 whitespace-pre-wrap font-sans">{note}</pre>
                   </details>
@@ -293,21 +293,21 @@ export default function ReviewQueueClient() {
 
                 <div className="mb-3 flex flex-wrap gap-1.5">
                   {q.tags.filter((t) => t.startsWith('Second-Review:') || t.startsWith('AI-Verified:')).map((t) => (
-                    <span key={t} className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-500">{t}</span>
+                    <span key={t} className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-500 dark:bg-surface dark:border-white/10 dark:text-slate-400">{t}</span>
                   ))}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => void resolve(q.id)} disabled={busy}
-                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-black text-emerald-700 disabled:opacity-50">
+                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-black text-emerald-700 disabled:opacity-50 dark:text-emerald-400 dark:bg-emerald-500/10">
                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Mark resolved
                   </button>
                   <button onClick={() => void archive(q.id)} disabled={busy}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />} Archive
                   </button>
                   <button onClick={() => void openHistory(q.id)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50">
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
                     <History className="h-3.5 w-3.5" /> History
                   </button>
                 </div>
@@ -319,7 +319,7 @@ export default function ReviewQueueClient() {
 
       {nextCursor && (
         <div className="mt-5 flex justify-center">
-          <button onClick={() => void loadMore()} disabled={loadingMore} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+          <button onClick={() => void loadMore()} disabled={loadingMore} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
             {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Load more
           </button>
         </div>
@@ -327,29 +327,29 @@ export default function ReviewQueueClient() {
 
       {historyForId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-surface">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2"><History className="h-5 w-5 text-indigo-500" /> Version history</h2>
-              <button onClick={() => setHistoryForId(null)}><X className="h-5 w-5 text-slate-400" /></button>
+              <h2 className="font-display text-lg font-black text-slate-900 flex items-center gap-2 dark:text-white"><History className="h-5 w-5 text-indigo-500 dark:text-brand" /> Version history</h2>
+              <button onClick={() => setHistoryForId(null)}><X className="h-5 w-5 text-slate-400 dark:text-slate-500" /></button>
             </div>
 
             {loadingHistory ? (
-              <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
             ) : historyVersions.length === 0 ? (
-              <p className="text-sm text-slate-500">No prior versions — this question has never had a content edit recorded.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">No prior versions — this question has never had a content edit recorded.</p>
             ) : (
               <div className="space-y-3">
                 {historyVersions.map((v) => (
-                  <div key={v.id} className="rounded-xl border border-slate-200 p-3">
-                    <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-500">
+                  <div key={v.id} className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+                    <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
                       <span>Version {v.version}{v.changeReason ? ` · ${v.changeReason}` : ''}</span>
                       <span>{new Date(v.createdAt).toLocaleString('en-IN')}</span>
                     </div>
-                    <div className="rounded-lg bg-slate-50 p-2.5 text-sm text-slate-800">
+                    <div className="rounded-lg bg-slate-50 p-2.5 text-sm text-slate-800 dark:bg-surface-muted dark:text-slate-200">
                       <MathRenderer content={v.content} />
                     </div>
                     {v.correctAnswer && (
-                      <p className="mt-1.5 text-xs text-slate-500">Answer at this version: <span className="font-bold text-slate-700">{v.correctAnswer}</span></p>
+                      <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Answer at this version: <span className="font-bold text-slate-700 dark:text-slate-300">{v.correctAnswer}</span></p>
                     )}
                   </div>
                 ))}

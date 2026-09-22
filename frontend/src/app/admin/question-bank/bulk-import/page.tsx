@@ -1081,7 +1081,7 @@ export default function BulkImportStudio() {
                     </div>
                     <div className="flex flex-col">
                         <span className="font-black text-[11px] uppercase tracking-[0.2em] leading-none">Back to Admin</span>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Dashboard</span>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1 dark:text-slate-400">Dashboard</span>
                     </div>
                 </Link>
                 <div className="flex items-center gap-3">
@@ -1089,21 +1089,21 @@ export default function BulkImportStudio() {
                         <BookOpen className="w-5 h-5 text-indigo-400" />
                     </div>
                     <div>
-                        <h1 className="text-base font-black text-white tracking-tight">AI Extraction Studio</h1>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Mathpix OCR Â· Bulk Import</p>
+                        <h1 className="font-display text-base font-black text-white tracking-tight">AI Extraction Studio</h1>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold dark:text-slate-400">Mathpix OCR Â· Bulk Import</p>
                     </div>
                 </div>
                 <GlobalMathToolbar />
             </div>
 
             <div className={`${mainTab === 'drafts' || mainTab === 'qa' || mainTab === 'auto' ? 'max-w-[98vw] mx-4' : 'max-w-4xl mx-auto'} mt-10 px-8 w-full pb-20`}>
-                <Link href="/admin/dashboard" className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-semibold">
+                <Link href="/admin/dashboard" className="flex items-center text-blue-600 hover:text-blue-800 mb-6 font-semibold dark:text-blue-400">
                     <ArrowLeft className="w-4 h-4 mr-2"/> Back to Admin Dashboard
                 </Link>
                 {/* Primary tabs */}
                 <div className="flex flex-wrap justify-center gap-2 mb-10 bg-slate-800 p-1.5 rounded-2xl w-fit mx-auto">
                     <Link href="/admin/question-bank/books"
-                        className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-cyan-600/40"
+                        className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-cyan-600/40 dark:text-slate-500"
                         title="Register a book edition, upload its PDF, and confirm its chapter manifest before extracting questions">
                         <BookOpen className="w-4 h-4" /> Book Ingestion
                     </Link>
@@ -1129,7 +1129,7 @@ export default function BulkImportStudio() {
                     <div className="space-y-6">
                         <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-8">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <h3 className="font-display text-xs font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2 dark:text-slate-400">
                                     <Folder className="w-4 h-4 text-indigo-400" /> 1. Select Topic
                                 </h3>
                                 <button 
@@ -1168,8 +1168,8 @@ export default function BulkImportStudio() {
                             <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center mb-6 text-indigo-400 group-hover:scale-110 transition-transform">
                                 <UploadCloud className="w-10 h-10" />
                             </div>
-                            <h3 className="text-xl font-black text-white mb-2">Click to browse or drag and drop a PDF here</h3>
-                            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-2">Local PDF Batch Extraction via Mathpix</p>
+                            <h3 className="font-display text-xl font-black text-white mb-2">Click to browse or drag and drop a PDF here</h3>
+                            <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-2 dark:text-slate-400">Local PDF Batch Extraction via Mathpix</p>
                             <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" accept="application/pdf,image/*" id="pdf-upload" />
                         </div>
                     </div>
@@ -1185,8 +1185,8 @@ export default function BulkImportStudio() {
                             <div className="w-20 h-20 bg-violet-500/10 rounded-3xl flex items-center justify-center mb-6 text-violet-400 group-hover:scale-110 transition-transform">
                                 <FileUp className="w-10 h-10" />
                             </div>
-                            <h3 className="text-xl font-black text-white mb-2">Upload Word Document</h3>
-                            <p className="text-slate-500 font-medium text-sm flex items-center gap-2 mt-1">
+                            <h3 className="font-display text-xl font-black text-white mb-2">Upload Word Document</h3>
+                            <p className="text-slate-500 font-medium text-sm flex items-center gap-2 mt-1 dark:text-slate-400">
                                 <MousePointerClick className="w-4 h-4" /> Click or drag &amp; drop (.docx)
                             </p>
                             <div className="mt-5 flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-2">
@@ -1275,15 +1275,15 @@ export default function BulkImportStudio() {
                                 <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4 text-emerald-400 group-hover:scale-110 transition-transform">
                                     <FileText className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-lg font-black text-white mb-1">Upload Spreadsheet</h3>
-                                <p className="text-slate-500 text-xs font-medium">Click to select .xlsx or .csv file</p>
+                                <h3 className="font-display text-lg font-black text-white mb-1">Upload Spreadsheet</h3>
+                                <p className="text-slate-500 text-xs font-medium dark:text-slate-400">Click to select .xlsx or .csv file</p>
                                 <input ref={excelInputRef} type="file" onChange={handleExcelUpload} className="hidden" accept=".xlsx,.csv" />
                             </div>
 
                             {/* Template Area */}
                             {/* Template Area - Highly Aesthetic Cards */}
                             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col justify-center">
-                                <h3 className="text-xs font-black text-slate-500 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <h3 className="font-display text-xs font-black text-slate-500 mb-6 uppercase tracking-[0.2em] flex items-center gap-2 dark:text-slate-400">
                                     <Clipboard className="w-4 h-4 text-emerald-400" /> Standardized Templates
                                 </h3>
                                 <div className="grid grid-cols-1 gap-4">
@@ -1292,15 +1292,15 @@ export default function BulkImportStudio() {
                                         className="group flex items-center justify-between p-5 bg-gradient-to-br from-indigo-500/10 to-purple-600/5 hover:from-indigo-600 hover:to-purple-700 border border-indigo-500/20 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-indigo-500/20"
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-white dark:bg-slate-800 rounded-xl text-indigo-600 group-hover:scale-110 transition-transform">
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded-xl text-indigo-600 group-hover:scale-110 transition-transform dark:bg-surface dark:text-brand">
                                                 <FileSpreadsheet className="w-5 h-5" />
                                             </div>
                                             <div className="text-left">
                                                 <p className="text-sm font-black text-white group-hover:text-white">Objective (MCQ/MSQ)</p>
-                                                <p className="text-[10px] text-slate-500 group-hover:text-indigo-100 font-bold uppercase tracking-wider">CBSE / JEE Format</p>
+                                                <p className="text-[10px] text-slate-500 group-hover:text-indigo-100 font-bold uppercase tracking-wider dark:text-slate-400">CBSE / JEE Format</p>
                                             </div>
                                         </div>
-                                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-white" />
+                                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-white dark:text-slate-400" />
                                     </button>
 
                                     <button 
@@ -1308,15 +1308,15 @@ export default function BulkImportStudio() {
                                         className="group flex items-center justify-between p-5 bg-gradient-to-br from-emerald-500/10 to-teal-600/5 hover:from-emerald-600 hover:to-teal-700 border border-emerald-500/20 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-emerald-500/20"
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-white dark:bg-slate-800 rounded-xl text-emerald-600 group-hover:scale-110 transition-transform">
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded-xl text-emerald-600 group-hover:scale-110 transition-transform dark:bg-surface dark:text-emerald-400">
                                                 <FileText className="w-5 h-5" />
                                             </div>
                                             <div className="text-left">
                                                 <p className="text-sm font-black text-white group-hover:text-white">Subjective (VSA/SA/LA)</p>
-                                                <p className="text-[10px] text-slate-500 group-hover:text-emerald-100 font-bold uppercase tracking-wider">Theory & Answers</p>
+                                                <p className="text-[10px] text-slate-500 group-hover:text-emerald-100 font-bold uppercase tracking-wider dark:text-slate-400">Theory & Answers</p>
                                             </div>
                                         </div>
-                                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-white" />
+                                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-white dark:text-slate-400" />
                                     </button>
 
                                     <button 
@@ -1324,15 +1324,15 @@ export default function BulkImportStudio() {
                                         className="group flex items-center justify-between p-5 bg-gradient-to-br from-amber-500/10 to-orange-600/5 hover:from-amber-600 hover:to-orange-700 border border-amber-500/20 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-amber-500/20"
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-white dark:bg-slate-800 rounded-xl text-amber-600 group-hover:scale-110 transition-transform">
+                                            <div className="p-3 bg-white dark:bg-slate-800 rounded-xl text-amber-600 group-hover:scale-110 transition-transform dark:bg-surface dark:text-amber-400">
                                                 <BookOpen className="w-5 h-5" />
                                             </div>
                                             <div className="text-left">
                                                 <p className="text-sm font-black text-white group-hover:text-white">Case Study / Passage</p>
-                                                <p className="text-[10px] text-slate-500 group-hover:text-amber-100 font-bold uppercase tracking-wider">Contextual Quests</p>
+                                                <p className="text-[10px] text-slate-500 group-hover:text-amber-100 font-bold uppercase tracking-wider dark:text-slate-400">Contextual Quests</p>
                                             </div>
                                         </div>
-                                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-white" />
+                                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-white dark:text-slate-400" />
                                     </button>
                                 </div>
                             </div>
@@ -1411,7 +1411,7 @@ export default function BulkImportStudio() {
                 {mainTab === 'manual' && (
                     <div className="space-y-6">
                         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                            <h2 className="text-xl font-black text-white flex items-center gap-2">
+                            <h2 className="font-display text-xl font-black text-white flex items-center gap-2">
                                 <PenLine className="w-6 h-6 text-emerald-400" /> Manual Question Entry
                             </h2>
                             <div className="flex items-center gap-4">
@@ -1430,10 +1430,10 @@ export default function BulkImportStudio() {
                         
                         {questions.length === 0 ? (
                             <div className="border-2 border-dashed border-slate-800 bg-slate-900/50 rounded-3xl p-20 flex flex-col items-center justify-center text-center">
-                                <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-4 text-slate-500">
+                                <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-4 text-slate-500 dark:text-slate-400">
                                     <Clipboard className="w-8 h-8" />
                                 </div>
-                                <p className="text-slate-500 font-bold">No items in the creation queue.</p>
+                                <p className="text-slate-500 font-bold dark:text-slate-400">No items in the creation queue.</p>
                                 <button onClick={() => setQuestions([blankQuestion()])} className="mt-4 text-emerald-400 hover:text-emerald-300 font-black text-sm transition-colors">
                                     Click here to start with a blank question â†’
                                 </button>
@@ -1494,11 +1494,11 @@ export default function BulkImportStudio() {
                     <div>
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h2 className="text-lg font-black text-white flex items-center gap-2">
+                                <h2 className="font-display text-lg font-black text-white flex items-center gap-2">
                                     <Clock className="w-5 h-5 text-amber-400" /> Pending Drafts
                                     {!isDraftsLoading && <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">{draftQuestions.length}</span>}
                                 </h2>
-                                <p className="text-[11px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold">Review, edit &amp; publish questions from external imports</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold dark:text-slate-400">Review, edit &amp; publish questions from external imports</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button 
@@ -1565,7 +1565,7 @@ export default function BulkImportStudio() {
                                 {!isDraftsLoading && draftQuestions.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-64 opacity-40 gap-4 bg-slate-900 rounded-3xl border border-slate-800">
                                         <CheckCircle2 className="w-14 h-14 text-emerald-500" />
-                                        <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No pending drafts â€” all clear!</p>
+                                        <p className="text-slate-400 font-black uppercase tracking-widest text-sm dark:text-slate-500">No pending drafts â€” all clear!</p>
                                     </div>
                                 )}
                                 {!isDraftsLoading && draftQuestions.length > 0 && (
@@ -1603,9 +1603,9 @@ export default function BulkImportStudio() {
                     <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6">
                         <div className="flex items-center gap-3 mb-6 flex-wrap">
                             <AlertTriangle className="w-5 h-5 text-red-400" />
-                            <h2 className="text-lg font-black text-white">QA Issues</h2>
+                            <h2 className="font-display text-lg font-black text-white">QA Issues</h2>
                             {!isDraftsLoading && <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">{flaggedDrafts.length}</span>}
-                            <p className="text-slate-400 text-xs font-semibold">Drafts auto-flagged for broken LaTeX, missing answers/options, answer mismatches, or missing data. Fix &amp; save, or delete.</p>
+                            <p className="text-slate-400 text-xs font-semibold dark:text-slate-500">Drafts auto-flagged for broken LaTeX, missing answers/options, answer mismatches, or missing data. Fix &amp; save, or delete.</p>
                         </div>
 
                         {isDraftsLoading && (
@@ -1617,7 +1617,7 @@ export default function BulkImportStudio() {
                         {!isDraftsLoading && flaggedDrafts.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-64 opacity-40 gap-4 bg-slate-900 rounded-3xl border border-slate-800">
                                 <CheckCircle2 className="w-14 h-14 text-emerald-500" />
-                                <p className="text-slate-400 font-black uppercase tracking-widest text-sm">No QA issues â€” all drafts look clean!</p>
+                                <p className="text-slate-400 font-black uppercase tracking-widest text-sm dark:text-slate-500">No QA issues â€” all drafts look clean!</p>
                             </div>
                         )}
                         {!isDraftsLoading && flaggedDrafts.length > 0 && (
@@ -1756,16 +1756,16 @@ function AutoPopulatePanel() {
             <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-8">
                 <div className="flex items-center gap-3 mb-6">
                     <Zap className="w-5 h-5 text-green-400" />
-                    <h2 className="text-lg font-black text-white">Auto-Populate Question Bank</h2>
+                    <h2 className="font-display text-lg font-black text-white">Auto-Populate Question Bank</h2>
                 </div>
-                <p className="text-slate-400 text-xs font-semibold mb-8">
+                <p className="text-slate-400 text-xs font-semibold mb-8 dark:text-slate-500">
                     Auto-fill under-covered topics by scraping NCERT PDFs and/or generating questions via AI.
                     Questions are saved as DRAFT for your review.
                 </p>
 
                 {/* Board Selection */}
                 <div className="mb-6">
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Target Boards</label>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block dark:text-slate-500">Target Boards</label>
                     <div className="flex flex-wrap gap-2">
                         {BOARDS.map(b => (
                             <button key={b} onClick={() => toggleBoard(b)}
@@ -1784,12 +1784,12 @@ function AutoPopulatePanel() {
                 {/* Class Selection */}
                 {selBoards.length > 0 && (
                     <div className="mb-6">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Target Classes</label>
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block dark:text-slate-500">Target Classes</label>
                         <div className="flex flex-wrap gap-2">
                             {loadingClasses ? (
-                                <span className="text-xs text-slate-500 flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Loading...</span>
+                                <span className="text-xs text-slate-500 flex items-center gap-2 dark:text-slate-400"><Loader2 className="w-3 h-3 animate-spin" /> Loading...</span>
                             ) : classes.length === 0 ? (
-                                <span className="text-xs text-slate-500">No classes found</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">No classes found</span>
                             ) : (
                                 classes.map(cls => (
                                     <button key={cls.id} onClick={() => toggleClass(cls.id)}
@@ -1821,8 +1821,8 @@ function AutoPopulatePanel() {
                         {coverageData && (
                             <div className="space-y-2 mt-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Topic Coverage</span>
-                                    <button onClick={() => setCoverageData(null)} className="text-[10px] text-slate-500 hover:text-white">Reset</button>
+                                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest dark:text-slate-500">Topic Coverage</span>
+                                    <button onClick={() => setCoverageData(null)} className="text-[10px] text-slate-500 hover:text-white dark:text-slate-400">Reset</button>
                                 </div>
                                 <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
                                     {coverageData.map((t: any, i: number) => (
@@ -1842,7 +1842,7 @@ function AutoPopulatePanel() {
                 {/* Options */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     <div>
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block">Target per Topic</label>
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block dark:text-slate-500">Target per Topic</label>
                         <input type="number" min={1} max={50} value={targetPerTopic}
                             onChange={e => setTargetPerTopic(Number(e.target.value))}
                             className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-green-500"
@@ -1874,7 +1874,7 @@ function AutoPopulatePanel() {
             {/* Progress & Results */}
             {(progress.length > 0 || results) && (
                 <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6">
-                    <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2">
+                    <h3 className="font-display text-sm font-black text-white mb-4 flex items-center gap-2">
                         <Activity className="w-4 h-4 text-green-400" /> Progress Log
                     </h3>
                     <div className="max-h-80 overflow-y-auto space-y-1 custom-scrollbar font-mono">
@@ -1927,7 +1927,7 @@ function QueuePanelHeader({
                             className={`w-5 h-5 accent-${color}-500 shrink-0 cursor-pointer rounded-lg`} />
                     )}
                     <div>
-                        <h3 className="text-sm font-black text-white flex items-center gap-2">
+                        <h3 className="font-display text-sm font-black text-white flex items-center gap-2">
                             Review Queue <span className={`${bgColors[color]} text-white text-[10px] px-2 py-0.5 rounded-full font-black`}>{count}</span>
                         </h3>
                         {selectedCount > 0 && <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-0.5">{selectedCount} items selected</p>}
@@ -1974,7 +1974,7 @@ function QueuePanelHeader({
             
             {/* Legend */}
             {!hideActions && (
-                <div className="flex items-center gap-6 text-[10px] font-bold uppercase text-slate-500 tracking-widest px-2">
+                <div className="flex items-center gap-6 text-[10px] font-bold uppercase text-slate-500 tracking-widest px-2 dark:text-slate-400">
                     <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-sm" /> NEWLY EXTRACTED</div>
                     <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm animate-pulse" /> SIMILAR QUESTION EXISTS</div>
                 </div>
@@ -2020,17 +2020,17 @@ function QueuePanel({ questions, isExtracting, onUpdate, onUpdateOption, onAddTa
                 <div className="flex items-center gap-2 min-w-0">
                     <input type="checkbox" checked={allSelected} onChange={toggleSelectAll}
                         className="w-4 h-4 accent-indigo-500 shrink-0 cursor-pointer" />
-                    <h3 className="text-sm font-black text-white flex items-center gap-2 truncate">
+                    <h3 className="font-display text-sm font-black text-white flex items-center gap-2 truncate">
                         Queue <span className="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">{questions.length}</span>
                     </h3>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     {/* Right zoom controls */}
                     <div className="flex items-center gap-0.5 bg-slate-800 rounded-lg p-1">
-                        <button onClick={() => setRightZoom(z => Math.max(z - 10, 60))} className="p-1 text-slate-400 hover:text-white"><ZoomOut className="w-3 h-3" /></button>
-                        <span className="text-[9px] font-black text-slate-500 w-6 text-center">{rightZoom}%</span>
-                        <button onClick={() => setRightZoom(z => Math.min(z + 10, 140))} className="p-1 text-slate-400 hover:text-white"><ZoomIn className="w-3 h-3" /></button>
-                        <button onClick={() => setRightZoom(() => 100)} className="text-[9px] font-black px-1 text-slate-400 hover:text-white">FIT</button>
+                        <button onClick={() => setRightZoom(z => Math.max(z - 10, 60))} className="p-1 text-slate-400 hover:text-white dark:text-slate-500"><ZoomOut className="w-3 h-3" /></button>
+                        <span className="text-[9px] font-black text-slate-500 w-6 text-center dark:text-slate-400">{rightZoom}%</span>
+                        <button onClick={() => setRightZoom(z => Math.min(z + 10, 140))} className="p-1 text-slate-400 hover:text-white dark:text-slate-500"><ZoomIn className="w-3 h-3" /></button>
+                        <button onClick={() => setRightZoom(() => 100)} className="text-[9px] font-black px-1 text-slate-400 hover:text-white dark:text-slate-500">FIT</button>
                     </div>
                     <button onClick={onAddBlank}
                         className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all">
@@ -2054,14 +2054,14 @@ function QueuePanel({ questions, isExtracting, onUpdate, onUpdateOption, onAddTa
             <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
                 {isExtracting && questions.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 gap-4">
-                        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+                        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin dark:text-brand" />
                         <p className="text-indigo-400 text-sm font-black uppercase tracking-widest">Mathpix OCR + AI Structuring...</p>
                     </div>
                 )}
                 {!isExtracting && questions.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 opacity-30 gap-4">
-                        <Target className="w-14 h-14 text-slate-600" />
-                        <p className="text-slate-500 font-black uppercase tracking-widest text-sm">Queue Empty â€” Extract a page or add manually</p>
+                        <Target className="w-14 h-14 text-slate-600 dark:text-slate-400" />
+                        <p className="text-slate-500 font-black uppercase tracking-widest text-sm dark:text-slate-400">Queue Empty â€” Extract a page or add manually</p>
                     </div>
                 )}
                 {questions.map((q, idx) => (
@@ -2074,7 +2074,7 @@ function QueuePanel({ questions, isExtracting, onUpdate, onUpdateOption, onAddTa
                 ))}
                 {isExtracting && questions.length > 0 && (
                     <div className="flex items-center justify-center gap-3 p-4 bg-slate-900 rounded-2xl border border-slate-800">
-                        <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
+                        <Loader2 className="w-4 h-4 text-indigo-500 animate-spin dark:text-brand" />
                         <p className="text-indigo-400 text-xs font-black uppercase tracking-widest">Processing next page...</p>
                     </div>
                 )}
@@ -2211,7 +2211,7 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
                 <div className="flex items-center gap-2 min-w-0">
                     {sourceViewMode === 'pdf' ? <Image className={`w-4 h-4 ${tc} shrink-0`} /> : <FileText className={`w-4 h-4 ${tc} shrink-0`} />}
                     <span className={`text-sm font-black ${tc} uppercase tracking-widest truncate`}>{titleLabel}</span>
-                    {sourceViewMode !== 'pdf' && <span className="text-[10px] text-slate-500 font-bold shrink-0">({displayText.length.toLocaleString()} chars)</span>}
+                    {sourceViewMode !== 'pdf' && <span className="text-[10px] text-slate-500 font-bold shrink-0 dark:text-slate-400">({displayText.length.toLocaleString()} chars)</span>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     {hasPdf && (
@@ -2255,7 +2255,7 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
                         className="flex-1 bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-yellow-500/50"
                     />
                     {matches.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 shrink-0">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 shrink-0 dark:text-slate-500">
                             <span>{currentMatch + 1}/{matches.length}</span>
                             <button onClick={() => goToMatch(-1)}
                                 className="p-1 hover:bg-slate-700 rounded transition-colors">
@@ -2273,7 +2273,7 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
                     {searchQuery && (
                         <button onClick={() => { setSearchQuery(''); setCurrentMatch(0); }}
                             className="p-1 hover:bg-slate-700 rounded transition-colors shrink-0">
-                            <X className="w-3 h-3 text-slate-400" />
+                            <X className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                         </button>
                     )}
                 </div>
@@ -2287,7 +2287,7 @@ function SourcePanel({ rawMarkdown, fullRawText, sourceViewMode, setSourceViewMo
                         </div>
                     ) : (
                         <div className="flex items-center justify-center h-full">
-                            <Loader2 className="w-8 h-8 text-slate-500 animate-spin" />
+                            <Loader2 className="w-8 h-8 text-slate-500 animate-spin dark:text-slate-400" />
                         </div>
                     )
                 ) : sourceViewMode === 'raw' ? (
@@ -2389,7 +2389,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                         <span className="text-[10px] font-black text-red-400 uppercase tracking-widest flex items-center gap-2">
                             <FileText className="w-3.5 h-3.5" /> Existing Question in Database
                         </span>
-                        <span className="text-[9px] text-slate-500 font-mono">Match: {q.duplicateMatchData.similarity}% ({q.duplicateMatchData.matchType})</span>
+                        <span className="text-[9px] text-slate-500 font-mono dark:text-slate-400">Match: {q.duplicateMatchData.similarity}% ({q.duplicateMatchData.matchType})</span>
                     </div>
                     <div className="p-4 space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
                         <div className="flex flex-wrap gap-1.5">
@@ -2414,7 +2414,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                             )}
                         </div>
                         <div className="bg-slate-800/50 rounded-xl p-3 text-sm text-slate-200">
-                            <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-2">Question:</div>
+                            <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-2 dark:text-slate-400">Question:</div>
                             <MathRenderer content={q.duplicateMatchData.content} />
                         </div>
                         {q.duplicateMatchData.options && q.duplicateMatchData.options.length > 0 && q.duplicateMatchData.options.some((o: string) => o.trim()) && (
@@ -2423,7 +2423,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                                     const letter = String.fromCharCode(65 + oi);
                                     return opt.trim() ? (
                                         <div key={oi} className="flex items-start gap-2 p-2 rounded-lg text-xs bg-slate-800/30">
-                                            <span className="font-bold shrink-0 text-slate-400">{letter}.</span>
+                                            <span className="font-bold shrink-0 text-slate-400 dark:text-slate-500">{letter}.</span>
                                             <MathRenderer content={opt} />
                                         </div>
                                     ) : null;
@@ -2441,7 +2441,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                         {q.duplicateMatchData.tags && q.duplicateMatchData.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                                 {q.duplicateMatchData.tags.map((t: string) => (
-                                    <span key={t} className="px-2 py-0.5 text-[9px] rounded-full bg-slate-800 text-slate-400 border border-slate-700">{t}</span>
+                                    <span key={t} className="px-2 py-0.5 text-[9px] rounded-full bg-slate-800 text-slate-400 border border-slate-700 dark:text-slate-500">{t}</span>
                                 ))}
                             </div>
                         )}
@@ -2466,7 +2466,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                                     ? q.duplicateOf.content.substring(0, 500) + '...'
                                     : q.duplicateOf.content}
                             </p>
-                            <p className="text-[10px] text-slate-500 font-mono">
+                            <p className="text-[10px] text-slate-500 font-mono dark:text-slate-400">
                                 ID: {q.duplicateOf.id} | Status: {q.duplicateOf.status}
                             </p>
                         </div>
@@ -2546,7 +2546,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                                         <Clipboard className="w-3 h-3" /> Copy LaTeX
                                     </button>
                                 </div>
-                                <div className="bg-white rounded-xl p-4 text-sm text-slate-900 shadow-xl max-h-[300px] overflow-y-auto">
+                                <div className="bg-white rounded-xl p-4 text-sm text-slate-900 shadow-xl max-h-[300px] overflow-y-auto dark:bg-surface dark:text-white">
                                     <MathRenderer content={q.content || '*(empty content)*'} />
                                 </div>
                             </div>
@@ -2558,7 +2558,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
             {/* VIEW MODE: clean math preview */}
             {!editing && (
                 <div className={`p-4 space-y-3 ${isDup ? 'line-through opacity-60' : ''}`}>
-                    <div className="bg-white rounded-2xl p-4 text-sm text-slate-900 shadow-inner">
+                    <div className="bg-white rounded-2xl p-4 text-sm text-slate-900 shadow-inner dark:bg-surface dark:text-white">
                         <MathRenderer content={q.content || '*(empty)*'} />
                     </div>
                     {q.options.some(o => o.trim()) && (
@@ -2620,7 +2620,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                             { label: 'Class', field: 'classLevel' as const, opts: [['Class 12', 'Class 12'], ['Class 11', 'Class 11'], ['NDA', 'NDA']] },
                         ].map(({ label, field, opts }) => (
                             <div key={field}>
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">{label}</label>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1 dark:text-slate-400">{label}</label>
                                 <select value={(q as any)[field]} onChange={e => onUpdate(q.id, field, e.target.value)}
                                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-300 outline-none focus:border-indigo-500 font-semibold">
                                     {opts.map(([val, lbl]) => <option key={val} value={val} className="bg-slate-800">{lbl}</option>)}
@@ -2631,7 +2631,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
 
                     {/* Tags section */}
                     <div>
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Tags</label>
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2 dark:text-slate-400">Tags</label>
                         <div className="flex flex-wrap gap-1 items-center">
                             {q.tags.map(tag => (
                                 <span key={tag} className="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 group">
@@ -2668,7 +2668,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                             <div className="flex gap-1 ml-2">
                                 {['Board', 'NDA', 'JEE', 'MCQ'].map(t => (
                                     <button key={t} onClick={() => !q.tags.includes(t) && onUpdate(q.id, 'tags', [...q.tags, t])}
-                                        className="bg-slate-800 hover:bg-slate-700 text-slate-500 hover:text-indigo-300 px-1.5 py-0.5 rounded text-[8px] font-black transition-all border border-slate-700">
+                                        className="bg-slate-800 hover:bg-slate-700 text-slate-500 hover:text-indigo-300 px-1.5 py-0.5 rounded text-[8px] font-black transition-all border border-slate-700 dark:text-slate-400">
                                         +{t}
                                     </button>
                                 ))}
@@ -2681,7 +2681,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                     <FieldRow label="Problem Statement" value={q.content} onChange={v => onUpdate(q.id, 'content', v)} rows={4} tags={q.tags} />
                     
                     <div>
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Answer Options</label>
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2 dark:text-slate-400">Answer Options</label>
                         {['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'ASSERTION_REASONING'].includes(q.type) && (
                             <div className="grid grid-cols-2 gap-3">
                                 {q.options.map((opt, oIdx) => {
@@ -2721,14 +2721,14 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
 
                     <div className="grid grid-cols-4 gap-4">
                         <div className="col-span-1 space-y-1">
-                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Answer Key</label>
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block dark:text-slate-400">Answer Key</label>
                             <input value={q.correctAnswer} onChange={e => onUpdate(q.id, 'correctAnswer', e.target.value.toUpperCase())}
                                 placeholder={q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE' ? 'A' : 'Ans'}
                                 className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl py-3 text-sm text-center text-indigo-400 font-black outline-none focus:border-indigo-500 transition-colors" />
                         </div>
                         <div className="col-span-3">
                             <div className="flex items-center justify-between mb-1">
-                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Explanation</label>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest dark:text-slate-400">Explanation</label>
                                 <button
                                     title="Paste from clipboard"
                                     onClick={async () => {
@@ -2737,7 +2737,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                                             onUpdate(q.id, 'explanation', text);
                                         } catch {}
                                     }}
-                                    className="flex items-center gap-1 text-slate-600 hover:text-indigo-400 text-[9px] font-black uppercase tracking-widest transition-all">
+                                    className="flex items-center gap-1 text-slate-600 hover:text-indigo-400 text-[9px] font-black uppercase tracking-widest transition-all dark:text-slate-400">
                                     <Clipboard className="w-3 h-3" /> Quick Paste
                                 </button>
                             </div>
@@ -2767,11 +2767,11 @@ function FieldRow({ label, value, onChange, rows, compact, tags }: {
 }) {
     return (
         <div className={compact ? '' : 'space-y-1'}>
-            {label && <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">{label}</label>}
+            {label && <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block dark:text-slate-400">{label}</label>}
             <div className="grid grid-cols-2 gap-2">
                 <textarea value={value} onChange={e => onChange(e.target.value)} rows={rows} placeholder="LaTeX source..."
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs font-mono text-slate-300 resize-none outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all custom-scrollbar" />
-                <div className="bg-white rounded-xl p-3 text-xs text-slate-900 overflow-auto select-text border border-slate-200"
+                <div className="bg-white rounded-xl p-3 text-xs text-slate-900 overflow-auto select-text border border-slate-200 dark:bg-surface dark:border-white/10 dark:text-white"
                     style={{ minHeight: `${rows * 1.75}rem` }}>
                     <MathRenderer content={value || '*(empty)*'} />
                     {tags && <QuestionTags tags={tags} />}

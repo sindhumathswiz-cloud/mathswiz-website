@@ -304,7 +304,7 @@ export default function KnowledgeBasePage() {
                 {!activeFolder && (
                     <button 
                         onClick={() => setIsCreatingFolder(true)}
-                        className="bg-indigo-600 hover:bg-slate-900 text-white font-black px-6 py-4 rounded-3xl shadow-xl shadow-indigo-100 flex items-center gap-2 transition-all hover:scale-[1.02]"
+                        className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white font-black px-6 py-4 rounded-3xl shadow-xl shadow-indigo-100 dark:shadow-none flex items-center gap-2 transition-all hover:scale-[1.02]"
                     >
                         <Plus className="w-5 h-5" />
                         New Topic Folder
@@ -325,25 +325,25 @@ export default function KnowledgeBasePage() {
                                 key={folder.id}
                                 whileHover={{ scale: 1.02 }}
                                 onClick={() => { setActiveFolder(folder); fetchFolderDetail(folder.id); }}
-                                className="group relative bg-white border-2 border-slate-100 p-8 rounded-[2.5rem] cursor-pointer hover:border-indigo-200 hover:shadow-2xl hover:shadow-indigo-50 transition-all"
+                                className="group relative bg-white dark:bg-surface border-2 border-slate-100 dark:border-white/10 p-8 rounded-[2.5rem] cursor-pointer hover:border-indigo-200 dark:hover:border-brand/40 hover:shadow-2xl hover:shadow-indigo-50 dark:hover:shadow-none transition-all"
                             >
-                                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-50 transition-colors">
-                                    <Folder className="w-8 h-8 text-slate-400 group-hover:text-indigo-600" />
+                                <div className="w-16 h-16 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-50 dark:group-hover:bg-brand/10 transition-colors">
+                                    <Folder className="w-8 h-8 text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-brand" />
                                 </div>
                                 <div className="flex items-center justify-between gap-2 mb-2">
-                                    <h3 className="text-xl font-black text-slate-900 truncate">{folder.topicName}</h3>
-                                    <button 
+                                    <h3 className="font-display text-xl font-black text-slate-900 dark:text-white truncate">{folder.topicName}</h3>
+                                    <button
                                         onClick={(e) => { e.stopPropagation(); handleRenameFolder(folder.id, folder.topicName); }}
-                                        className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                        className="p-2 text-slate-300 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-brand hover:bg-indigo-50 dark:hover:bg-brand/10 rounded-lg transition-all"
                                     >
                                         ✏️
                                     </button>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-white/5 px-3 py-1 rounded-full group-hover:bg-indigo-50 dark:group-hover:bg-brand/10 group-hover:text-indigo-600 dark:group-hover:text-brand transition-all">
                                         {folder._count?.documents || 0} Documents
                                     </span>
-                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full">
+                                    <span className="text-[10px] font-black text-emerald-500 dark:text-emerald-400 uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-full">
                                         Active
                                     </span>
                                 </div>
@@ -359,8 +359,8 @@ export default function KnowledgeBasePage() {
                                 <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
                                     <BookOpen className="w-10 h-10 text-slate-300" />
                                 </div>
-                                <h2 className="text-2xl font-black text-slate-900 mb-2">No Training Folders Yet</h2>
-                                <p className="text-slate-400 font-medium">Create your first topic folder to start training the AI generator.</p>
+                                <h2 className="font-display text-2xl font-black text-slate-900 dark:text-white mb-2">No Training Folders Yet</h2>
+                                <p className="text-slate-400 dark:text-slate-500 font-medium">Create your first topic folder to start training the AI generator.</p>
                             </div>
                         )}
                     </motion.div>
@@ -425,28 +425,28 @@ export default function KnowledgeBasePage() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div className="lg:col-span-2 space-y-6">
-                                <section className="bg-white border-2 border-slate-100 p-10 rounded-[3rem] shadow-sm">
+                                <section className="bg-white dark:bg-surface border-2 border-slate-100 dark:border-white/10 p-10 rounded-[3rem] shadow-sm">
                                     <div className="flex items-center justify-between mb-8">
-                                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                                            <Upload className="w-6 h-6 text-indigo-600" />
+                                        <h3 className="font-display text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                                            <Upload className="w-6 h-6 text-indigo-600 dark:text-brand" />
                                             Universal Trainer
                                         </h3>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <label className="group relative border-2 border-dashed border-slate-100 p-8 rounded-3xl hover:border-indigo-400 hover:bg-indigo-50/30 transition-all cursor-pointer flex flex-col items-center text-center">
-                                            <input 
-                                                type="file" 
-                                                multiple 
-                                                className="hidden" 
+                                        <label className="group relative border-2 border-dashed border-slate-100 dark:border-white/10 p-8 rounded-3xl hover:border-indigo-400 dark:hover:border-brand hover:bg-indigo-50/30 dark:hover:bg-brand/10 transition-all cursor-pointer flex flex-col items-center text-center">
+                                            <input
+                                                type="file"
+                                                multiple
+                                                className="hidden"
                                                 onChange={(e) => handleFileUpload(e.target.files)}
                                                 accept=".pdf,.docx,.jpg,.jpeg,.png"
                                             />
-                                            <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
-                                                <Upload className="w-6 h-6 text-slate-400 group-hover:text-indigo-600" />
+                                            <div className="w-12 h-12 bg-slate-50 dark:bg-white/5 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-100 dark:group-hover:bg-brand/10 transition-colors">
+                                                <Upload className="w-6 h-6 text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-brand" />
                                             </div>
-                                            <p className="text-sm font-black text-slate-900 mb-1 leading-none">Drop Files Here</p>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">PDF, DOCX, or IMAGES</p>
+                                            <p className="text-sm font-black text-slate-900 dark:text-white mb-1 leading-none">Drop Files Here</p>
+                                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tighter mt-1">PDF, DOCX, or IMAGES</p>
                                         </label>
 
                                         <div className="space-y-4">
@@ -492,12 +492,12 @@ export default function KnowledgeBasePage() {
                                 </section>
 
                                 <div className="space-y-4">
-                                    <h3 className="text-xl font-black text-slate-900 tracking-tight">📜 Training Sources ({activeFolder.documents?.length || 0})</h3>
+                                    <h3 className="font-display text-xl font-black text-slate-900 dark:text-white tracking-tight">📜 Training Sources ({activeFolder.documents?.length || 0})</h3>
                                     <div className="grid grid-cols-1 gap-3">
                                         {activeFolder.documents?.map((doc) => (
-                                            <div key={doc.id} className="bg-white border border-slate-100 p-5 rounded-2xl flex items-center justify-between group hover:shadow-lg transition-all">
+                                            <div key={doc.id} className="bg-white dark:bg-surface border border-slate-100 dark:border-white/10 p-5 rounded-2xl flex items-center justify-between group hover:shadow-lg transition-all">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="p-3 bg-slate-50 rounded-xl text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                                    <div className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl text-slate-400 dark:text-slate-500 group-hover:bg-indigo-50 dark:group-hover:bg-brand/10 group-hover:text-indigo-600 dark:group-hover:text-brand transition-colors">
                                                         {doc.sourceType === 'PDF' && <FileText className="w-5 h-5" />}
                                                         {doc.sourceType === 'URL' && <Globe className="w-5 h-5" />}
                                                         {doc.sourceType === 'YOUTUBE' && <Youtube className="w-5 h-5" />}
@@ -505,19 +505,19 @@ export default function KnowledgeBasePage() {
                                                         {doc.sourceType === 'IMAGE' && <FileType className="w-5 h-5" />}
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-black text-slate-900 text-sm truncate max-w-md">{doc.title}</h4>
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                        <h4 className="font-black text-slate-900 dark:text-white text-sm truncate max-w-md">{doc.title}</h4>
+                                                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                                                             Trained on {new Date(doc.createdAt).toLocaleDateString()}
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <button 
+                                                <button
                                                     onClick={async () => {
                                                         if (!confirm("Remove this source?")) return;
                                                         await fetch(`/api/teacher/knowledge/documents/${doc.id}`, { method: 'DELETE' });
                                                         fetchFolderDetail(activeFolder.id);
                                                     }}
-                                                    className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                                    className="p-3 text-slate-200 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all"
                                                 >
                                                     <Trash2 className="w-5 h-5" />
                                                 </button>
@@ -545,13 +545,13 @@ export default function KnowledgeBasePage() {
             <AnimatePresence>
                 {isCreatingFolder && (
                     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white p-12 rounded-[3.5rem] w-full max-w-md shadow-2xl border border-white">
-                            <h2 className="text-3xl font-black text-slate-900 mb-2">New Topic</h2>
-                            <p className="text-slate-400 font-bold mb-8">Group your school notes and URLs into a specialized AI training library.</p>
-                            <input autoFocus type="text" placeholder="e.g. Calculus: Limits" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 rounded-3xl p-6 font-bold text-slate-900 focus:outline-none focus:border-indigo-400 focus:bg-white mb-8" />
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-surface p-12 rounded-[3.5rem] w-full max-w-md shadow-2xl border border-white dark:border-white/10">
+                            <h2 className="font-display text-3xl font-black text-slate-900 dark:text-white mb-2">New Topic</h2>
+                            <p className="text-slate-400 dark:text-slate-500 font-bold mb-8">Group your school notes and URLs into a specialized AI training library.</p>
+                            <input autoFocus type="text" placeholder="e.g. Calculus: Limits" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-50 dark:border-white/10 rounded-3xl p-6 font-bold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-400 dark:focus:border-brand focus:bg-white dark:focus:bg-white/10 mb-8" />
                             <div className="flex gap-4">
-                                <button onClick={() => setIsCreatingFolder(false)} className="flex-1 py-5 text-slate-400 font-black">Cancel</button>
-                                <button disabled={!newTopicName.trim()} onClick={createFolder} className="flex-1 py-5 bg-slate-900 text-white rounded-3xl font-black shadow-xl disabled:opacity-30">Create</button>
+                                <button onClick={() => setIsCreatingFolder(false)} className="flex-1 py-5 text-slate-400 dark:text-slate-400 font-black">Cancel</button>
+                                <button disabled={!newTopicName.trim()} onClick={createFolder} className="flex-1 py-5 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white rounded-3xl font-black shadow-xl disabled:opacity-30">Create</button>
                             </div>
                         </motion.div>
                     </div>
@@ -562,28 +562,28 @@ export default function KnowledgeBasePage() {
             <AnimatePresence>
                 {isGenModalOpen && activeFolder && (
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl z-[60] flex items-center justify-center p-4">
-                        <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white p-16 rounded-[4rem] w-full max-w-2xl shadow-2xl relative">
-                            <button onClick={() => setIsGenModalOpen(false)} className="absolute top-10 right-10 p-3 hover:bg-slate-50 rounded-2xl transition"><X className="w-6 h-6 text-slate-400" /></button>
-                            <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-8">Mass Quiz Builder</h2>
+                        <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white dark:bg-surface p-16 rounded-[4rem] w-full max-w-2xl shadow-2xl relative">
+                            <button onClick={() => setIsGenModalOpen(false)} className="absolute top-10 right-10 p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl transition"><X className="w-6 h-6 text-slate-400 dark:text-slate-500" /></button>
+                            <h2 className="font-display text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-8">Mass Quiz Builder</h2>
                             <div className="grid grid-cols-2 gap-10">
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-4">How many?</label>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-4">How many?</label>
                                     <div className="flex items-center gap-4">
-                                        <button onClick={() => setGenConfig({...genConfig, count: Math.max(1, genConfig.count - 1)})} className="w-12 h-12 bg-slate-50 rounded-xl font-black text-xl hover:bg-indigo-50">-</button>
-                                        <span className="text-3xl font-black w-10 text-center">{genConfig.count}</span>
-                                        <button onClick={() => setGenConfig({...genConfig, count: Math.min(20, genConfig.count + 1)})} className="w-12 h-12 bg-slate-50 rounded-xl font-black text-xl hover:bg-indigo-50">+</button>
+                                        <button onClick={() => setGenConfig({...genConfig, count: Math.max(1, genConfig.count - 1)})} className="w-12 h-12 bg-slate-50 dark:bg-white/5 dark:text-white rounded-xl font-black text-xl hover:bg-indigo-50 dark:hover:bg-brand/10">-</button>
+                                        <span className="text-3xl font-black w-10 text-center dark:text-white">{genConfig.count}</span>
+                                        <button onClick={() => setGenConfig({...genConfig, count: Math.min(20, genConfig.count + 1)})} className="w-12 h-12 bg-slate-50 dark:bg-white/5 dark:text-white rounded-xl font-black text-xl hover:bg-indigo-50 dark:hover:bg-brand/10">+</button>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-4">Difficulty</label>
+                                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-4">Difficulty</label>
                                     <div className="flex flex-wrap gap-2">
                                         {['EASY', 'MEDIUM', 'HARD'].map(d => (
-                                            <button key={d} onClick={() => setGenConfig({...genConfig, difficulties: [d]})} className={`px-6 py-3 rounded-2xl text-[10px] font-black transition-all ${genConfig.difficulties.includes(d) ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-400'}`}>{d}</button>
+                                            <button key={d} onClick={() => setGenConfig({...genConfig, difficulties: [d]})} className={`px-6 py-3 rounded-2xl text-[10px] font-black transition-all ${genConfig.difficulties.includes(d) ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-slate-50 dark:bg-white/5 text-slate-400 dark:text-slate-500'}`}>{d}</button>
                                         ))}
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={handleGenerateQuestions} disabled={isGenerating} className="w-full mt-12 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-6 rounded-[2rem] shadow-2xl flex items-center justify-center gap-3 transition-all disabled:opacity-50">
+                            <button onClick={handleGenerateQuestions} disabled={isGenerating} className="w-full mt-12 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white font-black py-6 rounded-[2rem] shadow-2xl flex items-center justify-center gap-3 transition-all disabled:opacity-50">
                                 {isGenerating ? <><Loader2 className="w-5 h-5 animate-spin" /> Training...</> : <><Sparkles className="w-5 h-5" /> Execute Generation</>}
                             </button>
                         </motion.div>

@@ -14,18 +14,18 @@ const montserrat = Montserrat({ subsets: ['latin'], weight: '800' });
 
 const StatusBadge = ({ status }: { status: string }) => {
     switch (status) {
-        case 'DRAFT': return <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit"><SplitSquareHorizontal className="w-3 h-3" /> Draft (Untested)</span>;
-        case 'PENDING_REVIEW': return <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> Review Pending</span>;
-        case 'APPROVED': return <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit"><CheckCircle className="w-3 h-3" /> Approved DB</span>;
-        case 'REPORTED': return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit"><AlertCircle className="w-3 h-3" /> Requires Edits</span>;
-        default: return <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold">{status}</span>;
+        case 'DRAFT': return <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit dark:text-brand dark:bg-brand/15"><SplitSquareHorizontal className="w-3 h-3" /> Draft (Untested)</span>;
+        case 'PENDING_REVIEW': return <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit dark:text-amber-400 dark:bg-amber-500/10"><Clock className="w-3 h-3" /> Review Pending</span>;
+        case 'APPROVED': return <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit dark:text-emerald-400 dark:bg-emerald-500/10"><CheckCircle className="w-3 h-3" /> Approved DB</span>;
+        case 'REPORTED': return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit dark:text-red-400 dark:bg-red-500/10"><AlertCircle className="w-3 h-3" /> Requires Edits</span>;
+        default: return <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold dark:bg-white/5 dark:text-slate-300">{status}</span>;
     }
 };
 
 const ScopeBadge = ({ scope }: { scope: string }) => {
     switch (scope) {
-        case 'PUBLIC': return <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit"><Shield className="w-3 h-3" /> Public</span>;
-        case 'TEACHER_PRIVATE': return <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit"><Users className="w-3 h-3" /> Teacher</span>;
+        case 'PUBLIC': return <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit dark:text-blue-400 dark:bg-blue-500/10"><Shield className="w-3 h-3" /> Public</span>;
+        case 'TEACHER_PRIVATE': return <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit dark:text-purple-400 dark:bg-purple-500/10"><Users className="w-3 h-3" /> Teacher</span>;
         default: return null;
     }
 };
@@ -205,16 +205,16 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
 
     return (
         <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden dark:bg-surface dark:border-white/10">
 
             {/* Filters */}
-            <div className="p-6 border-b border-gray-100 flex flex-wrap gap-4 items-center bg-gray-50">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2 mr-4">
-                    <Database className="w-5 h-5 text-indigo-600" /> Question Ledger
+            <div className="p-6 border-b border-gray-100 flex flex-wrap gap-4 items-center bg-gray-50 dark:border-white/10 dark:bg-surface-muted">
+                <h2 className="font-display text-xl font-bold text-gray-900 flex items-center gap-2 mr-4 dark:text-white">
+                    <Database className="w-5 h-5 text-indigo-600 dark:text-brand" /> Question Ledger
                 </h2>
 
                 {/* Status Filter */}
-                <div className="flex rounded-lg overflow-hidden border border-gray-300 shadow-sm">
+                <div className="flex rounded-lg overflow-hidden border border-gray-300 shadow-sm dark:border-white/10">
                     {(['DRAFT', 'PENDING_REVIEW', 'REPORTED', 'APPROVED', 'ALL'] as const).map((status) => (
                         <button
                             key={status}
@@ -227,12 +227,12 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                 </div>
 
                 {/* Scope Filter */}
-                <div className="flex rounded-lg overflow-hidden border border-gray-300 shadow-sm">
+                <div className="flex rounded-lg overflow-hidden border border-gray-300 shadow-sm dark:border-white/10">
                     {(['PUBLIC', 'TEACHER_PRIVATE', 'ALL'] as const).map((scope) => (
                         <button
                             key={scope}
                             onClick={() => setFilterScope(scope)}
-                            className={`px-4 py-2 text-sm font-bold ${filterScope === scope ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                            className={`px-4 py-2 text-sm font-bold ${filterScope === scope ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-white dark:bg-surface text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}
                         >
                             {scope === 'ALL' ? 'All Scopes' : scope === 'PUBLIC' ? 'Public' : 'Teacher'}
                         </button>
@@ -251,7 +251,7 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
 
                 <Link
                     href="/admin/question-bank/bulk-import"
-                    className="ml-3 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2"
+                    className="ml-3 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2"
                 >
                     <SplitSquareHorizontal className="w-4 h-4" /> Bulk Extraction
                 </Link>
@@ -260,20 +260,20 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
             {/* Content Studio Logic Container */}
             <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-gray-200 min-h-[600px]">
                 {/* Left Pane: Table/List */}
-                <div className="lg:col-span-1 border-r border-gray-200 overflow-y-auto max-h-[600px] bg-gray-50/50">
+                <div className="lg:col-span-1 border-r border-gray-200 overflow-y-auto max-h-[600px] bg-gray-50/50 dark:border-white/10 dark:bg-surface-muted">
                     {isLoading ? (
-                        <div className="p-12 text-center text-gray-500">Scanning Ledger...</div>
+                        <div className="p-12 text-center text-gray-500 dark:text-slate-400">Scanning Ledger...</div>
                     ) : filteredQuestions.length === 0 ? (
                         <div className="p-12 text-center h-full flex flex-col items-center justify-center">
                             <CheckCircle className="w-12 h-12 text-emerald-300 mb-4" />
-                            <h3 className="text-lg font-bold text-gray-500 mb-2">QA Queue Clear!</h3>
+                            <h3 className="font-display text-lg font-bold text-gray-500 mb-2 dark:text-slate-400">QA Queue Clear!</h3>
                         </div>
                     ) : (
                         <div className="divide-y divide-gray-100">
                             {filteredQuestions.map((q) => (
                                 <div
                                     key={q.id}
-                                    className={`p-4 cursor-pointer transition flex gap-3 ${selectedQuestion?.id === q.id ? 'bg-indigo-50 border-l-4 border-indigo-600' : 'hover:bg-white'}`}
+                                    className={`p-4 cursor-pointer transition flex gap-3 ${selectedQuestion?.id === q.id ? 'bg-indigo-50 dark:bg-brand/10 border-l-4 border-indigo-600 dark:border-brand' : 'hover:bg-white dark:hover:bg-white/5'}`}
                                     onClick={() => setSelectedQuestion(q)}
                                 >
                                     <input 
@@ -291,7 +291,7 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                             <StatusBadge status={q.status} />
                                             {q.scope && <ScopeBadge scope={q.scope} />}
                                         </div>
-                                        <div className="text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed">
+                                        <div className="text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed dark:text-white">
                                             <LatexInline content={q.content} />
                                         </div>
                                     </div>
@@ -302,16 +302,16 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                 </div>
 
                 {/* Right Pane: Detailed QA View */}
-                <div className="lg:col-span-2 bg-white p-8">
+                <div className="lg:col-span-2 bg-white p-8 dark:bg-surface">
                     {selectedQuestion ? (
                         <div className="h-full flex flex-col">
                             <div className="flex justify-between items-start mb-6 border-b pb-6">
-                                <h3 className="text-2xl font-bold text-gray-900 border-l-4 border-indigo-600 pl-3">Content Review</h3>
+                                <h3 className="font-display text-2xl font-bold text-gray-900 border-l-4 border-indigo-600 pl-3 dark:text-white">Content Review</h3>
                                 <div className="flex gap-2">
                                     {selectedQuestion.originalRawText && (
                                         <button 
                                             onClick={() => setIsSplitView(!isSplitView)}
-                                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all border ${isSplitView ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white border-gray-200 text-gray-600'}`}
+                                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all border ${isSplitView ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white border-indigo-500' : 'bg-white dark:bg-surface border-gray-200 dark:border-white/10 text-gray-600 dark:text-slate-400'}`}
                                         >
                                             <SplitSquareHorizontal className="w-4 h-4 inline mr-2" />
                                             {isSplitView ? 'Exit Split View' : 'Compare Source (OCR)'}
@@ -319,14 +319,14 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                     )}
                                     {!isEditing ? (
                                         <>
-                                            <button onClick={() => setIsEditing(true)} className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-bold text-sm">Edit</button>
+                                            <button onClick={() => setIsEditing(true)} className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-bold text-sm dark:text-brand dark:bg-brand/15">Edit</button>
                                             <button onClick={() => handleQAAction(selectedQuestion.id, 'APPROVE')} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Approve</button>
-                                            <button onClick={() => handleQAAction(selectedQuestion.id, 'REJECT')} className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-bold text-sm">Report</button>
+                                            <button onClick={() => handleQAAction(selectedQuestion.id, 'REJECT')} className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-bold text-sm dark:text-red-400 dark:bg-red-500/10">Report</button>
                                         </>
                                     ) : (
                                         <>
-                                            <button onClick={handleSaveEdit} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Save</button>
-                                            <button onClick={() => setIsEditing(false)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm">Cancel</button>
+                                            <button onClick={handleSaveEdit} className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm">Save</button>
+                                            <button onClick={() => setIsEditing(false)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm dark:bg-white/5 dark:text-slate-300">Cancel</button>
                                         </>
                                     )}
                                 </div>
@@ -338,15 +338,15 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                         {isSplitView && (
                                             <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col h-full animate-in slide-in-from-left duration-300">
                                                 <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-4">
-                                                    <h4 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                                                    <h4 className="font-display text-white font-black text-xs uppercase tracking-widest flex items-center gap-2">
                                                         <FileText className="w-3 h-3 text-indigo-400" /> Ground Truth (OCR Source)
                                                     </h4>
-                                                    <span className="text-[10px] text-slate-500 font-bold">RAW EXTRACTION</span>
+                                                    <span className="text-[10px] text-slate-500 font-bold dark:text-slate-400">RAW EXTRACTION</span>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto text-slate-300 font-mono text-[11px] leading-relaxed select-text bg-black/40 rounded-xl p-4 whitespace-pre-wrap">
                                                     {selectedQuestion.originalRawText}
                                                 </div>
-                                                <div className="mt-4 pt-4 border-t border-slate-800 text-[10px] text-slate-500 font-bold flex justify-between">
+                                                <div className="mt-4 pt-4 border-t border-slate-800 text-[10px] text-slate-500 font-bold flex justify-between dark:text-slate-400">
                                                     <span>SOURCE: {selectedQuestion.sourceUrl?.split('/').pop() || 'Ingested Content'}</span>
                                                     <span>UTF-8 CHARS: {selectedQuestion.originalRawText?.length}</span>
                                                 </div>
@@ -354,17 +354,17 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                         )}
                                         <div className="space-y-6">
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-gray-500 ml-1">LaTeX Logic Editor</label>
+                                                <label className="text-[10px] font-black uppercase text-gray-500 ml-1 dark:text-slate-400">LaTeX Logic Editor</label>
                                                 <textarea 
                                                     value={editForm.content}
                                                     onChange={e => setEditForm({...editForm, content: e.target.value})}
-                                                    className="w-full border-2 border-gray-100 focus:border-indigo-500 outline-none p-4 rounded-xl font-mono text-sm h-48 transition-all"
+                                                    className="w-full border-2 border-gray-100 focus:border-indigo-500 outline-none p-4 rounded-xl font-mono text-sm h-48 transition-all dark:border-white/10"
                                                 />
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 {editForm.options.map((opt: string, idx: number) => (
                                                     <div key={idx} className="space-y-1">
-                                                        <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Option {String.fromCharCode(65 + idx)}</label>
+                                                        <label className="text-[10px] font-black uppercase text-gray-500 ml-1 dark:text-slate-400">Option {String.fromCharCode(65 + idx)}</label>
                                                         <textarea 
                                                             value={opt}
                                                             onChange={e => {
@@ -372,29 +372,29 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                                                 newOpts[idx] = e.target.value;
                                                                 setEditForm({...editForm, options: newOpts});
                                                             }}
-                                                            className="w-full border border-gray-200 focus:border-indigo-400 outline-none p-3 rounded-xl text-xs transition-all"
+                                                            className="w-full border border-gray-200 focus:border-indigo-400 outline-none p-3 rounded-xl text-xs transition-all dark:border-white/10"
                                                         />
                                                     </div>
                                                 ))}
                                             </div>
 
                                             <div>
-                                                <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Tags</label>
-                                                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl min-h-[46px] mt-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-500 ml-1 dark:text-slate-400">Tags</label>
+                                                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl min-h-[46px] mt-2 dark:border-white/10 dark:bg-surface-muted">
                                                     {editForm.tags.map((tag: string, tidx: number) => (
                                                         <span key={tidx} className="bg-indigo-600 text-white px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
                                                             {tag}
                                                             <X className="w-3 h-3 cursor-pointer hover:text-red-300" onClick={() => { const t = [...editForm.tags]; t.splice(tidx, 1); setEditForm({...editForm, tags: t}); }} />
                                                         </span>
                                                     ))}
-                                                    <input className="bg-transparent border-none outline-none text-sm text-gray-600 flex-1 min-w-[100px]" placeholder="+ add tag..." onKeyDown={e => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === 'Enter' && v) { e.preventDefault(); if (!editForm.tags.includes(v)) setEditForm({...editForm, tags: [...editForm.tags, v]}); (e.target as HTMLInputElement).value = ''; }}} />
+                                                    <input className="bg-transparent border-none outline-none text-sm text-gray-600 flex-1 min-w-[100px] dark:text-slate-400" placeholder="+ add tag..." onKeyDown={e => { const v = (e.target as HTMLInputElement).value.trim(); if (e.key === 'Enter' && v) { e.preventDefault(); if (!editForm.tags.includes(v)) setEditForm({...editForm, tags: [...editForm.tags, v]}); (e.target as HTMLInputElement).value = ''; }}} />
                                                 </div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
-                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Type</label>
-                                                    <select value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2">
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 dark:text-slate-400">Type</label>
+                                                    <select value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2 dark:border-white/10 dark:bg-surface-muted">
                                                         <option value="SINGLE_CHOICE">Single Choice</option>
                                                         <option value="MULTIPLE_CHOICE">Multiple Choice</option>
                                                         <option value="INTEGER">Integer</option>
@@ -409,33 +409,33 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Difficulty</label>
-                                                    <select value={editForm.difficulty} onChange={e => setEditForm({...editForm, difficulty: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2">
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 dark:text-slate-400">Difficulty</label>
+                                                    <select value={editForm.difficulty} onChange={e => setEditForm({...editForm, difficulty: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2 dark:border-white/10 dark:bg-surface-muted">
                                                         <option value="EASY">Easy</option>
                                                         <option value="MEDIUM">Medium</option>
                                                         <option value="HARD">Hard</option>
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Subject</label>
-                                                    <input type="text" value={editForm.subject} onChange={e => setEditForm({...editForm, subject: e.target.value})} placeholder="e.g. Mathematics" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2"/>
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 dark:text-slate-400">Subject</label>
+                                                    <input type="text" value={editForm.subject} onChange={e => setEditForm({...editForm, subject: e.target.value})} placeholder="e.g. Mathematics" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2 dark:border-white/10 dark:bg-surface-muted"/>
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Class</label>
-                                                    <input type="text" value={editForm.classLevel} onChange={e => setEditForm({...editForm, classLevel: e.target.value})} placeholder="e.g. Class 12" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2"/>
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 dark:text-slate-400">Class</label>
+                                                    <input type="text" value={editForm.classLevel} onChange={e => setEditForm({...editForm, classLevel: e.target.value})} placeholder="e.g. Class 12" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2 dark:border-white/10 dark:bg-surface-muted"/>
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Exam Type</label>
-                                                    <input type="text" value={editForm.examType} onChange={e => setEditForm({...editForm, examType: e.target.value})} placeholder="e.g. JEE Main" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2"/>
+                                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 dark:text-slate-400">Exam Type</label>
+                                                    <input type="text" value={editForm.examType} onChange={e => setEditForm({...editForm, examType: e.target.value})} placeholder="e.g. JEE Main" className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none transition-all mt-2 dark:border-white/10 dark:bg-surface-muted"/>
                                                 </div>
                                             </div>
 
-                                            <details className="bg-gray-50 border border-gray-200 rounded-xl group mt-4">
-                                                <summary className="cursor-pointer text-[10px] font-black text-indigo-600 uppercase tracking-widest p-3 hover:bg-gray-100 rounded-xl transition-all flex items-center gap-2 select-none">
+                                            <details className="bg-gray-50 border border-gray-200 rounded-xl group mt-4 dark:border-white/10 dark:bg-surface-muted">
+                                                <summary className="cursor-pointer text-[10px] font-black text-indigo-600 uppercase tracking-widest p-3 hover:bg-gray-100 rounded-xl transition-all flex items-center gap-2 select-none dark:text-brand hover:dark:bg-white/5">
                                                     <svg className={`w-3 h-3 transition-transform group-open:rotate-90`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                                     Taxonomy Tags (optional)
                                                 </summary>
-                                                <div className="p-3 border-t border-gray-200">
+                                                <div className="p-3 border-t border-gray-200 dark:border-white/10">
                                                     <TaxonomyCascadeSelector selectedIds={selectedTaxonomyIds} onSelectMultiple={setSelectedTaxonomyIds} />
                                                 </div>
                                             </details>
@@ -446,25 +446,25 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                                         {isSplitView && (
                                             <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col h-full animate-in slide-in-from-left duration-300">
                                                 <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-4">
-                                                    <h4 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                                                    <h4 className="font-display text-white font-black text-xs uppercase tracking-widest flex items-center gap-2">
                                                         <FileText className="w-3 h-3 text-indigo-400" /> Ground Truth (OCR Source)
                                                     </h4>
-                                                    <span className="text-[10px] text-slate-500 font-bold">RAW EXTRACTION</span>
+                                                    <span className="text-[10px] text-slate-500 font-bold dark:text-slate-400">RAW EXTRACTION</span>
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto text-slate-300 font-mono text-[11px] leading-relaxed select-text bg-black/40 rounded-xl p-4 whitespace-pre-wrap">
                                                     {selectedQuestion.originalRawText}
                                                 </div>
                                             </div>
                                         )}
-                                        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                                        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 dark:border-white/10 dark:bg-surface-muted">
                                             <div className="flex flex-wrap gap-2 mb-4">
-                                                {selectedQuestion.type && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.type.replace(/_/g, ' ')}</span>}
+                                                {selectedQuestion.type && <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider dark:text-brand dark:bg-brand/15">{selectedQuestion.type.replace(/_/g, ' ')}</span>}
                                                 {selectedQuestion.difficulty && <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${selectedQuestion.difficulty === 'EASY' ? 'bg-emerald-100 text-emerald-700' : selectedQuestion.difficulty === 'HARD' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{selectedQuestion.difficulty}</span>}
-                                                {selectedQuestion.subject && <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.subject}</span>}
+                                                {selectedQuestion.subject && <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider dark:text-blue-400 dark:bg-blue-500/10">{selectedQuestion.subject}</span>}
                                                 {selectedQuestion.class && <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.class}</span>}
-                                                {selectedQuestion.examType && <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">{selectedQuestion.examType}</span>}
+                                                {selectedQuestion.examType && <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider dark:text-rose-400 dark:bg-rose-500/10">{selectedQuestion.examType}</span>}
                                             </div>
-                                            <div className="prose max-w-none text-gray-900 text-lg mb-8">
+                                            <div className="prose max-w-none text-gray-900 text-lg mb-8 dark:text-white">
                                                 <MathRenderer content={selectedQuestion.content} />
                                             </div>
                                             {selectedQuestion.options && Array.isArray(selectedQuestion.options) && (
@@ -483,9 +483,9 @@ export function QuestionBankStudio({ publicCount, teacherPrivateCount }: { publi
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center">
+                        <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center dark:text-slate-500">
                             <Search className="w-16 h-16 mb-4 text-gray-200" />
-                            <h3 className="text-xl font-bold text-gray-500 mb-2">Select a Question</h3>
+                            <h3 className="font-display text-xl font-bold text-gray-500 mb-2 dark:text-slate-400">Select a Question</h3>
                             <p>Click on any question from the ledger to perform detailed review.</p>
                         </div>
                     )}

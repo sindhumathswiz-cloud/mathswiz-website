@@ -9,13 +9,13 @@ export default async function ClassChallengePage() {
   if (!session?.user?.id || session.user.role !== 'STUDENT') redirect('/login');
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 md:p-10">
+    <main className="min-h-screen bg-slate-50 dark:bg-background p-6 md:p-10">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8 flex items-center gap-3">
-          <Swords className="w-9 h-9 text-indigo-600" />
+          <Swords className="w-9 h-9 text-indigo-600 dark:text-brand" />
           <div>
-            <h1 className="text-3xl font-black text-slate-900">Class Challenge</h1>
-            <p className="text-slate-500 font-medium text-sm">A time-boxed, teacher-run challenge for your batch.</p>
+            <h1 className="font-display text-3xl font-black text-slate-900 dark:text-white">Class Challenge</h1>
+            <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">A time-boxed, teacher-run challenge for your batch.</p>
           </div>
         </div>
         <ClassChallenge />

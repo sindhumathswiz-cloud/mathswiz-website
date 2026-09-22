@@ -150,12 +150,12 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white dark:bg-surface">
       {/* Header */}
-      <div className="px-4 py-3 border-b flex items-center justify-between bg-gray-50">
+      <div className="px-4 py-3 border-b flex items-center justify-between bg-gray-50 dark:bg-surface-muted">
         <div>
-          <h3 className="text-lg font-bold">Review Questions</h3>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h3 className="font-display text-lg font-bold">Review Questions</h3>
+          <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-400">
             {questions.length} extracted • {approvedIds.size} approved • {draftIds.size} drafts • {questions.length - approvedIds.size - draftIds.size - rejectedIds.size} pending
           </p>
         </div>
@@ -165,19 +165,19 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
       </div>
 
       {/* Toolbar */}
-      <div className="px-4 py-2 border-b flex items-center gap-2 bg-white">
-        <button onClick={toggleSelectAll} className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+      <div className="px-4 py-2 border-b flex items-center gap-2 bg-white dark:bg-surface">
+        <button onClick={toggleSelectAll} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 dark:text-brand">
           {selected.size === filtered.length ? 'Deselect All' : 'Select All'}
         </button>
-        <span className="text-xs text-gray-400">({selected.size})</span>
+        <span className="text-xs text-gray-400 dark:text-slate-500">({selected.size})</span>
         <div className="flex-1" />
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 dark:bg-white/5">
           {(['pending', 'all', 'duplicate'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-2 py-0.5 text-[10px] font-medium rounded-md transition-colors ${
-                filter === f ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:bg-gray-200'
+                filter === f ? 'bg-white dark:bg-surface text-indigo-700 dark:text-brand shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-white/10'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -187,7 +187,7 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
       </div>
 
       {/* Action Buttons */}
-      <div className="px-4 py-2 border-b flex gap-2 bg-white">
+      <div className="px-4 py-2 border-b flex gap-2 bg-white dark:bg-surface">
         <button
           onClick={handleApproveSelected}
           disabled={selected.size === 0}
@@ -220,8 +220,8 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
             <div
               key={q.id}
               className={`border-b transition-colors ${
-                isDupOfExisting ? 'bg-amber-50 border-l-4 border-l-amber-400' :
-                selected.has(q.id) ? 'bg-indigo-50/50' : 'hover:bg-gray-50'
+                isDupOfExisting ? 'bg-amber-50 dark:bg-amber-500/10 border-l-4 border-l-amber-400' :
+                selected.has(q.id) ? 'bg-indigo-50/50 dark:bg-brand/10' : 'hover:bg-gray-50 dark:hover:bg-white/5'
               }`}
             >
               <div className="px-4 py-3">
@@ -230,22 +230,22 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                     type="checkbox"
                     checked={selected.has(q.id)}
                     onChange={() => toggleSelect(q.id)}
-                    className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/10 dark:text-brand"
                   />
                   <div className="flex-1 min-w-0">
                     {/* Metadata Row */}
                     <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                      <span className="text-[10px] font-mono font-bold text-gray-400">#{idx + 1}</span>
-                      {q.number && <span className="text-[10px] font-bold text-gray-600">Q{q.number}</span>}
-                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full bg-indigo-100 text-indigo-700">
+                      <span className="text-[10px] font-mono font-bold text-gray-400 dark:text-slate-500">#{idx + 1}</span>
+                      {q.number && <span className="text-[10px] font-bold text-gray-600 dark:text-slate-400">Q{q.number}</span>}
+                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full bg-indigo-100 text-indigo-700 dark:text-brand dark:bg-brand/15">
                         {q.type}
                       </span>
                       <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full ${getDifficultyColor(q.difficulty)}`}>
                         {q.difficulty}
                       </span>
-                      <span className="text-[10px] text-gray-400">P{q.sourcePage}</span>
+                      <span className="text-[10px] text-gray-400 dark:text-slate-500">P{q.sourcePage}</span>
                       {isDupOfExisting && (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-700">
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-700 dark:text-amber-400 dark:bg-amber-500/10">
                           <AlertTriangle className="w-2.5 h-2.5" />
                           Already in bank
                         </span>
@@ -253,9 +253,9 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                       {q.tags.length > 0 && (
                         <div className="flex gap-0.5">
                           {q.tags.slice(0, 3).map(t => (
-                            <span key={t} className="px-1 py-0.5 text-[9px] rounded bg-gray-100 text-gray-600">{t}</span>
+                            <span key={t} className="px-1 py-0.5 text-[9px] rounded bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-slate-400">{t}</span>
                           ))}
-                          {q.tags.length > 3 && <span className="text-[9px] text-gray-400">+{q.tags.length - 3}</span>}
+                          {q.tags.length > 3 && <span className="text-[9px] text-gray-400 dark:text-slate-500">+{q.tags.length - 3}</span>}
                         </div>
                       )}
                     </div>
@@ -263,7 +263,7 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                     {editingId === q.id ? (
                       <div className="space-y-2">
                         <div>
-                          <label className="text-[10px] font-bold text-gray-500 uppercase">Question</label>
+                          <label className="text-[10px] font-bold text-gray-500 uppercase dark:text-slate-400">Question</label>
                           <textarea
                             value={editData.question || ''}
                             onChange={e => setEditData(prev => ({ ...prev, question: e.target.value }))}
@@ -273,7 +273,7 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                         </div>
                         {editData.options && editData.options.length > 0 && (
                           <div>
-                            <label className="text-[10px] font-bold text-gray-500 uppercase">Options</label>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase dark:text-slate-400">Options</label>
                             <div className="space-y-1 mt-1">
                               {editData.options.map((opt, i) => (
                                 <div key={i} className="flex items-center gap-2">
@@ -282,9 +282,9 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                                     name={`correct-${q.id}`}
                                     checked={editData.correctOption === opt.label}
                                     onChange={() => setEditData(prev => ({ ...prev, correctOption: opt.label }))}
-                                    className="w-3.5 h-3.5 text-emerald-600"
+                                    className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
                                   />
-                                  <span className="text-xs font-bold text-gray-500 w-4">{opt.label}.</span>
+                                  <span className="text-xs font-bold text-gray-500 w-4 dark:text-slate-400">{opt.label}.</span>
                                   <input
                                     value={opt.text}
                                     onChange={e => {
@@ -297,11 +297,11 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                                 </div>
                               ))}
                             </div>
-                            <p className="text-[9px] text-gray-400 mt-1">Click radio button to mark correct answer</p>
+                            <p className="text-[9px] text-gray-400 mt-1 dark:text-slate-500">Click radio button to mark correct answer</p>
                           </div>
                         )}
                         <div>
-                          <label className="text-[10px] font-bold text-gray-500 uppercase">Detailed Solution</label>
+                          <label className="text-[10px] font-bold text-gray-500 uppercase dark:text-slate-400">Detailed Solution</label>
                           <textarea
                             value={editData.solution || ''}
                             onChange={e => setEditData(prev => ({ ...prev, solution: e.target.value }))}
@@ -311,7 +311,7 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-gray-500 uppercase">Tags</label>
+                          <label className="text-[10px] font-bold text-gray-500 uppercase dark:text-slate-400">Tags</label>
                           <input
                             value={(editData.tags || []).join(', ')}
                             onChange={e => setEditData(prev => ({ ...prev, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) }))}
@@ -321,13 +321,13 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                         </div>
                         <div className="flex gap-2">
                           <button onClick={saveEdit} className="px-3 py-1 text-xs font-medium text-white bg-emerald-600 rounded-lg">Save</button>
-                          <button onClick={cancelEdit} className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg">Cancel</button>
+                          <button onClick={cancelEdit} className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg dark:bg-white/5 dark:text-slate-400">Cancel</button>
                         </div>
                       </div>
                     ) : (
                       <div>
                         {/* Question */}
-                        <div className="text-sm text-gray-800 mb-2">
+                        <div className="text-sm text-gray-800 mb-2 dark:text-slate-200">
                           <MathRenderer content={q.question} />
                         </div>
 
@@ -361,7 +361,7 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                                     <MathRenderer content={opt.text} />
                                   </span>
                                   {isCorrect && (
-                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full dark:text-emerald-400 dark:bg-emerald-500/10">
                                       Correct
                                     </span>
                                   )}
@@ -373,15 +373,15 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
 
                         {/* Detailed Solution */}
                         {q.solution && (
-                          <div className="mt-2 p-2.5 bg-blue-50/50 rounded-lg border border-blue-100">
+                          <div className="mt-2 p-2.5 bg-blue-50/50 rounded-lg border border-blue-100 dark:bg-blue-500/10">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-1">
-                                <FileText className="w-3 h-3 text-blue-600" />
-                                <strong className="text-xs text-blue-700">Detailed Solution:</strong>
+                                <FileText className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                <strong className="text-xs text-blue-700 dark:text-blue-400">Detailed Solution:</strong>
                               </div>
                               <button
                                 onClick={() => copySolutionToClipboard(q.solution!)}
-                                className="p-1 hover:bg-blue-100 rounded"
+                                className="p-1 hover:bg-blue-100 rounded hover:dark:bg-blue-500/10"
                                 title="Copy solution"
                               >
                                 <Copy className="w-3 h-3 text-blue-500" />
@@ -403,7 +403,7 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                       className="p-1 hover:bg-gray-200 rounded"
                       title="Edit"
                     >
-                      <Edit3 className="w-3.5 h-3.5 text-gray-500" />
+                      <Edit3 className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" />
                     </button>
                     <button
                       onClick={() => toggleExpand(q.id)}
@@ -411,9 +411,9 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
                       title="Expand"
                     >
                       {expanded.has(q.id) ? (
-                        <AlertTriangle className="w-3.5 h-3.5 text-gray-500" />
+                        <AlertTriangle className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" />
                       ) : (
-                        <FileText className="w-3.5 h-3.5 text-gray-500" />
+                        <FileText className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" />
                       )}
                     </button>
                   </div>
@@ -434,22 +434,22 @@ export default function QuestionReview({ questions, existingQuestions, onApprove
 
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-              <Check className="w-6 h-6 text-gray-400" />
+            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 dark:bg-white/5">
+              <Check className="w-6 h-6 text-gray-400 dark:text-slate-500" />
             </div>
-            <p className="text-sm font-medium text-gray-600">All questions processed</p>
-            <p className="text-xs text-gray-400 mt-1">Approve, draft, or reject questions to clear this list</p>
+            <p className="text-sm font-medium text-gray-600 dark:text-slate-400">All questions processed</p>
+            <p className="text-xs text-gray-400 mt-1 dark:text-slate-500">Approve, draft, or reject questions to clear this list</p>
           </div>
         )}
       </div>
 
       {/* Footer Stats */}
-      <div className="px-4 py-2 border-t bg-gray-50 flex items-center justify-between text-xs text-gray-500">
+      <div className="px-4 py-2 border-t bg-gray-50 flex items-center justify-between text-xs text-gray-500 dark:text-slate-400 dark:bg-surface-muted">
         <span>{filtered.length} showing</span>
         <div className="flex gap-3">
-          <span className="text-emerald-600">{approvedIds.size} approved</span>
-          <span className="text-blue-600">{draftIds.size} drafts</span>
-          <span className="text-amber-600">{questions.filter(q => q.duplicate?.isDuplicate || existingIds.has(q.id)).length} duplicates</span>
+          <span className="text-emerald-600 dark:text-emerald-400">{approvedIds.size} approved</span>
+          <span className="text-blue-600 dark:text-blue-400">{draftIds.size} drafts</span>
+          <span className="text-amber-600 dark:text-amber-400">{questions.filter(q => q.duplicate?.isDuplicate || existingIds.has(q.id)).length} duplicates</span>
         </div>
       </div>
     </div>

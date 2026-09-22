@@ -31,7 +31,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 dark:bg-background">
             <UserProfileClient user={user} />
         </div>
     );

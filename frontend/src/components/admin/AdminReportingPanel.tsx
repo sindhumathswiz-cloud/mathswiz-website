@@ -30,9 +30,9 @@ type TeacherActivity = {
 
 function SectionCard({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
     return (
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <h3 className="text-sm font-black text-gray-900 uppercase tracking-wide mb-4 flex items-center gap-2">
-                <Icon className="w-4 h-4 text-indigo-600" /> {title}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm dark:bg-surface dark:border-white/10">
+            <h3 className="font-display text-sm font-black text-gray-900 uppercase tracking-wide mb-4 flex items-center gap-2 dark:text-white">
+                <Icon className="w-4 h-4 text-indigo-600 dark:text-brand" /> {title}
             </h3>
             {children}
         </div>
@@ -61,7 +61,7 @@ export function AdminReportingPanel() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-600 dark:text-brand" />
             </div>
         );
     }
@@ -69,18 +69,18 @@ export function AdminReportingPanel() {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Platform Reporting</h2>
-                <p className="text-gray-500 font-medium text-sm">Curriculum coverage, class performance, content quality, and teacher activity across the whole platform.</p>
+                <h2 className="font-display text-2xl font-black text-gray-900 tracking-tight dark:text-white">Platform Reporting</h2>
+                <p className="text-gray-500 font-medium text-sm dark:text-slate-400">Curriculum coverage, class performance, content quality, and teacher activity across the whole platform.</p>
             </div>
 
             <SectionCard icon={BookOpen} title="Curriculum Coverage">
                 {!curriculum || curriculum.books.length === 0 ? (
-                    <p className="text-sm text-gray-400">No confirmed book chapters reconciled yet.</p>
+                    <p className="text-sm text-gray-400 dark:text-slate-500">No confirmed book chapters reconciled yet.</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="text-left text-[10px] font-black text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                                <tr className="text-left text-[10px] font-black text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-white/10 dark:text-slate-500">
                                     <th className="py-2 pr-4">Book</th>
                                     <th className="py-2 pr-4">Class</th>
                                     <th className="py-2 pr-4">Exercises</th>
@@ -92,29 +92,29 @@ export function AdminReportingPanel() {
                             <tbody>
                                 {curriculum.books.map((b) => (
                                     <tr key={b.bookId} className="border-b border-gray-50">
-                                        <td className="py-2 pr-4 font-bold text-gray-900">{b.bookTitle}</td>
-                                        <td className="py-2 pr-4 text-gray-500">{b.className}</td>
+                                        <td className="py-2 pr-4 font-bold text-gray-900 dark:text-white">{b.bookTitle}</td>
+                                        <td className="py-2 pr-4 text-gray-500 dark:text-slate-400">{b.className}</td>
                                         <td className="py-2 pr-4">{b.exerciseCount}</td>
                                         <td className="py-2 pr-4">{b.totalExtracted}</td>
                                         <td className="py-2 pr-4">{b.totalUnresolved}</td>
-                                        <td className="py-2">{b.discrepantCount > 0 ? <span className="text-rose-600 font-bold">{b.discrepantCount}</span> : <span className="text-emerald-600">0</span>}</td>
+                                        <td className="py-2">{b.discrepantCount > 0 ? <span className="text-rose-600 font-bold dark:text-rose-400">{b.discrepantCount}</span> : <span className="text-emerald-600 dark:text-emerald-400">0</span>}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        <p className="text-xs text-gray-400 mt-3">Platform total: {curriculum.platform.totalExtracted} extracted, {curriculum.platform.totalUnresolved} unresolved across {curriculum.platform.exerciseCount} exercises.</p>
+                        <p className="text-xs text-gray-400 mt-3 dark:text-slate-500">Platform total: {curriculum.platform.totalExtracted} extracted, {curriculum.platform.totalUnresolved} unresolved across {curriculum.platform.exerciseCount} exercises.</p>
                     </div>
                 )}
             </SectionCard>
 
             <SectionCard icon={Users} title="Class Performance">
                 {!classPerformance || classPerformance.classPerformance.length === 0 ? (
-                    <p className="text-sm text-gray-400">No approved enrollments with mastery data yet.</p>
+                    <p className="text-sm text-gray-400 dark:text-slate-500">No approved enrollments with mastery data yet.</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="text-left text-[10px] font-black text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                                <tr className="text-left text-[10px] font-black text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-white/10 dark:text-slate-500">
                                     <th className="py-2 pr-4">Batch</th>
                                     <th className="py-2 pr-4">Teacher</th>
                                     <th className="py-2 pr-4">Students</th>
@@ -125,11 +125,11 @@ export function AdminReportingPanel() {
                             <tbody>
                                 {classPerformance.classPerformance.map((b) => (
                                     <tr key={b.batchId} className="border-b border-gray-50">
-                                        <td className="py-2 pr-4 font-bold text-gray-900">{b.batchName}</td>
-                                        <td className="py-2 pr-4 text-gray-500">{b.teacherName}</td>
+                                        <td className="py-2 pr-4 font-bold text-gray-900 dark:text-white">{b.batchName}</td>
+                                        <td className="py-2 pr-4 text-gray-500 dark:text-slate-400">{b.teacherName}</td>
                                         <td className="py-2 pr-4">{b.studentCount}</td>
                                         <td className="py-2 pr-4">{b.avgMastery}%</td>
-                                        <td className="py-2">{b.atRiskStudentCount > 0 ? <span className="text-rose-600 font-bold">{b.atRiskStudentCount}</span> : <span className="text-emerald-600">0</span>}</td>
+                                        <td className="py-2">{b.atRiskStudentCount > 0 ? <span className="text-rose-600 font-bold dark:text-rose-400">{b.atRiskStudentCount}</span> : <span className="text-emerald-600 dark:text-emerald-400">0</span>}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -140,28 +140,28 @@ export function AdminReportingPanel() {
 
             <SectionCard icon={ShieldCheck} title="Content Quality">
                 {!contentQuality ? (
-                    <p className="text-sm text-gray-400">Unavailable.</p>
+                    <p className="text-sm text-gray-400 dark:text-slate-500">Unavailable.</p>
                 ) : (
                     <div className="space-y-4">
                         <div className="grid grid-cols-3 gap-4">
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <p className="text-[10px] font-black text-gray-400 uppercase">Flagged</p>
-                                <p className="text-xl font-black text-gray-900">{contentQuality.stats.flaggedPercent}%</p>
+                            <div className="bg-gray-50 rounded-xl p-4 dark:bg-surface-muted">
+                                <p className="text-[10px] font-black text-gray-400 uppercase dark:text-slate-500">Flagged</p>
+                                <p className="text-xl font-black text-gray-900 dark:text-white">{contentQuality.stats.flaggedPercent}%</p>
                             </div>
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <p className="text-[10px] font-black text-gray-400 uppercase">Open Pool Scored</p>
-                                <p className="text-xl font-black text-gray-900">{contentQuality.stats.riskPoolSize}{contentQuality.stats.riskPoolCapped ? '+' : ''}</p>
+                            <div className="bg-gray-50 rounded-xl p-4 dark:bg-surface-muted">
+                                <p className="text-[10px] font-black text-gray-400 uppercase dark:text-slate-500">Open Pool Scored</p>
+                                <p className="text-xl font-black text-gray-900 dark:text-white">{contentQuality.stats.riskPoolSize}{contentQuality.stats.riskPoolCapped ? '+' : ''}</p>
                             </div>
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <p className="text-[10px] font-black text-gray-400 uppercase">Total Questions</p>
-                                <p className="text-xl font-black text-gray-900">{contentQuality.stats.total}</p>
+                            <div className="bg-gray-50 rounded-xl p-4 dark:bg-surface-muted">
+                                <p className="text-[10px] font-black text-gray-400 uppercase dark:text-slate-500">Total Questions</p>
+                                <p className="text-xl font-black text-gray-900 dark:text-white">{contentQuality.stats.total}</p>
                             </div>
                         </div>
                         {Object.keys(contentQuality.stats.riskByBook).length > 0 && (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="text-left text-[10px] font-black text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                                        <tr className="text-left text-[10px] font-black text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-white/10 dark:text-slate-500">
                                             <th className="py-2 pr-4">Book</th>
                                             <th className="py-2 pr-4">Blocked</th>
                                             <th className="py-2">Avg Score</th>
@@ -170,8 +170,8 @@ export function AdminReportingPanel() {
                                     <tbody>
                                         {Object.entries(contentQuality.stats.riskByBook).map(([book, r]) => (
                                             <tr key={book} className="border-b border-gray-50">
-                                                <td className="py-2 pr-4 font-bold text-gray-900">{book}</td>
-                                                <td className="py-2 pr-4">{r.blockedCount > 0 ? <span className="text-rose-600 font-bold">{r.blockedCount}</span> : '0'}</td>
+                                                <td className="py-2 pr-4 font-bold text-gray-900 dark:text-white">{book}</td>
+                                                <td className="py-2 pr-4">{r.blockedCount > 0 ? <span className="text-rose-600 font-bold dark:text-rose-400">{r.blockedCount}</span> : '0'}</td>
                                                 <td className="py-2">{r.avgScore}</td>
                                             </tr>
                                         ))}
@@ -185,12 +185,12 @@ export function AdminReportingPanel() {
 
             <SectionCard icon={Activity} title={`Teacher Activity (last ${teacherActivity?.windowDays ?? 30} days)`}>
                 {!teacherActivity || teacherActivity.teacherActivity.length === 0 ? (
-                    <p className="text-sm text-gray-400">No audit-logged teacher activity in this window.</p>
+                    <p className="text-sm text-gray-400 dark:text-slate-500">No audit-logged teacher activity in this window.</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="text-left text-[10px] font-black text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                                <tr className="text-left text-[10px] font-black text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-white/10 dark:text-slate-500">
                                     <th className="py-2 pr-4">Teacher</th>
                                     <th className="py-2">Total Actions</th>
                                 </tr>
@@ -198,7 +198,7 @@ export function AdminReportingPanel() {
                             <tbody>
                                 {teacherActivity.teacherActivity.slice(0, 10).map((t) => (
                                     <tr key={t.teacherId} className="border-b border-gray-50">
-                                        <td className="py-2 pr-4 font-bold text-gray-900">{t.teacherName}</td>
+                                        <td className="py-2 pr-4 font-bold text-gray-900 dark:text-white">{t.teacherName}</td>
                                         <td className="py-2">{t.totalActions}</td>
                                     </tr>
                                 ))}

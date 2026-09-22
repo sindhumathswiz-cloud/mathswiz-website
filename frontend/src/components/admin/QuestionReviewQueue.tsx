@@ -105,8 +105,8 @@ export function QuestionReviewQueue({ initialQuestions = [] }: { initialQuestion
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <span className="ml-3 text-gray-500 font-medium">Loading review queue...</span>
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600 dark:text-brand" />
+        <span className="ml-3 text-gray-500 font-medium dark:text-slate-400">Loading review queue...</span>
       </div>
     );
   }
@@ -116,87 +116,87 @@ export function QuestionReviewQueue({ initialQuestions = [] }: { initialQuestion
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Question Review Queue</h2>
-          <p className="text-sm text-gray-500 mt-1">Review and approve questions submitted by teachers.</p>
+          <h2 className="font-display text-2xl font-bold text-gray-900 dark:text-white">Question Review Queue</h2>
+          <p className="text-sm text-gray-500 mt-1 dark:text-slate-400">Review and approve questions submitted by teachers.</p>
         </div>
-        <button onClick={fetchQuestions} className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg font-bold text-sm hover:bg-gray-200">
+        <button onClick={fetchQuestions} className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg font-bold text-sm hover:bg-gray-200 dark:bg-white/5">
           <Clock className="w-4 h-4" /> Refresh
         </button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-gray-200 flex items-center gap-4">
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+        <div className="bg-white p-5 rounded-xl border border-gray-200 flex items-center gap-4 dark:bg-surface dark:border-white/10">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl dark:text-amber-400 dark:bg-amber-500/10">
             <Clock className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Pending Review</p>
-            <p className="text-2xl font-black text-gray-900">{questions.length}</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Pending Review</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white">{questions.length}</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200 flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+        <div className="bg-white p-5 rounded-xl border border-gray-200 flex items-center gap-4 dark:bg-surface dark:border-white/10">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl dark:text-emerald-400 dark:bg-emerald-500/10">
             <CheckCircle className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Approved Today</p>
-            <p className="text-2xl font-black text-gray-900">{stats.today}</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Approved Today</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white">{stats.today}</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200 flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+        <div className="bg-white p-5 rounded-xl border border-gray-200 flex items-center gap-4 dark:bg-surface dark:border-white/10">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl dark:text-blue-400 dark:bg-blue-500/10">
             <User className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Contributing Teachers</p>
-            <p className="text-2xl font-black text-gray-900">{new Set(questions.map(q => `${q.createdBy?.firstName}-${q.createdBy?.lastName}`)).size}</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Contributing Teachers</p>
+            <p className="text-2xl font-black text-gray-900 dark:text-white">{new Set(questions.map(q => `${q.createdBy?.firstName}-${q.createdBy?.lastName}`)).size}</p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 flex flex-wrap gap-4 items-center">
-        <Filter className="w-4 h-4 text-gray-400" />
+      <div className="bg-white p-4 rounded-xl border border-gray-200 flex flex-wrap gap-4 items-center dark:bg-surface dark:border-white/10">
+        <Filter className="w-4 h-4 text-gray-400 dark:text-slate-500" />
         <select
           value={filterSubject}
           onChange={(e) => setFilterSubject(e.target.value)}
-          className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500"
+          className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 dark:border-white/10 dark:bg-surface-muted"
         >
           {subjects.map(s => <option key={s} value={s}>{s === 'All' ? 'All Subjects' : s}</option>)}
         </select>
         <select
           value={filterClass}
           onChange={(e) => setFilterClass(e.target.value)}
-          className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500"
+          className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 dark:border-white/10 dark:bg-surface-muted"
         >
           {classes.map(c => <option key={c} value={c}>{c === 'All' ? 'All Classes' : c}</option>)}
         </select>
-        <span className="text-sm text-gray-500 ml-auto">{filtered.length} questions shown</span>
+        <span className="text-sm text-gray-500 ml-auto dark:text-slate-400">{filtered.length} questions shown</span>
       </div>
 
       {/* Question List */}
       {filtered.length === 0 ? (
-        <div className="bg-white p-12 rounded-xl border text-center">
+        <div className="bg-white p-12 rounded-xl border text-center dark:bg-surface">
           <CheckCircle className="w-16 h-16 text-emerald-300 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-gray-700">Review queue is empty!</h3>
-          <p className="text-gray-500 mt-1">No teacher questions pending approval.</p>
+          <h3 className="font-display text-lg font-bold text-gray-700 dark:text-slate-300">Review queue is empty!</h3>
+          <p className="text-gray-500 mt-1 dark:text-slate-400">No teacher questions pending approval.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {filtered.map((q) => (
-            <div key={q.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+            <div key={q.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow dark:bg-surface dark:border-white/10">
               {/* Summary Row */}
               <div
                 onClick={() => setExpandedId(expandedId === q.id ? null : q.id)}
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 hover:dark:bg-surface-muted"
               >
                 <div className="flex items-center gap-4 flex-1">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 dark:text-brand dark:bg-brand/15">
                     <BookOpen className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-900 truncate">
+                    <p className="text-sm font-bold text-gray-900 truncate dark:text-white">
                       <MathRenderer content={q.content} />
                     </p>
                     <div className="flex items-center gap-2 mt-1">
@@ -205,27 +205,27 @@ export function QuestionReviewQueue({ initialQuestions = [] }: { initialQuestion
                         q.difficulty === 'MEDIUM' ? 'bg-amber-100 text-amber-700' :
                         'bg-emerald-100 text-emerald-700'
                       }`}>{q.difficulty}</span>
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold">{q.subject}</span>
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold">{q.class}</span>
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold dark:bg-white/5 dark:text-slate-400">{q.subject}</span>
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold dark:bg-white/5 dark:text-slate-400">{q.class}</span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right">
-                    <p className="text-xs font-bold text-gray-700">{q.createdBy?.firstName} {q.createdBy?.lastName}</p>
-                    <p className="text-[10px] text-gray-400">{new Date(q.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs font-bold text-gray-700 dark:text-slate-300">{q.createdBy?.firstName} {q.createdBy?.lastName}</p>
+                    <p className="text-[10px] text-gray-400 dark:text-slate-500">{new Date(q.createdAt).toLocaleDateString()}</p>
                   </div>
-                  {expandedId === q.id ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  {expandedId === q.id ? <ChevronUp className="w-5 h-5 text-gray-400 dark:text-slate-500" /> : <ChevronDown className="w-5 h-5 text-gray-400 dark:text-slate-500" />}
                 </div>
               </div>
 
               {/* Expanded Detail */}
               {expandedId === q.id && (
-                <div className="p-6 bg-gray-50 border-t border-gray-200 space-y-6">
+                <div className="p-6 bg-gray-50 border-t border-gray-200 space-y-6 dark:border-white/10 dark:bg-surface-muted">
                   {/* Question Display */}
-                  <div className="bg-white p-6 rounded-xl border border-gray-200">
-                    <h4 className="text-sm font-black text-gray-500 uppercase tracking-widest mb-3">Question</h4>
-                    <div className="prose max-w-none text-gray-900 text-lg mb-6">
+                  <div className="bg-white p-6 rounded-xl border border-gray-200 dark:bg-surface dark:border-white/10">
+                    <h4 className="font-display text-sm font-black text-gray-500 uppercase tracking-widest mb-3 dark:text-slate-400">Question</h4>
+                    <div className="prose max-w-none text-gray-900 text-lg mb-6 dark:text-white">
                       <MathRenderer content={q.content} />
                     </div>
                     {q.options && q.options.length > 0 && (
@@ -239,8 +239,8 @@ export function QuestionReviewQueue({ initialQuestions = [] }: { initialQuestion
                       </div>
                     )}
                     {q.explanation && (
-                      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-xs font-black text-blue-600 mb-1">Explanation:</p>
+                      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 dark:bg-blue-500/10 dark:border-blue-500/20">
+                        <p className="text-xs font-black text-blue-600 mb-1 dark:text-blue-400">Explanation:</p>
                         <MathRenderer content={q.explanation} />
                       </div>
                     )}
@@ -249,19 +249,19 @@ export function QuestionReviewQueue({ initialQuestions = [] }: { initialQuestion
                   {/* Review Actions */}
                   <div className="flex flex-wrap gap-4 items-end">
                     <div className="flex-1">
-                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Review Notes (optional)</label>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 dark:text-slate-400">Review Notes (optional)</label>
                       <textarea
                         value={reviewNotes[q.id] || ''}
                         onChange={(e) => setReviewNotes(prev => ({ ...prev, [q.id]: e.target.value }))}
                         placeholder="Add notes for the teacher..."
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none h-20"
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none h-20 dark:bg-surface dark:border-white/10"
                       />
                     </div>
                     <div className="flex gap-3">
                       <button
                         onClick={() => handleReview(q.id, 'REJECT')}
                         disabled={processingId === q.id}
-                        className="px-6 py-3 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 disabled:opacity-50 flex items-center gap-2"
+                        className="px-6 py-3 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 disabled:opacity-50 flex items-center gap-2 dark:text-red-400 dark:bg-red-500/10"
                       >
                         {processingId === q.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-5 h-5" />}
                         Reject

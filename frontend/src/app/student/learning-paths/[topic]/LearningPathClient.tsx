@@ -40,17 +40,17 @@ export default function LearningPathClient({ topicParam }: { topicParam: string 
 
   useEffect(() => { load(); }, [encodedTopic]);
 
-  if (loading) return <main className="min-h-screen bg-slate-50 p-10"><Loader2 className="mx-auto my-20 h-8 w-8 animate-spin text-indigo-600" /></main>;
-  if (!detail) return <main className="min-h-screen bg-slate-50 p-10"><div className="mx-auto max-w-3xl rounded-3xl border border-dashed bg-white p-16 text-center font-bold text-slate-600">Could not load this path.</div></main>;
+  if (loading) return <main className="min-h-screen bg-slate-50 dark:bg-background p-10"><Loader2 className="mx-auto my-20 h-8 w-8 animate-spin text-indigo-600 dark:text-brand" /></main>;
+  if (!detail) return <main className="min-h-screen bg-slate-50 dark:bg-background p-10"><div className="mx-auto max-w-3xl rounded-3xl border border-dashed dark:border-white/10 bg-white dark:bg-surface p-16 text-center font-bold text-slate-600 dark:text-slate-400">Could not load this path.</div></main>;
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 md:p-10">
+    <main className="min-h-screen bg-slate-50 dark:bg-background p-6 md:p-10">
       <div className="mx-auto max-w-3xl">
-        <Link href="/student/learning-paths" className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-indigo-700">
+        <Link href="/student/learning-paths" className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-indigo-700 dark:text-brand">
           <ArrowLeft className="h-4 w-4" />All learning paths
         </Link>
-        <h1 className="mb-1 text-3xl font-black text-slate-900">{topic}</h1>
-        <p className="mb-8 text-slate-600">
+        <h1 className="font-display mb-1 text-3xl font-black text-slate-900 dark:text-white">{topic}</h1>
+        <p className="mb-8 text-slate-600 dark:text-slate-400">
           {detail.stage === 'EXAMPLES' && 'Step 1 of 4 — worked examples'}
           {detail.stage === 'GUIDED_PRACTICE' && 'Step 2 of 4 — guided practice'}
           {detail.stage === 'TIMED_QUIZ' && 'Step 3 of 4 — timed quiz'}
@@ -90,31 +90,31 @@ function ExamplesStage({ encodedTopic, detail, onAdvance }: { topic: string; enc
   };
 
   if (detail.examples.length === 0) {
-    return <div className="rounded-3xl border border-dashed bg-white p-16 text-center font-bold text-slate-600">No worked examples available for this topic yet.</div>;
+    return <div className="rounded-3xl border border-dashed dark:border-white/10 bg-white dark:bg-surface p-16 text-center font-bold text-slate-600 dark:text-slate-400">No worked examples available for this topic yet.</div>;
   }
 
   return (
     <div>
-      <div className="mb-6 rounded-2xl bg-indigo-50 p-4 text-sm font-bold text-indigo-700">
+      <div className="mb-6 rounded-2xl bg-indigo-50 dark:bg-brand/10 p-4 text-sm font-bold text-indigo-700 dark:text-brand">
         Reviewed {detail.examplesViewedCount} of {detail.examplesRequired} required examples.
       </div>
       <div className="space-y-4">
         {detail.examples.map((ex) => {
           const viewed = detail.examplesViewedIds.includes(ex.id);
           return (
-            <div key={ex.id} className={`rounded-2xl border bg-white p-5 ${viewed ? 'border-emerald-300' : ''}`}>
-              <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
+            <div key={ex.id} className={`rounded-2xl border dark:border-white/10 bg-white dark:bg-surface p-5 ${viewed ? 'border-emerald-300 dark:border-emerald-500/40' : ''}`}>
+              <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <BookOpen className="h-4 w-4" />Worked example · {ex.difficulty}
-                {viewed && <span className="ml-auto inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-4 w-4" />Reviewed</span>}
+                {viewed && <span className="ml-auto inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" />Reviewed</span>}
               </div>
-              <div className="mb-3 text-sm font-bold text-slate-900"><MathRenderer content={ex.content} /></div>
-              <div className="mb-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><MathRenderer content={ex.explanation} /></div>
+              <div className="mb-3 text-sm font-bold text-slate-900 dark:text-white"><MathRenderer content={ex.content} /></div>
+              <div className="mb-4 rounded-xl bg-slate-50 dark:bg-white/5 p-4 text-sm text-slate-700 dark:text-slate-300"><MathRenderer content={ex.explanation} /></div>
               {!viewed && (
                 <button
                   type="button"
                   onClick={() => markViewed(ex.id)}
                   disabled={markingId === ex.id}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-white disabled:opacity-50"
+                  className="rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-4 py-2 text-xs font-black text-white disabled:opacity-50"
                 >
                   {markingId === ex.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Mark as reviewed'}
                 </button>
@@ -172,13 +172,13 @@ function GuidedPracticeStage({ topic, encodedTopic, detail, onAdvance }: { topic
 
   return (
     <div>
-      <div className="mb-6 rounded-2xl bg-indigo-50 p-4 text-sm font-bold text-indigo-700">
+      <div className="mb-6 rounded-2xl bg-indigo-50 dark:bg-brand/10 p-4 text-sm font-bold text-indigo-700 dark:text-brand">
         {attempted} attempted (need {GUIDED_MIN_ATTEMPTS}+) · {accuracy}% accuracy (need {Math.round(GUIDED_ACCURACY_THRESHOLD * 100)}%+)
       </div>
       {loading ? (
-        <Loader2 className="mx-auto my-16 h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="mx-auto my-16 h-8 w-8 animate-spin text-indigo-600 dark:text-brand" />
       ) : !question ? (
-        <div className="rounded-3xl border border-dashed bg-white p-16 text-center font-bold text-slate-600">No more questions available for this topic right now.</div>
+        <div className="rounded-3xl border border-dashed dark:border-white/10 bg-white dark:bg-surface p-16 text-center font-bold text-slate-600 dark:text-slate-400">No more questions available for this topic right now.</div>
       ) : (
         <LearningPathQuestionCard key={question.id} question={question} onAnswered={handleAnswered} />
       )}
@@ -241,12 +241,12 @@ function TimedQuizStage({ encodedTopic, onAdvance }: { encodedTopic: string; onA
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
-  if (error) return <div className="rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center font-bold text-amber-800">{error}</div>;
-  if (!questions) return <Loader2 className="mx-auto my-16 h-8 w-8 animate-spin text-indigo-600" />;
+  if (error) return <div className="rounded-3xl border border-amber-200 dark:border-accent-warm/30 bg-amber-50 dark:bg-accent-warm/10 p-8 text-center font-bold text-amber-800 dark:text-accent-warm">{error}</div>;
+  if (!questions) return <Loader2 className="mx-auto my-16 h-8 w-8 animate-spin text-indigo-600 dark:text-brand" />;
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between rounded-2xl bg-indigo-50 p-4 text-sm font-black text-indigo-700">
+      <div className="mb-6 flex items-center justify-between rounded-2xl bg-indigo-50 dark:bg-brand/10 p-4 text-sm font-black text-indigo-700 dark:text-brand">
         <span>Question {index + 1} of {questions.length}</span>
         <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{formatTime(secondsLeft)}</span>
       </div>
@@ -277,14 +277,14 @@ function RecoveryStage({ topic, encodedTopic, detail, onAdvance }: { topic: stri
   };
 
   return (
-    <div className="rounded-3xl border bg-white p-8 text-center">
-      <RotateCcw className="mx-auto mb-4 h-10 w-10 text-amber-500" />
-      <p className="mb-2 text-lg font-black text-slate-900">{detail.recoveryQuestionIds.length} question{detail.recoveryQuestionIds.length === 1 ? '' : 's'} to correct</p>
-      <p className="mb-6 text-sm text-slate-600">Review the quiz questions you missed. Once you answer them correctly, this path completes automatically.</p>
+    <div className="rounded-3xl border dark:border-white/10 bg-white dark:bg-surface p-8 text-center">
+      <RotateCcw className="mx-auto mb-4 h-10 w-10 text-amber-500 dark:text-accent-warm" />
+      <p className="mb-2 text-lg font-black text-slate-900 dark:text-white">{detail.recoveryQuestionIds.length} question{detail.recoveryQuestionIds.length === 1 ? '' : 's'} to correct</p>
+      <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">Review the quiz questions you missed. Once you answer them correctly, this path completes automatically.</p>
       <div className="flex items-center justify-center gap-3">
         <Link
           href={`/student/practice?mode=mistakes&topic=${encodeURIComponent(topic)}`}
-          className="rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white"
+          className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-6 py-3 text-sm font-black text-white"
         >
           Review now
         </Link>
@@ -292,7 +292,7 @@ function RecoveryStage({ topic, encodedTopic, detail, onAdvance }: { topic: stri
           type="button"
           onClick={checkStatus}
           disabled={checking}
-          className="rounded-2xl border-2 border-slate-200 px-6 py-3 text-sm font-black text-slate-600 disabled:opacity-50"
+          className="rounded-2xl border-2 border-slate-200 dark:border-white/10 px-6 py-3 text-sm font-black text-slate-600 dark:text-slate-400 disabled:opacity-50"
         >
           {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : "I've reviewed — check again"}
         </button>
@@ -303,16 +303,16 @@ function RecoveryStage({ topic, encodedTopic, detail, onAdvance }: { topic: stri
 
 function CompletedStage({ topic, detail }: { topic: string; detail: PathDetail }) {
   return (
-    <div className="rounded-3xl border bg-white p-10 text-center">
-      <Trophy className="mx-auto mb-4 h-12 w-12 text-amber-500" />
-      <p className="mb-2 text-2xl font-black text-slate-900">Path complete!</p>
-      <p className="mb-6 text-slate-600">You've worked through examples, guided practice, and the quiz for {topic}.</p>
-      {detail.quizScore !== null && <p className="mb-6 text-sm font-black text-indigo-700">Quiz score: {detail.quizScore}%</p>}
+    <div className="rounded-3xl border dark:border-white/10 bg-white dark:bg-surface p-10 text-center">
+      <Trophy className="mx-auto mb-4 h-12 w-12 text-amber-500 dark:text-accent-warm" />
+      <p className="mb-2 text-2xl font-black text-slate-900 dark:text-white">Path complete!</p>
+      <p className="mb-6 text-slate-600 dark:text-slate-400">You've worked through examples, guided practice, and the quiz for {topic}.</p>
+      {detail.quizScore !== null && <p className="mb-6 text-sm font-black text-indigo-700 dark:text-brand">Quiz score: {detail.quizScore}%</p>}
       <div className="flex items-center justify-center gap-3">
-        <Link href="/student/mastery" className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white">
+        <Link href="/student/mastery" className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-6 py-3 text-sm font-black text-white">
           <Target className="h-4 w-4" />View mastery
         </Link>
-        <Link href="/student/learning-paths" className="rounded-2xl border-2 border-slate-200 px-6 py-3 text-sm font-black text-slate-600">
+        <Link href="/student/learning-paths" className="rounded-2xl border-2 border-slate-200 dark:border-white/10 px-6 py-3 text-sm font-black text-slate-600 dark:text-slate-400">
           More paths
         </Link>
       </div>

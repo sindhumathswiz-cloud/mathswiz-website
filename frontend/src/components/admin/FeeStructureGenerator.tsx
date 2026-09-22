@@ -74,16 +74,16 @@ export const FeeStructureGenerator = () => {
     };
 
     return (
-        <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-gray-50 bg-gray-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden dark:bg-surface dark:border-white/10">
+            <div className="p-8 border-b border-gray-50 bg-gray-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4 dark:bg-surface-muted">
                 <div>
-                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Smart Fee Architect</h3>
-                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Design Custom Installment Blueprints</p>
+                    <h3 className="font-display text-xl font-black text-gray-900 tracking-tight dark:text-white">Smart Fee Architect</h3>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1 dark:text-slate-400">Design Custom Installment Blueprints</p>
                 </div>
-                <div className="flex bg-white rounded-2xl p-2 border border-gray-200 items-center gap-4">
+                <div className="flex bg-white rounded-2xl p-2 border border-gray-200 items-center gap-4 dark:bg-surface dark:border-white/10">
                     <div className="pl-4">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Valuation</p>
-                        <p className="text-lg font-black text-indigo-600">₹{totalAmount.toLocaleString()}</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Total Valuation</p>
+                        <p className="text-lg font-black text-indigo-600 dark:text-brand">₹{totalAmount.toLocaleString()}</p>
                     </div>
                     <button 
                         onClick={handleSave}
@@ -98,22 +98,22 @@ export const FeeStructureGenerator = () => {
                 {/* Configuration */}
                 <div className="space-y-8">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Blueprint Name</label>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 dark:text-slate-500">Blueprint Name</label>
                         <input 
                             type="text" 
                             placeholder="e.g. JEE Intensive 2026 - Standard Plan"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition text-gray-900 shadow-inner"
+                            className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition text-gray-900 shadow-inner dark:border-white/10 dark:text-white dark:bg-surface-muted"
                         />
                     </div>
 
                     <div className="space-y-4">
                         <div className="flex items-center justify-between mb-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Installment Sequence</label>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 dark:text-slate-500">Installment Sequence</label>
                             <button 
                                 onClick={addInstallment}
-                                className="text-[10px] font-extrabold text-indigo-600 flex items-center gap-1 hover:underline"
+                                className="text-[10px] font-extrabold text-indigo-600 flex items-center gap-1 hover:underline dark:text-brand"
                             >
                                 <Plus className="w-3 h-3" /> Append Slab
                             </button>
@@ -121,8 +121,8 @@ export const FeeStructureGenerator = () => {
 
                         <div className="space-y-4">
                             {installments.map((inst, idx) => (
-                                <div key={idx} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 relative group">
-                                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-indigo-600 rounded-full flex items-center justify-center text-[10px] font-black text-indigo-600 z-10 shadow-sm">
+                                <div key={idx} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 relative group dark:bg-surface dark:border-white/10">
+                                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-indigo-600 rounded-full flex items-center justify-center text-[10px] font-black text-indigo-600 z-10 shadow-sm dark:bg-surface dark:text-brand">
                                         {idx + 1}
                                     </div>
                                     
@@ -133,7 +133,7 @@ export const FeeStructureGenerator = () => {
                                                 placeholder="Slab Name (e.g. Registration)"
                                                 value={inst.description}
                                                 onChange={(e) => updateInstallment(idx, 'description', e.target.value)}
-                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-xs"
+                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-xs dark:border-white/10 dark:bg-surface-muted"
                                             />
                                         </div>
                                         <div>
@@ -142,7 +142,7 @@ export const FeeStructureGenerator = () => {
                                                 placeholder="Amount"
                                                 value={inst.amount || ''}
                                                 onChange={(e) => updateInstallment(idx, 'amount', Number(e.target.value))}
-                                                className="w-full px-4 py-2 bg-indigo-50/30 border border-indigo-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-black text-indigo-700 text-xs"
+                                                className="w-full px-4 py-2 bg-indigo-50/30 border border-indigo-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-black text-indigo-700 text-xs dark:text-brand dark:bg-brand/10"
                                             />
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -151,12 +151,12 @@ export const FeeStructureGenerator = () => {
                                                 placeholder="Days"
                                                 value={inst.dueOffsetDays}
                                                 onChange={(e) => updateInstallment(idx, 'dueOffsetDays', Number(e.target.value))}
-                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-xs"
+                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-xs dark:border-white/10 dark:bg-surface-muted"
                                             />
                                             <button 
                                                 onClick={() => removeInstallment(idx)}
                                                 disabled={installments.length === 1}
-                                                className="p-2 text-rose-300 hover:text-rose-600 transition disabled:opacity-0"
+                                                className="p-2 text-rose-300 hover:text-rose-600 transition disabled:opacity-0 hover:dark:text-rose-400"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -178,7 +178,7 @@ export const FeeStructureGenerator = () => {
 
                         <div className="flex-1 space-y-12">
                             <div>
-                                <h4 className="text-4xl font-black mb-2 leading-tight">Financial Timeline Projection</h4>
+                                <h4 className="font-display text-4xl font-black mb-2 leading-tight">Financial Timeline Projection</h4>
                                 <p className="text-indigo-200/70 text-sm font-medium">Automatic due-date triggering model for {name || 'New Blueprint'}.</p>
                             </div>
 

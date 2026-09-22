@@ -81,10 +81,10 @@ export default function BadgeCollection() {
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-4 rounded-xl text-white">
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-brand dark:to-brand-violet p-4 rounded-xl text-white">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-2xl font-bold">{earnedCount}/{badges.length}</div>
+            <div className="text-2xl font-bold font-display">{earnedCount}/{badges.length}</div>
             <div className="text-sm opacity-90">Badges Earned</div>
           </div>
           <Award className="w-12 h-12 opacity-50" />
@@ -99,8 +99,8 @@ export default function BadgeCollection() {
             onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter === f
-                ? 'bg-indigo-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
             }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -115,8 +115,8 @@ export default function BadgeCollection() {
             key={badge.id}
             className={`relative p-4 rounded-xl border transition-all ${
               badge.isEarned
-                ? 'border-indigo-300 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-sm'
-                : 'border-slate-200 bg-slate-50 opacity-75'
+                ? 'border-indigo-300 dark:border-brand/30 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-brand/10 dark:to-brand-violet/10 shadow-sm'
+                : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 opacity-75'
             }`}
           >
             {/* Badge Icon */}
@@ -124,7 +124,7 @@ export default function BadgeCollection() {
               className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
                 badge.isEarned
                   ? `bg-gradient-to-br ${getCategoryColor(badge.category)} text-white shadow-md`
-                  : 'bg-slate-200 text-slate-400'
+                  : 'bg-slate-200 dark:bg-white/10 text-slate-400 dark:text-slate-500'
               }`}
             >
               {getIcon(badge.icon)}
@@ -132,15 +132,15 @@ export default function BadgeCollection() {
 
             {/* Badge Info */}
             <div className="text-center">
-              <h4 className="font-medium text-sm text-slate-800 truncate">{badge.name}</h4>
-              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{badge.description}</p>
+              <h4 className="font-display font-medium text-sm text-slate-800 dark:text-white truncate">{badge.name}</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{badge.description}</p>
               {badge.isEarned && badge.earnedAt && (
-                <div className="text-xs text-indigo-600 mt-2">
+                <div className="text-xs text-indigo-600 dark:text-brand mt-2">
                   Earned {new Date(badge.earnedAt).toLocaleDateString()}
                 </div>
               )}
               {!badge.isEarned && (
-                <div className="text-xs text-slate-400 mt-2 flex items-center justify-center gap-1">
+                <div className="text-xs text-slate-400 dark:text-slate-500 mt-2 flex items-center justify-center gap-1">
                   <Star className="w-3 h-3" /> {badge.points} pts
                 </div>
               )}
@@ -149,7 +149,7 @@ export default function BadgeCollection() {
             {/* Earned Badge */}
             {badge.isEarned && (
               <div className="absolute top-2 right-2">
-                <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                <div className="w-4 h-4 bg-emerald-500 dark:bg-emerald-400 rounded-full flex items-center justify-center">
                   <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
@@ -161,8 +161,8 @@ export default function BadgeCollection() {
       </div>
 
       {filteredBadges.length === 0 && (
-        <div className="text-center p-8 text-slate-500">
-          <Award className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+        <div className="text-center p-8 text-slate-500 dark:text-slate-400">
+          <Award className="w-12 h-12 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
           <p>No badges to display</p>
         </div>
       )}

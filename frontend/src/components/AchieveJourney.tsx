@@ -11,10 +11,10 @@ interface AchieveJourneyProps {
 
 export default function AchieveJourney({ goal, attempts, progress }: AchieveJourneyProps) {
     if (!goal) return (
-        <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-amber-200">
-            <Target className="w-16 h-16 text-amber-200 mx-auto mb-4" />
-            <h3 className="text-xl font-black text-slate-800 mb-2">Target Goal Not Set</h3>
-            <p className="text-slate-500 max-w-sm mx-auto mb-6">Set your dream exam and target score in the Performance tab to start your achievement journey.</p>
+        <div className="bg-white dark:bg-surface rounded-3xl p-12 text-center border-2 border-dashed border-amber-200 dark:border-accent-warm/30">
+            <Target className="w-16 h-16 text-amber-200 dark:text-accent-warm/40 mx-auto mb-4" />
+            <h3 className="font-display text-xl font-black text-slate-800 dark:text-white mb-2">Target Goal Not Set</h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">Set your dream exam and target score in the Performance tab to start your achievement journey.</p>
         </div>
     );
 
@@ -84,39 +84,39 @@ export default function AchieveJourney({ goal, attempts, progress }: AchieveJour
 
             {/* Topic Mastery Grid */}
             <div className="space-y-4">
-                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
-                    <Trophy className="text-amber-500 w-5 h-5" /> Area-wise Mastery
+                <h3 className="font-display text-lg font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-2">
+                    <Trophy className="text-amber-500 dark:text-accent-warm w-5 h-5" /> Area-wise Mastery
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {progress.length === 0 ? (
-                        <div className="col-span-full py-10 px-6 bg-slate-50 border border-dashed border-slate-200 rounded-3xl text-center">
-                            <p className="text-slate-400 text-sm italic">Analyze your practice sessions to see mastery here.</p>
+                        <div className="col-span-full py-10 px-6 bg-slate-50 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-3xl text-center">
+                            <p className="text-slate-400 dark:text-slate-500 text-sm italic">Analyze your practice sessions to see mastery here.</p>
                         </div>
                     ) : (
                         progress.slice(0, 4).map((topic, i) => (
-                            <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md hover:border-indigo-200 group">
+                            <div key={i} className="bg-white dark:bg-surface p-6 rounded-3xl border border-slate-100 dark:border-white/10 shadow-sm transition-all hover:shadow-md hover:border-indigo-200 dark:hover:border-brand/30 group">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                        <div className="w-10 h-10 bg-indigo-50 dark:bg-brand/10 text-indigo-600 dark:text-brand rounded-xl flex items-center justify-center group-hover:bg-indigo-600 dark:group-hover:bg-brand group-hover:text-white transition-colors">
                                             <Target size={20} />
                                         </div>
                                         <div>
-                                            <p className="font-black text-slate-900 text-sm uppercase tracking-tight">{topic.topic}</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Mastery Status</p>
+                                            <p className="font-black text-slate-900 dark:text-white text-sm uppercase tracking-tight">{topic.topic}</p>
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Mastery Status</p>
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-end">
-                                        <span className="text-lg font-black text-indigo-600">{topic.masteryScore}%</span>
+                                        <span className="text-lg font-black text-indigo-600 dark:text-brand">{topic.masteryScore}%</span>
                                         {topic.currentStreak > 1 && (
-                                            <span className="text-[9px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                            <span className="text-[9px] font-black text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                                                 <TrendingUp size={10} /> {topic.currentStreak} Streak
                                             </span>
                                         )}
                                     </div>
                                 </div>
-                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-indigo-600 rounded-full transition-all duration-1000" 
+                                <div className="h-2 w-full bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-indigo-600 dark:bg-brand rounded-full transition-all duration-1000"
                                         style={{ width: `${topic.masteryScore}%` }}
                                     />
                                 </div>
@@ -128,25 +128,25 @@ export default function AchieveJourney({ goal, attempts, progress }: AchieveJour
 
             {/* Gap Analysis Blocks */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex items-start gap-6">
-                    <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center shrink-0">
+                <div className="bg-white dark:bg-surface rounded-3xl p-8 border border-slate-100 dark:border-white/10 shadow-sm flex items-start gap-6">
+                    <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 rounded-2xl flex items-center justify-center shrink-0">
                         <ArrowRight size={32} />
                     </div>
                     <div>
-                        <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Marks to Close</h4>
-                        <p className="text-4xl font-black text-slate-900 mb-2">{gap}</p>
-                        <p className="text-slate-500 text-sm font-medium">This is the critical gap. Bridging this will put you in the top 1% percentile.</p>
+                        <h4 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Marks to Close</h4>
+                        <p className="text-4xl font-black text-slate-900 dark:text-white mb-2">{gap}</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">This is the critical gap. Bridging this will put you in the top 1% percentile.</p>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex items-start gap-6">
-                    <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shrink-0">
+                <div className="bg-white dark:bg-surface rounded-3xl p-8 border border-slate-100 dark:border-white/10 shadow-sm flex items-start gap-6">
+                    <div className="w-16 h-16 bg-indigo-50 dark:bg-brand/10 text-indigo-600 dark:text-brand rounded-2xl flex items-center justify-center shrink-0">
                         <Gauge size={32} />
                     </div>
                     <div>
-                        <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Consistency Level</h4>
-                        <p className="text-4xl font-black text-slate-900 mb-2">{attempts.length > 5 ? 'Elite' : attempts.length > 0 ? 'Rising' : 'Day 1'}</p>
-                        <p className="text-slate-500 text-sm font-medium">Engagement with daily practice is the leading indicator of exam success.</p>
+                        <h4 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Consistency Level</h4>
+                        <p className="text-4xl font-black text-slate-900 dark:text-white mb-2">{attempts.length > 5 ? 'Elite' : attempts.length > 0 ? 'Rising' : 'Day 1'}</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Engagement with daily practice is the leading indicator of exam success.</p>
                     </div>
                 </div>
             </div>

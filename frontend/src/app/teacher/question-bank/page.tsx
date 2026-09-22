@@ -112,31 +112,31 @@ export default function TeacherQuestionStudio() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+        <div className="min-h-screen bg-slate-50 dark:bg-background flex flex-col font-sans">
 
             {/* ── Header ── */}
-            <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-4 shadow-sm sticky top-0 z-40">
-                <Link href="/teacher/dashboard" className="text-slate-500 hover:text-slate-800 transition-colors">
+            <div className="bg-white dark:bg-surface border-b border-slate-200 dark:border-white/10 px-6 py-3 flex items-center gap-4 shadow-sm sticky top-0 z-40">
+                <Link href="/teacher/dashboard" className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">
                     <ChevronLeft className="w-5 h-5" />
                 </Link>
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
-                        <FileEdit className="w-5 h-5 text-indigo-600" />
+                    <div className="w-9 h-9 bg-indigo-100 dark:bg-brand/15 rounded-xl flex items-center justify-center">
+                        <FileEdit className="w-5 h-5 text-indigo-600 dark:text-brand" />
                     </div>
                     <div>
-                        <h1 className="text-base font-black text-slate-900">Content Creator Studio</h1>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Teacher Workspace</p>
+                        <h1 className="font-display text-base font-black text-slate-900 dark:text-white">Content Creator Studio</h1>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">Teacher Workspace</p>
                     </div>
                 </div>
                 <div className="ml-auto flex items-center gap-4">
                     {/* Compact math toolbar in header */}
                     <GlobalMathToolbar className="hidden md:block" />
                     <button onClick={() => handleSave('DRAFT')}
-                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition text-xs flex items-center gap-2 border border-slate-300">
+                        className="px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition text-xs flex items-center gap-2 border border-slate-300 dark:border-white/10">
                         <Save className="w-3.5 h-3.5" /> Draft
                     </button>
                     <button onClick={() => handleSave('PENDING_REVIEW')}
-                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition text-xs flex items-center gap-2">
+                        className="px-5 py-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white font-bold rounded-xl shadow transition text-xs flex items-center gap-2">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Submit for Review
                     </button>
                 </div>
@@ -156,23 +156,23 @@ export default function TeacherQuestionStudio() {
                 <div className="lg:col-span-1 space-y-5">
 
                     {/* AI Smart Snippet Zone */}
-                    <div className="bg-white rounded-2xl border border-indigo-100 shadow p-5">
-                        <h3 className="font-black text-slate-900 text-sm flex items-center gap-2 mb-4">
-                            <BrainCircuit className="w-4 h-4 text-indigo-500" /> AI Snippet Zone
+                    <div className="bg-white dark:bg-surface rounded-2xl border border-indigo-100 dark:border-brand/20 shadow p-5">
+                        <h3 className="font-display font-black text-slate-900 dark:text-white text-sm flex items-center gap-2 mb-4">
+                            <BrainCircuit className="w-4 h-4 text-indigo-500 dark:text-brand" /> AI Snippet Zone
                         </h3>
                         <div
                             onClick={() => fileInputRef.current?.click()}
-                            className="aspect-video border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all group"
+                            className="aspect-video border-2 border-dashed border-indigo-200 dark:border-brand/30 hover:border-indigo-400 dark:hover:border-brand bg-indigo-50/50 dark:bg-brand/10 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all group"
                         >
                             {isAI ? (
                                 <>
-                                    <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mb-2" />
-                                    <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Parsing…</span>
+                                    <Loader2 className="w-8 h-8 text-indigo-500 dark:text-brand animate-spin mb-2" />
+                                    <span className="text-[11px] font-bold text-indigo-600 dark:text-brand uppercase tracking-widest">Parsing…</span>
                                 </>
                             ) : (
                                 <>
-                                    <Upload className="w-8 h-8 text-indigo-200 group-hover:text-indigo-400 transition-colors mb-2" />
-                                    <p className="text-xs font-semibold text-slate-500 text-center px-4">Click to upload or <span className="text-indigo-500 font-bold">Ctrl+V</span> to paste screenshot</p>
+                                    <Upload className="w-8 h-8 text-indigo-200 dark:text-brand/40 group-hover:text-indigo-400 dark:group-hover:text-brand transition-colors mb-2" />
+                                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center px-4">Click to upload or <span className="text-indigo-500 dark:text-brand font-bold">Ctrl+V</span> to paste screenshot</p>
                                 </>
                             )}
                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*"
@@ -181,8 +181,8 @@ export default function TeacherQuestionStudio() {
                     </div>
 
                     {/* Taxonomy */}
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow p-5 space-y-4">
-                        <h3 className="font-black text-slate-900 text-sm border-b border-slate-100 pb-3">Categorization</h3>
+                    <div className="bg-white dark:bg-surface rounded-2xl border border-slate-200 dark:border-white/10 shadow p-5 space-y-4">
+                        <h3 className="font-display font-black text-slate-900 dark:text-white text-sm border-b border-slate-100 dark:border-white/10 pb-3">Categorization</h3>
 
                         {[
                             { label: 'Class', value: classLevel, setter: setClassLevel, opts: ['Class 12', 'Class 11', 'NDA', 'CUET'] },
@@ -192,9 +192,9 @@ export default function TeacherQuestionStudio() {
                             { label: 'Difficulty', value: difficulty, setter: setDifficulty, opts: ['EASY', 'MEDIUM', 'HARD'] },
                         ].map(({ label, value, setter, opts }) => (
                             <div key={label}>
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">{label}</label>
+                                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-1">{label}</label>
                                 <select value={value} onChange={e => setter(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500">
+                                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 dark:focus:border-brand">
                                     {opts.map(o => <option key={o}>{o}</option>)}
                                 </select>
                             </div>
@@ -202,12 +202,12 @@ export default function TeacherQuestionStudio() {
 
                         {/* Tags */}
                         <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 flex items-center gap-1">
+                            <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-2 flex items-center gap-1">
                                 <Tag className="w-3 h-3" /> Tags
                             </label>
-                            <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-xl min-h-[44px] mb-2">
+                            <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl min-h-[44px] mb-2">
                                 {tags.map(t => (
-                                    <span key={t} className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                                    <span key={t} className="bg-indigo-100 dark:bg-brand/15 text-indigo-700 dark:text-brand px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
                                         {t} <X className="w-2.5 h-2.5 cursor-pointer hover:text-red-500" onClick={() => setTags(tags.filter(x => x !== t))} />
                                     </span>
                                 ))}
@@ -216,8 +216,8 @@ export default function TeacherQuestionStudio() {
                                 <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
                                     placeholder="Type tag & press Enter"
-                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-indigo-500 font-semibold text-slate-700" />
-                                <button onClick={addTag} className="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-xl text-xs font-bold transition">Add</button>
+                                    className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-indigo-500 dark:focus:border-brand font-semibold text-slate-700 dark:text-slate-200" />
+                                <button onClick={addTag} className="px-3 py-1.5 bg-indigo-100 dark:bg-brand/15 hover:bg-indigo-200 dark:hover:bg-brand/25 text-indigo-700 dark:text-brand rounded-xl text-xs font-bold transition">Add</button>
                             </div>
                         </div>
                     </div>
@@ -242,11 +242,11 @@ export default function TeacherQuestionStudio() {
 
                     {/* Options */}
                     <div>
-                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-3">Answer Options</label>
+                        <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-3">Answer Options</label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {options.map((opt, oIdx) => (
                                 <div key={oIdx} className="space-y-1">
-                                    <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">{String.fromCharCode(65 + oIdx)}</div>
+                                    <div className="text-[10px] font-black text-indigo-500 dark:text-brand uppercase tracking-widest pl-1">{String.fromCharCode(65 + oIdx)}</div>
                                     <SideBySideField label="" value={opt} onChange={v => { const n = [...options]; n[oIdx] = v; setOptions(n); }} rows={2} compact />
                                 </div>
                             ))}
@@ -256,10 +256,10 @@ export default function TeacherQuestionStudio() {
                     {/* Correct + Explanation */}
                     <div className="grid grid-cols-4 gap-4">
                         <div className="col-span-1 space-y-1">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest block">Correct</label>
+                            <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block">Correct</label>
                             <input value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value.toUpperCase())}
                                 placeholder="A"
-                                className="w-full bg-emerald-50 border border-emerald-200 rounded-2xl py-4 text-center text-xl text-emerald-600 font-black outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all" />
+                                className="w-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl py-4 text-center text-xl text-emerald-600 dark:text-emerald-400 font-black outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-500/20 transition-all" />
                         </div>
                         <div className="col-span-3">
                             <SideBySideField label="Explanation" value={explanation} onChange={setExplanation} rows={4} />
@@ -277,17 +277,17 @@ function SideBySideField({ label, value, onChange, rows, compact }: {
 }) {
     return (
         <div className={compact ? '' : 'space-y-1.5'}>
-            {label && <label className="text-xs font-black text-slate-500 uppercase tracking-widest block">{label}</label>}
+            {label && <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block">{label}</label>}
             <div className="grid grid-cols-2 gap-3">
                 <textarea
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     rows={rows}
                     placeholder="LaTeX source…"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-mono text-slate-800 resize-none outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all shadow-inner"
+                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm font-mono text-slate-800 dark:text-slate-200 resize-none outline-none focus:border-indigo-500 dark:focus:border-brand focus:ring-2 focus:ring-indigo-100 dark:focus:ring-brand/20 transition-all shadow-inner"
                 />
                 <div
-                    className="bg-white border border-slate-200 rounded-2xl p-4 text-sm text-slate-900 overflow-auto select-none pointer-events-none shadow-inner"
+                    className="bg-white dark:bg-surface border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm text-slate-900 dark:text-white overflow-auto select-none pointer-events-none shadow-inner"
                     style={{ minHeight: `${rows * 1.75}rem` }}
                     onContextMenu={e => e.preventDefault()}
                 >

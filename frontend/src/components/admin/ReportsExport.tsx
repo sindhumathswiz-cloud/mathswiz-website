@@ -212,16 +212,16 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
     return (
         <div className="space-y-8">
             <div>
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Reports & Export</h2>
-                <p className="text-gray-500 font-medium text-sm">Generate high-fidelity intelligence reports across all platform verticals.</p>
+                <h2 className="font-display text-2xl font-black text-gray-900 tracking-tight dark:text-white">Reports & Export</h2>
+                <p className="text-gray-500 font-medium text-sm dark:text-slate-400">Generate high-fidelity intelligence reports across all platform verticals.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left: Configuration */}
                 <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6 dark:bg-surface dark:border-white/10">
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Select Data Entity</label>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] dark:text-slate-500">Select Data Entity</label>
                             <div className="grid grid-cols-1 gap-2">
                                 {['Financials', 'User Registrations', 'Lead CRM'].map(item => (
                                     <button 
@@ -241,8 +241,8 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                         </div>
 
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Granular Filter</label>
-                            <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm transition">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] dark:text-slate-500">Granular Filter</label>
+                            <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm transition dark:border-white/10 dark:bg-surface-muted">
                                 <option>All Data</option>
                                 {entity === 'Financials' && (
                                     <>
@@ -269,7 +269,7 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                         </div>
 
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Reporting Period</label>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] dark:text-slate-500">Reporting Period</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {['Last 7 Days', 'Last 30 Days', 'This Month', 'Custom'].map(period => (
                                     <button 
@@ -292,14 +292,14 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                                 <button 
                                     onClick={() => handleExport('CSV')}
                                     disabled={isGenerating}
-                                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-indigo-100 disabled:opacity-50"
+                                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-indigo-100 dark:shadow-none disabled:opacity-50"
                                 >
                                     <Sheet className="w-4 h-4" /> Download CSV Data
                                 </button>
                                 <button 
                                     onClick={() => handleExport('PDF')}
                                     disabled={isGenerating}
-                                    className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold py-3 rounded-xl transition shadow-sm disabled:opacity-50"
+                                    className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold py-3 rounded-xl transition shadow-sm disabled:opacity-50 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted"
                                 >
                                     <FileText className="w-4 h-4 text-red-500" /> Export Professional PDF
                                 </button>
@@ -316,7 +316,7 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                                 <BarChart3 className="w-5 h-5" />
                                 <span className="text-[10px] font-black uppercase tracking-widest">Intelligence Preview</span>
                             </div>
-                            <h3 className="text-3xl font-black mb-2">{entity} Executive Summary</h3>
+                            <h3 className="font-display text-3xl font-black mb-2">{entity} Executive Summary</h3>
                             <p className="text-indigo-200 font-medium text-sm max-w-md">Real counts from the currently loaded {entity.toLowerCase()} records (reporting period filter: {dateRange.toLowerCase()}, not yet applied server-side).</p>
 
                             <div className="grid grid-cols-3 gap-6 mt-8">
@@ -336,26 +336,26 @@ export const ReportsExport = ({ stats, users, leads, payments }: ReportsExportPr
                         </div>
                     </div>
 
-                    <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
+                    <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm dark:bg-surface dark:border-white/10">
                         <div className="flex items-center justify-between mb-8">
-                            <h4 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
-                                <Calendar className="w-5 h-5 text-indigo-600" /> Status Breakdown
+                            <h4 className="font-display text-lg font-black text-gray-900 tracking-tight flex items-center gap-2 dark:text-white">
+                                <Calendar className="w-5 h-5 text-indigo-600 dark:text-brand" /> Status Breakdown
                             </h4>
                         </div>
 
                         {summary.breakdown.length === 0 ? (
-                            <div className="h-32 w-full bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No records loaded for {entity}</p>
+                            <div className="h-32 w-full bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center dark:border-white/10 dark:bg-surface-muted">
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest dark:text-slate-500">No records loaded for {entity}</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
                                 {summary.breakdown.map(([label, count]) => (
                                     <div key={label} className="flex items-center gap-4">
-                                        <span className="w-32 shrink-0 text-xs font-bold text-gray-600 truncate">{label}</span>
-                                        <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                                        <span className="w-32 shrink-0 text-xs font-bold text-gray-600 truncate dark:text-slate-400">{label}</span>
+                                        <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden dark:bg-white/5">
                                             <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${(count / maxBreakdownCount) * 100}%` }}></div>
                                         </div>
-                                        <span className="w-10 shrink-0 text-right text-xs font-black text-gray-900">{count}</span>
+                                        <span className="w-10 shrink-0 text-right text-xs font-black text-gray-900 dark:text-white">{count}</span>
                                     </div>
                                 ))}
                             </div>

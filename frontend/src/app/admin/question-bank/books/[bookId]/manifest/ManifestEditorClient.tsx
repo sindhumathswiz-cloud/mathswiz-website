@@ -366,101 +366,101 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <Link href="/admin/question-bank/books" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-indigo-600">
+      <Link href="/admin/question-bank/books" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-indigo-600 dark:text-brand">
         <ArrowLeft className="h-4 w-4" /> Book Ingestion Library
       </Link>
 
       <header className="mb-5">
-        <h1 className="text-2xl font-black text-slate-900">Chapter manifest</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="font-display text-2xl font-black text-slate-900 dark:text-white">Chapter manifest</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           {book ? <>{book.title} · {book.className}</> : 'Loading…'}{totalPages ? <> · {totalPages} pages</> : null}
         </p>
-        <p className="mt-1 text-xs font-bold text-slate-400">
+        <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">
           {chapters.length === 0 ? 'No chapters yet — run Auto-detect.' : `${confirmedCount} of ${chapters.length} chapters confirmed`}
         </p>
       </header>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <button onClick={() => void autoDetect()} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white disabled:opacity-60">
+        <button onClick={() => void autoDetect()} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-4 py-2.5 text-sm font-black text-white disabled:opacity-60">
           {busy === 'detect' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Auto-detect
         </button>
-        <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700">
+        <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 dark:bg-surface dark:border-white/10 dark:text-slate-300">
           Book page → PDF offset
-          <input inputMode="numeric" value={pageOffset} onChange={(e) => setPageOffset(e.target.value)} className="w-14 rounded-lg border border-slate-200 px-2 py-1 text-sm" />
-          <button onClick={reapplyOffset} disabled={anyBusy} className="inline-flex items-center gap-1 text-xs font-black text-indigo-600 disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" /> Re-apply</button>
+          <input inputMode="numeric" value={pageOffset} onChange={(e) => setPageOffset(e.target.value)} className="w-14 rounded-lg border border-slate-200 px-2 py-1 text-sm dark:border-white/10" />
+          <button onClick={reapplyOffset} disabled={anyBusy} className="inline-flex items-center gap-1 text-xs font-black text-indigo-600 disabled:opacity-50 dark:text-brand"><RefreshCw className="h-3.5 w-3.5" /> Re-apply</button>
         </label>
-        <button onClick={addChapter} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+        <button onClick={addChapter} disabled={anyBusy} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
           <Plus className="h-4 w-4" /> Add chapter
         </button>
-        <button onClick={() => void save(chapters, 'Draft saved.')} disabled={anyBusy || chapters.length === 0} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+        <button onClick={() => void save(chapters, 'Draft saved.')} disabled={anyBusy || chapters.length === 0} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
           {busy === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save draft
         </button>
-        <button onClick={() => void save(chapters.map((c) => ({ ...c, confirmed: true })), 'All chapters confirmed.')} disabled={anyBusy || chapters.length === 0} className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-60">
+        <button onClick={() => void save(chapters.map((c) => ({ ...c, confirmed: true })), 'All chapters confirmed.')} disabled={anyBusy || chapters.length === 0} className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 disabled:opacity-60 dark:bg-emerald-500/10">
           <CheckCircle2 className="h-4 w-4" /> Confirm all
         </button>
-        <button onClick={() => void refile()} disabled={anyBusy || confirmedCount === 0} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+        <button onClick={() => void refile()} disabled={anyBusy || confirmedCount === 0} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
           {busy === 'refile' ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Re-file existing questions
         </button>
       </div>
 
       {message && (
         <div className={`mb-5 rounded-xl border px-4 py-3 text-sm font-bold ${
-          message.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-          : message.kind === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800'
-          : 'border-indigo-200 bg-indigo-50 text-indigo-800'
+          message.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
+          : message.kind === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-400'
+          : 'border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-brand/20 dark:bg-brand/10 dark:text-brand'
         }`}>{message.text}</div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
       ) : (
         <div className="space-y-5">
           {chapters.map((chapter, ci) => (
-            <section key={ci} className={`rounded-2xl border bg-white p-5 ${chapter.confirmed ? 'border-emerald-300' : 'border-slate-200'}`}>
+            <section key={ci} className={`rounded-2xl border bg-white dark:bg-surface p-5 ${chapter.confirmed ? 'border-emerald-300 dark:border-emerald-500/30' : 'border-slate-200 dark:border-white/10'}`}>
               <div className="flex flex-wrap items-end gap-3">
                 <Field label="Ch #" width="w-14"><input value={chapter.chapterNumber} onChange={(e) => patchChapter(ci, { chapterNumber: e.target.value })} className={inputCls} /></Field>
                 <Field label="Chapter name" width="flex-1 min-w-48"><input value={chapter.name} onChange={(e) => patchChapter(ci, { name: e.target.value })} className={inputCls} /></Field>
                 <Field label="Topic" width="w-44"><input value={chapter.topic} onChange={(e) => patchChapter(ci, { topic: e.target.value })} placeholder="= name" className={inputCls} /></Field>
                 <Field label="Printed pp." width="w-24">
                   <div className="flex items-center gap-1">
-                    <input inputMode="numeric" value={chapter.printedStartPage} onChange={(e) => patchChapter(ci, { printedStartPage: e.target.value })} className="w-11 rounded-lg border border-slate-200 px-1.5 py-1.5 text-sm" />
-                    <span className="text-slate-400">–</span>
-                    <input inputMode="numeric" value={chapter.printedEndPage} onChange={(e) => patchChapter(ci, { printedEndPage: e.target.value })} className="w-11 rounded-lg border border-slate-200 px-1.5 py-1.5 text-sm" />
+                    <input inputMode="numeric" value={chapter.printedStartPage} onChange={(e) => patchChapter(ci, { printedStartPage: e.target.value })} className="w-11 rounded-lg border border-slate-200 px-1.5 py-1.5 text-sm dark:border-white/10" />
+                    <span className="text-slate-400 dark:text-slate-500">–</span>
+                    <input inputMode="numeric" value={chapter.printedEndPage} onChange={(e) => patchChapter(ci, { printedEndPage: e.target.value })} className="w-11 rounded-lg border border-slate-200 px-1.5 py-1.5 text-sm dark:border-white/10" />
                   </div>
                 </Field>
                 <PageRange label="PDF pages" startValue={chapter.startPage} endValue={chapter.endPage}
                   onStart={(v) => patchChapter(ci, { startPage: v })} onEnd={(v) => patchChapter(ci, { endPage: v })}
                   onView={() => void viewPages(chapter.startPage, chapter.endPage)} />
-                <button onClick={() => removeChapter(ci)} className="mb-1 rounded-lg border border-slate-200 p-2 text-slate-400 hover:border-rose-200 hover:text-rose-600" aria-label="Remove chapter"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => removeChapter(ci)} className="mb-1 rounded-lg border border-slate-200 p-2 text-slate-400 hover:border-rose-200 hover:text-rose-600 dark:border-white/10 dark:text-slate-500 hover:dark:text-rose-400 hover:dark:border-rose-500/20" aria-label="Remove chapter"><Trash2 className="h-4 w-4" /></button>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button onClick={() => void toggleChapterConfirm(ci)} disabled={anyBusy}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black disabled:opacity-50 ${chapter.confirmed ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-50'}`}>
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black disabled:opacity-50 ${chapter.confirmed ? 'bg-emerald-600 text-white' : 'border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
                   {chapter.confirmed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
                   {chapter.confirmed ? 'Confirmed' : 'Confirm chapter'}
                 </button>
-                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600" title="Questions currently in this chapter's PDF page range">
+                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600 dark:bg-white/5 dark:text-slate-400" title="Questions currently in this chapter's PDF page range">
                   {chapter.questionsInRange} question{chapter.questionsInRange === 1 ? '' : 's'} in range
                 </span>
                 {chapter.confirmed && (
                   <>
                     <button onClick={() => void extractChapter(ci)} disabled={anyBusy}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 disabled:opacity-50">
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 disabled:opacity-50 dark:text-brand dark:bg-brand/10">
                       {busy === `extract-${ci}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} Extract this chapter
                     </button>
                     <button onClick={() => void extractChapter(ci, true)} disabled={anyBusy}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:bg-surface dark:border-white/10 dark:text-slate-400 hover:dark:bg-surface-muted">
                       Re-extract (force)
                     </button>
                   </>
                 )}
-                {extractProgress[ci] && <span className="text-xs font-bold text-slate-500">{extractProgress[ci]}</span>}
+                {extractProgress[ci] && <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{extractProgress[ci]}</span>}
               </div>
 
-              <div className="mt-4 space-y-3 border-l-2 border-slate-100 pl-4">
+              <div className="mt-4 space-y-3 border-l-2 border-slate-100 pl-4 dark:border-white/10">
                 {chapter.sections.map((section, si) => (
-                  <div key={si} className="rounded-xl bg-slate-50 p-3">
+                  <div key={si} className="rounded-xl bg-slate-50 p-3 dark:bg-surface-muted">
                     <div className="flex flex-wrap items-end gap-3">
                       <Field label="Section type" width="w-44">
                         <select value={section.sectionType} onChange={(e) => patchSection(ci, si, { sectionType: e.target.value })} className={inputCls}>
@@ -471,21 +471,21 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                       <PageRange label="Question pages" startValue={section.startPage} endValue={section.endPage}
                         onStart={(v) => patchSection(ci, si, { startPage: v })} onEnd={(v) => patchSection(ci, si, { endPage: v })}
                         onView={() => void viewPages(section.startPage, section.endPage)} />
-                      <button onClick={() => removeSection(ci, si)} className="mb-1 rounded-lg border border-slate-200 p-2 text-slate-400 hover:border-rose-200 hover:text-rose-600" aria-label="Remove section"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => removeSection(ci, si)} className="mb-1 rounded-lg border border-slate-200 p-2 text-slate-400 hover:border-rose-200 hover:text-rose-600 dark:border-white/10 dark:text-slate-500 hover:dark:text-rose-400 hover:dark:border-rose-500/20" aria-label="Remove section"><Trash2 className="h-4 w-4" /></button>
                     </div>
 
                     <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-400">
                         <input type="checkbox" checked={section.noAnswers} onChange={(e) => patchSection(ci, si, { noAnswers: e.target.checked })} />
                         Practice exercise — no answers anywhere
                       </label>
                       <div className={section.noAnswers ? 'pointer-events-none opacity-40' : ''}>
-                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-400">
                           <input type="checkbox" disabled={section.noAnswers} checked={section.inlineAnswers} onChange={(e) => patchSection(ci, si, { inlineAnswers: e.target.checked })} />
                           Answers / solutions printed inline with the questions
                         </label>
 
-                        <label className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
+                        <label className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-400">
                           <input type="checkbox" disabled={section.noAnswers} checked={section.hasAnswerKey}
                             onChange={(e) => patchSection(ci, si, { hasAnswerKey: e.target.checked, ...(e.target.checked ? {} : { answerKeyStartPage: '', answerKeyEndPage: '' }) })} />
                           Separate answer key
@@ -494,7 +494,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                               <RangeMini startV={section.answerKeyStartPage} endV={section.answerKeyEndPage}
                                 onStart={(v) => patchSection(ci, si, { answerKeyStartPage: v })} onEnd={(v) => patchSection(ci, si, { answerKeyEndPage: v })}
                                 onView={() => void viewPages(section.answerKeyStartPage, section.answerKeyEndPage)} />
-                              <select value={section.answerKeyCoverage} onChange={(e) => patchSection(ci, si, { answerKeyCoverage: e.target.value })} className="rounded-lg border border-slate-200 px-1.5 py-1 text-xs">
+                              <select value={section.answerKeyCoverage} onChange={(e) => patchSection(ci, si, { answerKeyCoverage: e.target.value })} className="rounded-lg border border-slate-200 px-1.5 py-1 text-xs dark:border-white/10">
                                 <option value="ALL">covers all</option>
                                 <option value="SELECTED">selected only</option>
                               </select>
@@ -502,7 +502,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                           )}
                         </label>
 
-                        <label className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
+                        <label className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-400">
                           <input type="checkbox" disabled={section.noAnswers} checked={section.hasSolutions}
                             onChange={(e) => patchSection(ci, si, { hasSolutions: e.target.checked, ...(e.target.checked ? {} : { solutionsStartPage: '', solutionsEndPage: '' }) })} />
                           Separate detailed solutions
@@ -511,7 +511,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                               <RangeMini startV={section.solutionsStartPage} endV={section.solutionsEndPage}
                                 onStart={(v) => patchSection(ci, si, { solutionsStartPage: v })} onEnd={(v) => patchSection(ci, si, { solutionsEndPage: v })}
                                 onView={() => void viewPages(section.solutionsStartPage, section.solutionsEndPage)} />
-                              <select value={section.solutionCoverage} onChange={(e) => patchSection(ci, si, { solutionCoverage: e.target.value })} className="rounded-lg border border-slate-200 px-1.5 py-1 text-xs">
+                              <select value={section.solutionCoverage} onChange={(e) => patchSection(ci, si, { solutionCoverage: e.target.value })} className="rounded-lg border border-slate-200 px-1.5 py-1 text-xs dark:border-white/10">
                                 <option value="ALL">all solutions</option>
                                 <option value="SELECTED">selected only</option>
                                 <option value="HINTS">hints only</option>
@@ -523,7 +523,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                     </div>
                   </div>
                 ))}
-                <button onClick={() => addSection(ci)} className="inline-flex items-center gap-1.5 text-xs font-black text-indigo-600"><Plus className="h-3.5 w-3.5" /> Add section</button>
+                <button onClick={() => addSection(ci)} className="inline-flex items-center gap-1.5 text-xs font-black text-indigo-600 dark:text-brand"><Plus className="h-3.5 w-3.5" /> Add section</button>
               </div>
             </section>
           ))}
@@ -531,19 +531,19 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
       )}
 
       {preview && (
-        <aside className="fixed inset-y-0 right-0 z-40 w-full max-w-lg overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl">
+        <aside className="fixed inset-y-0 right-0 z-40 w-full max-w-lg overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl dark:bg-surface dark:border-white/10">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-black text-slate-900">OCR text · pages {preview.range}</h2>
-            <button onClick={() => setPreview(null)} className="rounded-lg p-1 text-slate-400 hover:text-slate-700" aria-label="Close"><X className="h-5 w-5" /></button>
+            <h2 className="font-display text-sm font-black text-slate-900 dark:text-white">OCR text · pages {preview.range}</h2>
+            <button onClick={() => setPreview(null)} className="rounded-lg p-1 text-slate-400 hover:text-slate-700 dark:text-slate-500 hover:dark:text-slate-300" aria-label="Close"><X className="h-5 w-5" /></button>
           </div>
           {previewLoading ? (
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
           ) : (
             <div className="space-y-4">
               {preview.pages.map((p) => (
                 <div key={p.pageNumber}>
-                  <div className="mb-1 text-xs font-black uppercase tracking-widest text-slate-400">Page {p.pageNumber}</div>
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{p.rawText || '(no text captured)'}</pre>
+                  <div className="mb-1 text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Page {p.pageNumber}</div>
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-surface-muted dark:text-slate-300">{p.rawText || '(no text captured)'}</pre>
                 </div>
               ))}
             </div>
@@ -559,7 +559,7 @@ const inputCls = 'w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-s
 function Field({ label, width, children }: { label: string; width: string; children: React.ReactNode }) {
   return (
     <label className={`${width} block`}>
-      <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+      <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">{label}</span>
       {children}
     </label>
   );
@@ -570,7 +570,7 @@ function PageRange({ startValue, endValue, onStart, onEnd, onView, label }: {
 }) {
   return (
     <div className="block">
-      <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+      <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">{label}</span>
       <RangeMini startV={startValue} endV={endValue} onStart={onStart} onEnd={onEnd} onView={onView} />
     </div>
   );
@@ -581,10 +581,10 @@ function RangeMini({ startV, endV, onStart, onEnd, onView }: {
 }) {
   return (
     <span className="inline-flex items-center gap-1">
-      <input inputMode="numeric" value={startV} onChange={(e) => onStart(e.target.value)} placeholder="from" className="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-sm" aria-label="page from" />
-      <span className="text-slate-400">–</span>
-      <input inputMode="numeric" value={endV} onChange={(e) => onEnd(e.target.value)} placeholder="to" className="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-sm" aria-label="page to" />
-      <button type="button" onClick={onView} disabled={!startV} className="rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:text-indigo-600 disabled:opacity-40" aria-label="View pages"><Eye className="h-3.5 w-3.5" /></button>
+      <input inputMode="numeric" value={startV} onChange={(e) => onStart(e.target.value)} placeholder="from" className="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-sm dark:border-white/10" aria-label="page from" />
+      <span className="text-slate-400 dark:text-slate-500">–</span>
+      <input inputMode="numeric" value={endV} onChange={(e) => onEnd(e.target.value)} placeholder="to" className="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-sm dark:border-white/10" aria-label="page to" />
+      <button type="button" onClick={onView} disabled={!startV} className="rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:text-indigo-600 disabled:opacity-40 dark:border-white/10 dark:text-slate-500 hover:dark:text-brand" aria-label="View pages"><Eye className="h-3.5 w-3.5" /></button>
     </span>
   );
 }

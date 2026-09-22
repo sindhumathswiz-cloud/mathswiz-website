@@ -52,17 +52,17 @@ export default function PerformanceAnalytics() {
     };
 
     if (loading) return (
-        <div className="h-screen flex items-center justify-center bg-slate-50">
+        <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-background">
             <div className="text-center animate-pulse">
-                <div className="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-xl shadow-indigo-100">
+                <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-xl shadow-indigo-100 dark:shadow-none">
                     <TrendingUp className="w-8 h-8 text-white" />
                 </div>
-                <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Generating Neural Insights</p>
+                <p className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest text-xs">Generating Neural Insights</p>
             </div>
         </div>
     );
 
-    if (!data) return <div>Error loading data.</div>;
+    if (!data) return <div className="min-h-screen bg-slate-50 dark:bg-background text-slate-900 dark:text-foreground p-8">Error loading data.</div>;
 
     const { attempt, behavioral, rank, totalTakers, responseInsights, recommendedAction } = data;
     const insightByResponseId = new Map((responseInsights || []).map((ri: any) => [ri.responseId, ri]));
@@ -74,9 +74,9 @@ export default function PerformanceAnalytics() {
         COMMON_MISTAKE: 'Common Mistake',
     };
     const CONFIDENCE_STYLE: Record<string, string> = {
-        HIGH: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-        MEDIUM: 'bg-amber-50 text-amber-700 border-amber-100',
-        LOW: 'bg-rose-50 text-rose-700 border-rose-100',
+        HIGH: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20',
+        MEDIUM: 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-accent-warm/10 dark:text-accent-warm dark:border-accent-warm/20',
+        LOW: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
     };
 
     // Data for charts
@@ -95,25 +95,25 @@ export default function PerformanceAnalytics() {
     }));
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] pb-20 font-sans">
+        <div className="min-h-screen bg-[#F8FAFC] dark:bg-background pb-20 font-sans">
             {/* Header */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
+            <div className="bg-white dark:bg-surface border-b border-slate-200 dark:border-white/10 sticky top-0 z-30">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-6">
-                        <button onClick={() => router.back()} className="w-10 h-10 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-slate-50 transition-all text-slate-500">
+                        <button onClick={() => router.back()} className="w-10 h-10 border border-slate-200 dark:border-white/10 rounded-xl flex items-center justify-center hover:bg-slate-50 dark:hover:bg-white/5 transition-all text-slate-500 dark:text-slate-400">
                             <ChevronLeft className="w-5 h-5" />
                         </button>
                         <div>
-                            <h1 className="text-xl font-black text-slate-900 tracking-tight">Post-Exam Intelligence</h1>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{attempt.test?.title || 'Practice Session'}</p>
+                            <h1 className="font-display text-xl font-black text-slate-900 dark:text-white tracking-tight">Post-Exam Intelligence</h1>
+                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{attempt.test?.title || 'Practice Session'}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="text-right hidden sm:block">
-                            <p className="text-xs font-black text-slate-900">Score Achieved</p>
-                            <p className="text-2xl font-black text-indigo-600 leading-none mt-1" suppressHydrationWarning>{attempt.totalScore}</p>
+                            <p className="text-xs font-black text-slate-900 dark:text-white">Score Achieved</p>
+                            <p className="text-2xl font-black text-indigo-600 dark:text-brand leading-none mt-1" suppressHydrationWarning>{attempt.totalScore}</p>
                         </div>
-                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100 dark:shadow-none">
                             <Trophy className="w-6 h-6 text-white" />
                         </div>
                     </div>
@@ -124,18 +124,18 @@ export default function PerformanceAnalytics() {
                 {/* Score Summary Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     {[
-                        { label: 'Total Questions', value: attempt.responses.length, icon: MousePointer2, color: 'text-slate-600', bg: 'bg-slate-100' },
-                        { label: 'Accuracy', value: `${attempt.totalCorrect + attempt.totalIncorrect > 0 ? Math.round((attempt.totalCorrect / (attempt.totalCorrect + attempt.totalIncorrect)) * 100) : 0}%`, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                        { label: 'Avg Time/Q', value: `${Math.round(behavioral.medianTime)}s`, icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
-                        { label: 'Rank', value: rank ? `${rank}/${totalTakers}` : 'Not available', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50' },
+                        { label: 'Total Questions', value: attempt.responses.length, icon: MousePointer2, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-white/5' },
+                        { label: 'Accuracy', value: `${attempt.totalCorrect + attempt.totalIncorrect > 0 ? Math.round((attempt.totalCorrect / (attempt.totalCorrect + attempt.totalIncorrect)) * 100) : 0}%`, icon: Target, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+                        { label: 'Avg Time/Q', value: `${Math.round(behavioral.medianTime)}s`, icon: Clock, color: 'text-blue-600 dark:text-sky-400', bg: 'bg-blue-50 dark:bg-sky-500/10' },
+                        { label: 'Rank', value: rank ? `${rank}/${totalTakers}` : 'Not available', icon: Trophy, color: 'text-amber-600 dark:text-accent-warm', bg: 'bg-amber-50 dark:bg-accent-warm/10' },
                     ].map((stat, i) => (
-                        <div key={i} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div key={i} className="bg-white dark:bg-surface p-6 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex items-center gap-4">
                             <div className={`p-4 ${stat.bg} ${stat.color} rounded-2xl`}>
                                 <stat.icon className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                                <p className="text-2xl font-black text-slate-900 tracking-tight">{stat.value}</p>
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{stat.label}</p>
+                                <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{stat.value}</p>
                             </div>
                         </div>
                     ))}
@@ -143,7 +143,7 @@ export default function PerformanceAnalytics() {
 
                 {/* Recommended Next Action */}
                 {recommendedAction && recommendedAction.type !== 'KEEP_GOING' && (
-                    <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[40px] p-8 shadow-xl shadow-indigo-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 text-white">
+                    <div className="bg-gradient-to-br from-indigo-600 to-purple-700 dark:from-brand dark:to-brand-violet rounded-[40px] p-8 shadow-xl shadow-indigo-100 dark:shadow-none flex flex-col md:flex-row items-start md:items-center justify-between gap-6 text-white">
                         <div className="flex items-start gap-4">
                             <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
                                 {recommendedAction.type === 'REVIEW_MISTAKES' ? <BookX className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
@@ -166,13 +166,13 @@ export default function PerformanceAnalytics() {
                     </div>
                 )}
                 {recommendedAction && recommendedAction.type === 'KEEP_GOING' && (
-                    <div className="bg-emerald-50 border border-emerald-100 rounded-[40px] p-6 flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                    <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-[40px] p-6 flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white dark:bg-surface rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm shrink-0">
                             <PartyPopper className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Recommended Next Action</p>
-                            <h3 className="text-sm font-black text-emerald-900">Nothing urgent — keep up the momentum!</h3>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 dark:text-emerald-400 mb-1">Recommended Next Action</p>
+                            <h3 className="font-display text-sm font-black text-emerald-900 dark:text-emerald-300">Nothing urgent — keep up the momentum!</h3>
                         </div>
                     </div>
                 )}
@@ -180,13 +180,13 @@ export default function PerformanceAnalytics() {
                 {/* Behavioral & Time Analytics */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Behavioral categorization (The "Embibe" Look) */}
-                    <div className="lg:col-span-1 bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm flex flex-col">
+                    <div className="lg:col-span-1 bg-white dark:bg-surface p-8 rounded-[40px] border border-slate-200 dark:border-white/10 shadow-sm flex flex-col">
                         <div className="mb-8">
                             <div className="flex items-center gap-2 mb-2">
-                                <Zap className="w-5 h-5 text-indigo-600" />
-                                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Behavioral Breakdown</h3>
+                                <Zap className="w-5 h-5 text-indigo-600 dark:text-brand" />
+                                <h3 className="font-display text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter">Behavioral Breakdown</h3>
                             </div>
-                            <p className="text-xs font-medium text-slate-500">How your decisions impacted your final score.</p>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">How your decisions impacted your final score.</p>
                         </div>
 
                         <div className="h-64 mb-8">
@@ -204,31 +204,31 @@ export default function PerformanceAnalytics() {
 
                         <div className="space-y-4">
                             {behavioralData.map((d, i) => (
-                                <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group transition-all hover:border-indigo-200">
+                                <div key={i} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/10 group transition-all hover:border-indigo-200 dark:hover:border-brand/40">
                                     <div className="flex items-center gap-3">
                                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></div>
                                         <div>
-                                            <p className="text-xs font-black text-slate-900 uppercase">{d.name}</p>
-                                            <p className="text-[10px] font-medium text-slate-400">{d.detail}</p>
+                                            <p className="text-xs font-black text-slate-900 dark:text-white uppercase">{d.name}</p>
+                                            <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{d.detail}</p>
                                         </div>
                                     </div>
-                                    <span className="text-lg font-black text-slate-900">{d.value}</span>
+                                    <span className="text-lg font-black text-slate-900 dark:text-white">{d.value}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
 
                     {/* Time Series Chart */}
-                    <div className="lg:col-span-2 bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+                    <div className="lg:col-span-2 bg-white dark:bg-surface p-8 rounded-[40px] border border-slate-200 dark:border-white/10 shadow-sm">
                         <div className="flex justify-between items-start mb-10">
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <Timer className="w-5 h-5 text-indigo-600" />
-                                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Temporal Flow</h3>
+                                    <Timer className="w-5 h-5 text-indigo-600 dark:text-brand" />
+                                    <h3 className="font-display text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter">Temporal Flow</h3>
                                 </div>
-                                <p className="text-xs font-medium text-slate-500">Timeline of exertion vs accuracy across the paper.</p>
+                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Timeline of exertion vs accuracy across the paper.</p>
                             </div>
-                            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
+                            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                                 <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Correct</div>
                                 <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Incorrect</div>
                             </div>
@@ -263,32 +263,32 @@ export default function PerformanceAnalytics() {
                 </div>
 
                 {/* Granular Response Audit */}
-                <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                <div className="bg-white dark:bg-surface rounded-[40px] border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
+                    <div className="p-8 border-b border-slate-100 dark:border-white/10 flex items-center justify-between">
                         <div>
-                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Response Audit</h3>
-                            <p className="text-xs font-medium text-slate-500">Step-by-step review of all attempted vectors.</p>
+                            <h3 className="font-display text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter">Response Audit</h3>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Step-by-step review of all attempted vectors.</p>
                         </div>
                         <div className="flex gap-2">
-                             <button className="px-5 py-2.5 bg-indigo-50 text-indigo-700 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-100 transition shadow-sm">Filter: Incorrect</button>
-                             <button className="px-5 py-2.5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg">Download PDF Analysis</button>
+                             <button className="px-5 py-2.5 bg-indigo-50 dark:bg-brand/10 text-indigo-700 dark:text-brand rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-brand/20 transition shadow-sm">Filter: Incorrect</button>
+                             <button className="px-5 py-2.5 bg-slate-900 dark:bg-white/10 dark:border dark:border-white/20 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg">Download PDF Analysis</button>
                         </div>
                     </div>
 
-                    <div className="divide-y divide-slate-50">
+                    <div className="divide-y divide-slate-50 dark:divide-white/5">
                         {attempt.responses.map((r: any, i: number) => {
                             const insight = insightByResponseId.get(r.id) as { errorType: string | null; confidence: string | null } | undefined;
                             return (
-                            <div key={i} className="p-8 hover:bg-slate-50/50 transition-colors">
+                            <div key={i} className="p-8 hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors">
                                 <div className="flex flex-col lg:flex-row gap-8">
-                                    <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shrink-0">
+                                    <div className="w-16 h-16 rounded-2xl bg-slate-900 dark:bg-white/10 text-white flex items-center justify-center font-black text-xl shrink-0">
                                         {i + 1}
                                     </div>
                                     <div className="flex-1 space-y-6">
                                         {(insight?.errorType || insight?.confidence) && (
                                             <div className="flex flex-wrap items-center gap-2">
                                                 {insight.errorType && (
-                                                    <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10">
                                                         {ERROR_TYPE_LABEL[insight.errorType] || insight.errorType}
                                                     </span>
                                                 )}
@@ -299,20 +299,20 @@ export default function PerformanceAnalytics() {
                                                 )}
                                             </div>
                                         )}
-                                        <div className="prose prose-slate max-w-none">
+                                        <div className="prose prose-slate dark:prose-invert max-w-none">
                                             <MathRenderer content={r.question.content} />
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className={`p-4 rounded-2xl border ${r.isCorrect ? 'bg-emerald-50 border-emerald-100 text-emerald-900' : 'bg-rose-50 border-rose-100 text-rose-900'} flex items-center gap-3`}>
+                                            <div className={`p-4 rounded-2xl border ${r.isCorrect ? 'bg-emerald-50 border-emerald-100 text-emerald-900 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300' : 'bg-rose-50 border-rose-100 text-rose-900 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300'} flex items-center gap-3`}>
                                                 {r.isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                                                 <div>
                                                     <p className="text-[10px] font-black uppercase opacity-60">Your Response</p>
                                                     <p className="text-sm font-bold">Option {r.selectedOption || 'Skipped'} {r.isCorrect ? '(Correct)' : '(Incorrect)'}</p>
                                                 </div>
                                             </div>
-                                            <div className="p-4 rounded-2xl border bg-slate-50 border-slate-100 text-slate-900 flex items-center gap-3">
-                                                <Clock className="w-5 h-5 text-slate-400" />
+                                            <div className="p-4 rounded-2xl border bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/10 text-slate-900 dark:text-white flex items-center gap-3">
+                                                <Clock className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                                                 <div>
                                                     <p className="text-[10px] font-black uppercase opacity-60">Time Invested</p>
                                                     <p className="text-sm font-bold">{Math.round(r.timeSpent)} seconds</p>
@@ -321,14 +321,14 @@ export default function PerformanceAnalytics() {
                                         </div>
 
                                         {!r.isCorrect && (
-                                            <div className="bg-indigo-50/50 border border-indigo-100 rounded-3xl p-6">
+                                            <div className="bg-indigo-50/50 dark:bg-brand/5 border border-indigo-100 dark:border-brand/20 rounded-3xl p-6">
                                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                                    <p className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                                                    <p className="text-xs font-black text-indigo-600 dark:text-brand uppercase tracking-widest flex items-center gap-2">
                                                         <ArrowUpRight className="w-4 h-4" /> Conceptual Resolution
                                                     </p>
                                                     <QuestionTrustBadge status={r.question.status} verificationStatus={r.question.verificationStatus} />
                                                 </div>
-                                                <div className="text-sm font-medium text-slate-700">
+                                                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
                                                     <MathRenderer content={r.question.explanation || 'Solution not available.'} />
                                                 </div>
                                             </div>

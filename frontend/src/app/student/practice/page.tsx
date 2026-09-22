@@ -38,8 +38,8 @@ const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'] as const;
 export default function PracticeArena() {
     return (
         <Suspense fallback={
-            <div className="h-screen flex items-center justify-center bg-slate-50">
-                <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+            <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-background">
+                <Loader2 className="w-12 h-12 animate-spin text-indigo-600 dark:text-brand" />
             </div>
         }>
             <PracticeArenaInner />
@@ -400,37 +400,37 @@ function PracticeArenaInner() {
     };
 
     if (loading) return (
-        <div className="h-screen flex items-center justify-center bg-slate-50">
-            <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+        <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-background">
+            <Loader2 className="w-12 h-12 animate-spin text-indigo-600 dark:text-brand" />
         </div>
     );
 
     if (fetchError) return (
-        <div className="h-screen flex items-center justify-center bg-slate-50" data-testid="practice-arena-error">
+        <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-background" data-testid="practice-arena-error">
             <div className="text-center max-w-sm">
-                <XCircle className="w-16 h-16 text-rose-300 mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-slate-900">Couldn't load a question</h2>
-                <p className="text-slate-500 mb-6">{fetchError}</p>
+                <XCircle className="w-16 h-16 text-rose-300 dark:text-rose-500/60 mx-auto mb-4" />
+                <h2 className="font-display text-xl font-bold text-slate-900 dark:text-white">Couldn't load a question</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">{fetchError}</p>
                 <div className="flex flex-col gap-3 items-center">
                     <button
                         onClick={() => fetchNextQuestion()}
-                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all"
+                        className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:brightness-105 text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all"
                     >
                         <RotateCcw className="w-4 h-4" />
                         Try Again
                     </button>
-                    <button onClick={() => router.back()} className="text-slate-400 font-bold text-sm">Return to Dashboard</button>
+                    <button onClick={() => router.back()} className="text-slate-400 dark:text-slate-500 font-bold text-sm">Return to Dashboard</button>
                 </div>
             </div>
         </div>
     );
 
     if (!question) return (
-        <div className="h-screen flex items-center justify-center">
+        <div className="h-screen flex items-center justify-center dark:bg-background">
             <div className="text-center max-w-sm">
-                <HelpCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-slate-900">Arena Empty</h2>
-                <p className="text-slate-500 mb-6">
+                <HelpCircle className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+                <h2 className="font-display text-xl font-bold text-slate-900 dark:text-white">Arena Empty</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">
                     {topicFilter || difficultyFilter
                         ? `No approved questions match "${topicFilter || 'this'}"${difficultyFilter ? ` at ${difficultyFilter}` : ''} yet.`
                         : 'No questions match your current profile.'}
@@ -441,20 +441,20 @@ function PracticeArenaInner() {
                             <button
                                 onClick={handleGenerate}
                                 disabled={isGenerating || !topicFilter.trim()}
-                                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all"
+                                className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:brightness-105 disabled:opacity-40 text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all"
                             >
                                 {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                                 Generate Questions For This Topic
                             </button>
                             <button
                                 onClick={() => { setTopicFilter(''); setDifficultyFilter(''); fetchNextQuestion({ topic: '', difficulty: '' }); }}
-                                className="text-indigo-600 font-bold text-sm"
+                                className="text-indigo-600 dark:text-brand font-bold text-sm"
                             >
                                 Clear filters
                             </button>
                         </>
                     )}
-                    <button onClick={() => router.back()} className="text-slate-400 font-bold text-sm">Return to Dashboard</button>
+                    <button onClick={() => router.back()} className="text-slate-400 dark:text-slate-500 font-bold text-sm">Return to Dashboard</button>
                 </div>
             </div>
         </div>
@@ -463,38 +463,38 @@ function PracticeArenaInner() {
     const options = parseQuestionOptions(question.options);
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] pb-20 font-sans">
+        <div className="min-h-screen bg-[#F8FAFC] dark:bg-background pb-20 font-sans">
             {/* Header / Stats Bar */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
+            <div className="bg-white dark:bg-surface border-b border-slate-200 dark:border-white/10 sticky top-0 z-30">
                 <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-900 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                        <div className="w-12 h-12 bg-indigo-900 dark:bg-gradient-to-br dark:from-brand dark:to-brand-violet rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100 dark:shadow-none">
                             <BrainCircuit className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-lg font-black text-slate-900 tracking-tight">Adaptive Practice Arena</h1>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Nurturing Mastery Room</p>
+                            <h1 className="font-display text-lg font-black text-slate-900 dark:text-white tracking-tight">Adaptive Practice Arena</h1>
+                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">Nurturing Mastery Room</p>
                         </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2 bg-rose-50 px-4 py-2 rounded-2xl border border-rose-100">
-                            <Flame className={`w-5 h-5 ${streak > 0 ? 'text-orange-500 animate-bounce' : 'text-slate-300'}`} />
-                            <span className="text-sm font-black text-slate-900">{streak} Streak</span>
+                        <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-500/10 px-4 py-2 rounded-2xl border border-rose-100 dark:border-rose-500/20">
+                            <Flame className={`w-5 h-5 ${streak > 0 ? 'text-orange-500 animate-bounce' : 'text-slate-300 dark:text-slate-600'}`} />
+                            <span className="text-sm font-black text-slate-900 dark:text-white">{streak} Streak</span>
                         </div>
-                        <div className="flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100">
-                            <Target className="w-5 h-5 text-indigo-600" />
-                            <span className="text-sm font-black text-slate-900">{stats.correct}/{stats.total} Session</span>
+                        <div className="flex items-center gap-2 bg-indigo-50 dark:bg-brand/10 px-4 py-2 rounded-2xl border border-indigo-100 dark:border-brand/20">
+                            <Target className="w-5 h-5 text-indigo-600 dark:text-brand" />
+                            <span className="text-sm font-black text-slate-900 dark:text-white">{stats.correct}/{stats.total} Session</span>
                         </div>
-                        <div className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-2xl border border-slate-200">
-                            <Clock className={`w-5 h-5 ${isSubmitted ? 'text-slate-300' : 'text-slate-500'}`} />
-                            <span className="text-sm font-black text-slate-900 tabular-nums">{formatElapsed(elapsedSeconds)}</span>
+                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-2xl border border-slate-200 dark:border-white/10">
+                            <Clock className={`w-5 h-5 ${isSubmitted ? 'text-slate-300 dark:text-slate-600' : 'text-slate-500 dark:text-slate-400'}`} />
+                            <span className="text-sm font-black text-slate-900 dark:text-white tabular-nums">{formatElapsed(elapsedSeconds)}</span>
                         </div>
                         {mistakesDue > 0 && !isReviewingMistakes && (
                             <button
                                 onClick={handleReviewMistakes}
                                 disabled={isLoadingMistakes}
-                                className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-amber-200 disabled:opacity-60"
+                                className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-500 hover:bg-amber-600 dark:bg-accent-warm dark:hover:bg-accent-warm/90 text-white dark:text-slate-900 font-black text-xs uppercase tracking-widest transition-colors shadow-lg shadow-amber-200 dark:shadow-none disabled:opacity-60"
                             >
                                 {isLoadingMistakes ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
                                 Review {mistakesDue} Mistake{mistakesDue === 1 ? '' : 's'}
@@ -502,7 +502,7 @@ function PracticeArenaInner() {
                         )}
                         <button
                             onClick={() => setShowSetup(s => !s)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-2xl border font-black text-xs uppercase tracking-widest transition-colors ${showSetup ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-2xl border font-black text-xs uppercase tracking-widest transition-colors ${showSetup ? 'bg-slate-900 text-white border-slate-900 dark:bg-white/10 dark:border-white/20' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600 dark:bg-surface dark:text-slate-400 dark:border-white/10 dark:hover:border-brand/40 dark:hover:text-brand'}`}
                         >
                             <SlidersHorizontal className="w-4 h-4" /> Setup
                         </button>
@@ -516,20 +516,20 @@ function PracticeArenaInner() {
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="border-t border-slate-100 overflow-hidden"
+                            className="border-t border-slate-100 dark:border-white/10 overflow-hidden"
                         >
                             <div className="max-w-5xl mx-auto px-6 py-6 space-y-5">
                                 {recommended.length > 0 && (
                                     <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                            <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Recommended for you — needs the most work
+                                        <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                            <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-brand" /> Recommended for you — needs the most work
                                         </p>
                                         <div className="flex flex-wrap gap-2">
                                             {recommended.map(topic => (
                                                 <button
                                                     key={topic}
                                                     onClick={() => handlePracticeTopic(topic)}
-                                                    className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition"
+                                                    className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-brand/10 dark:hover:bg-brand/20 dark:text-brand rounded-xl text-xs font-bold transition"
                                                 >
                                                     {topic}
                                                 </button>
@@ -540,21 +540,21 @@ function PracticeArenaInner() {
 
                                 <div className="flex flex-wrap items-end gap-4">
                                     <div className="flex-1 min-w-[200px] space-y-1.5">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Topic</label>
+                                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Topic</label>
                                         <input
                                             type="text"
                                             value={topicFilter}
                                             onChange={e => setTopicFilter(e.target.value)}
                                             placeholder="e.g. Integrals, Probability"
-                                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all"
+                                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-brand dark:focus:bg-white/10"
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Difficulty</label>
+                                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Difficulty</label>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setDifficultyFilter('')}
-                                                className={`px-4 py-3 rounded-2xl text-[10px] font-black transition-all ${difficultyFilter === '' ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                                className={`px-4 py-3 rounded-2xl text-[10px] font-black transition-all ${difficultyFilter === '' ? 'bg-slate-900 text-white dark:bg-white/10 dark:border dark:border-white/20' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 dark:bg-white/5 dark:text-slate-500 dark:hover:bg-white/10'}`}
                                             >
                                                 ANY
                                             </button>
@@ -562,7 +562,7 @@ function PracticeArenaInner() {
                                                 <button
                                                     key={d}
                                                     onClick={() => setDifficultyFilter(d)}
-                                                    className={`px-4 py-3 rounded-2xl text-[10px] font-black transition-all ${difficultyFilter === d ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                                    className={`px-4 py-3 rounded-2xl text-[10px] font-black transition-all ${difficultyFilter === d ? 'bg-slate-900 text-white dark:bg-white/10 dark:border dark:border-white/20' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 dark:bg-white/5 dark:text-slate-500 dark:hover:bg-white/10'}`}
                                                 >
                                                     {d}
                                                 </button>
@@ -571,20 +571,20 @@ function PracticeArenaInner() {
                                     </div>
                                     <button
                                         onClick={() => { setShowSetup(false); fetchNextQuestion(); }}
-                                        className="bg-slate-900 hover:bg-slate-800 text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all"
+                                        className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20 font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all"
                                     >
                                         Apply Filter
                                     </button>
                                     <button
                                         onClick={handleGenerate}
                                         disabled={isGenerating || !topicFilter.trim()}
-                                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-100"
+                                        className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black px-6 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 dark:shadow-none"
                                     >
                                         {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                                         Generate 5 New Questions
                                     </button>
                                 </div>
-                                <p className="text-[11px] text-slate-400 font-medium">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
                                     Generated questions go straight into this session's queue. They also join the question bank pending a teacher's review before other students see them.
                                 </p>
                             </div>
@@ -595,12 +595,12 @@ function PracticeArenaInner() {
 
             <div className="max-w-4xl mx-auto px-6 mt-12">
                 {isReviewingMistakes && (
-                    <div className="mb-6 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3">
-                        <RotateCcw className="w-4 h-4 text-amber-600 shrink-0" />
-                        <p className="text-sm font-bold text-amber-800">
+                    <div className="mb-6 flex items-center gap-3 bg-amber-50 border border-amber-200 dark:bg-accent-warm/10 dark:border-accent-warm/20 rounded-2xl px-5 py-3">
+                        <RotateCcw className="w-4 h-4 text-amber-600 dark:text-accent-warm shrink-0" />
+                        <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
                             Reviewing your mistakes — {queueCount + 1} left this session.
                             {typeof question.missCount === 'number' && question.missCount > 1 && (
-                                <span className="text-amber-600"> You've missed this one {question.missCount} times.</span>
+                                <span className="text-amber-600 dark:text-accent-warm"> You've missed this one {question.missCount} times.</span>
                             )}
                         </p>
                     </div>
@@ -614,14 +614,14 @@ function PracticeArenaInner() {
                         className="space-y-8"
                     >
                         {/* Question Card */}
-                        <div className="bg-white rounded-[40px] p-10 border border-slate-200 shadow-sm relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-8 text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">
+                        <div className="bg-white dark:bg-surface rounded-[40px] p-10 border border-slate-200 dark:border-white/10 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-8 text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest leading-none">
                                 Q-ID: {question.id.slice(-6)}
                             </div>
                             <div className="mb-6">
-                                <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase rounded-full tracking-widest">{question.subject} &bull; {question.topic}</span>
+                                <span className="px-3 py-1 bg-indigo-50 text-indigo-700 dark:bg-brand/10 dark:text-brand text-[10px] font-black uppercase rounded-full tracking-widest">{question.subject} &bull; {question.topic}</span>
                             </div>
-                            <div className="text-xl font-bold text-slate-900 leading-relaxed mb-4">
+                            <div className="text-xl font-bold text-slate-900 dark:text-white leading-relaxed mb-4">
                                 <MathRenderer content={question.content} />
                             </div>
                             <QuestionTags tags={question.tags} className="mb-10" />
@@ -639,21 +639,21 @@ function PracticeArenaInner() {
                                             data-testid={`option-${letter}`}
                                             onClick={() => handleOptionSelect(letter)}
                                             className={`flex items-center gap-6 p-5 rounded-2xl border-2 transition-all cursor-pointer group ${
-                                                isCorrect ? 'border-emerald-500 bg-emerald-50/50' :
-                                                isWrong ? 'border-rose-500 bg-rose-50/50' :
-                                                isSelected ? 'border-indigo-600 bg-indigo-50/30' :
-                                                'border-slate-100 hover:border-indigo-300 hover:bg-slate-50/50'
+                                                isCorrect ? 'border-emerald-500 bg-emerald-50/50 dark:border-emerald-500/60 dark:bg-emerald-500/10' :
+                                                isWrong ? 'border-rose-500 bg-rose-50/50 dark:border-rose-500/60 dark:bg-rose-500/10' :
+                                                isSelected ? 'border-indigo-600 bg-indigo-50/30 dark:border-brand dark:bg-brand/10' :
+                                                'border-slate-100 hover:border-indigo-300 hover:bg-slate-50/50 dark:border-white/10 dark:hover:border-brand/40 dark:hover:bg-white/5'
                                             }`}
                                         >
                                             <div className={`shrink-0 w-10 h-10 rounded-xl border-2 flex items-center justify-center font-black text-sm transition-colors ${
                                                 isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' :
                                                 isWrong ? 'bg-rose-500 border-rose-500 text-white' :
-                                                isSelected ? 'border-indigo-600 bg-indigo-600 text-white' :
-                                                'border-slate-200 bg-white text-slate-400 group-hover:border-indigo-300 group-hover:text-indigo-600'
+                                                isSelected ? 'border-indigo-600 bg-indigo-600 text-white dark:border-brand dark:bg-brand' :
+                                                'border-slate-200 bg-white text-slate-400 group-hover:border-indigo-300 group-hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-500 dark:group-hover:border-brand/40 dark:group-hover:text-brand'
                                             }`}>
                                                 {letter}
                                             </div>
-                                            <div className="text-lg font-bold text-slate-700">
+                                            <div className="text-lg font-bold text-slate-700 dark:text-slate-300">
                                                 <MathRenderer content={opt} />
                                             </div>
                                         </div>
@@ -662,17 +662,17 @@ function PracticeArenaInner() {
                             </div>
 
                             {options.length === 0 && (
-                                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-bold text-amber-800">
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:border-accent-warm/20 dark:bg-accent-warm/10 p-5 text-sm font-bold text-amber-800 dark:text-amber-200">
                                     This question has an invalid or incomplete option list. You can skip it safely.
                                 </div>
                             )}
 
-                            <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-center">
+                            <div className="mt-12 pt-8 border-t border-slate-100 dark:border-white/10 flex justify-between items-center">
                                 <div className="flex items-center gap-5">
                                 <button
                                     onClick={getHint}
                                     disabled={isHintLoading || isSubmitted}
-                                    className="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-widest hover:text-indigo-700 disabled:opacity-30"
+                                    className="flex items-center gap-2 text-indigo-600 dark:text-brand font-black text-xs uppercase tracking-widest hover:text-indigo-700 dark:hover:text-brand/80 disabled:opacity-30"
                                 >
                                     {isHintLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                                     Ask Doubt Buddy for a Hint 🤖
@@ -682,7 +682,7 @@ function PracticeArenaInner() {
                                     onClick={flagQuestion}
                                     disabled={isFlagging || !question}
                                     title="Pin to My Mistakes notebook"
-                                    className="flex items-center gap-2 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-amber-600 disabled:opacity-30"
+                                    className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-black text-xs uppercase tracking-widest hover:text-amber-600 dark:hover:text-accent-warm disabled:opacity-30"
                                 >
                                     {isFlagging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pin className="w-4 h-4" />}
                                     Flag
@@ -692,7 +692,7 @@ function PracticeArenaInner() {
                                     onClick={bookmarkQuestion}
                                     disabled={isBookmarking || !question}
                                     title="Save to bookmarks"
-                                    className="flex items-center gap-2 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-indigo-600 disabled:opacity-30"
+                                    className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-black text-xs uppercase tracking-widest hover:text-indigo-600 dark:hover:text-brand disabled:opacity-30"
                                 >
                                     {isBookmarking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bookmark className="w-4 h-4" />}
                                     Save
@@ -702,7 +702,7 @@ function PracticeArenaInner() {
                                 {options.length === 0 ? (
                                     <button
                                         onClick={handleSkip}
-                                        className="bg-amber-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-700 transition-all"
+                                        className="bg-amber-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-700 dark:bg-accent-warm dark:hover:bg-accent-warm/90 dark:text-slate-900 transition-all"
                                     >
                                         Skip Invalid Question
                                     </button>
@@ -710,7 +710,7 @@ function PracticeArenaInner() {
                                     <div className="flex items-center gap-3">
                                         <button
                                             onClick={handleSkip}
-                                            className="flex items-center gap-2 text-slate-500 hover:text-slate-800 border-2 border-slate-200 hover:border-slate-300 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                                            className="flex items-center gap-2 text-slate-500 hover:text-slate-800 border-2 border-slate-200 hover:border-slate-300 dark:text-slate-400 dark:hover:text-white dark:border-white/10 dark:hover:border-white/20 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
                                         >
                                             <SkipForward className="w-4 h-4" /> Skip
                                         </button>
@@ -718,7 +718,7 @@ function PracticeArenaInner() {
                                             data-testid="submit-answer"
                                             onClick={handleSubmit}
                                             disabled={!selectedOption}
-                                            className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 disabled:opacity-30 transition-all shadow-xl shadow-slate-200"
+                                            className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-white/10 dark:hover:bg-white/20 px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest disabled:opacity-30 transition-all shadow-xl shadow-slate-200 dark:shadow-none"
                                         >
                                             Verify Attempt
                                         </button>
@@ -726,7 +726,7 @@ function PracticeArenaInner() {
                                 ) : (
                                     <button
                                         onClick={() => fetchNextQuestion()}
-                                        className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center gap-2"
+                                        className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:brightness-105 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-indigo-100 dark:shadow-none flex items-center gap-2"
                                     >
                                         Next Challenge <ArrowRight className="w-4 h-4" />
                                     </button>
@@ -739,15 +739,15 @@ function PracticeArenaInner() {
                             <motion.div 
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="bg-amber-50 border border-amber-200 rounded-3xl p-8 relative"
+                                className="bg-amber-50 border border-amber-200 dark:bg-accent-warm/10 dark:border-accent-warm/20 rounded-3xl p-8 relative"
                             >
                                 <div className="flex gap-4">
-                                    <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0">
-                                        <MessageSquareQuote className="w-6 h-6 text-amber-500" />
+                                    <div className="w-10 h-10 bg-white dark:bg-surface rounded-xl shadow-sm flex items-center justify-center shrink-0">
+                                        <MessageSquareQuote className="w-6 h-6 text-amber-500 dark:text-accent-warm" />
                                     </div>
                                     <div className="space-y-2">
-                                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">Doubt Buddy Hint</p>
-                                        <div className="text-sm font-bold text-amber-900 leading-relaxed italic">
+                                        <p className="text-[10px] font-black text-amber-600 dark:text-accent-warm uppercase tracking-[0.2em]">Doubt Buddy Hint</p>
+                                        <div className="text-sm font-bold text-amber-900 dark:text-amber-100 leading-relaxed italic">
                                             <MathRenderer content={hint} />
                                         </div>
                                     </div>
@@ -756,23 +756,23 @@ function PracticeArenaInner() {
                         )}
 
                         {isSubmitted && (
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className={`rounded-3xl p-8 ${selectedOption === question.correctAnswer ? 'bg-emerald-50 border border-emerald-100' : 'bg-rose-50 border border-rose-100'}`}
+                                className={`rounded-3xl p-8 ${selectedOption === question.correctAnswer ? 'bg-emerald-50 border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20' : 'bg-rose-50 border border-rose-100 dark:bg-rose-500/10 dark:border-rose-500/20'}`}
                             >
                                 <div className="flex gap-4">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-white shadow-sm`}>
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-white dark:bg-surface shadow-sm`}>
                                         {selectedOption === question.correctAnswer ? <CheckCircle2 className="w-6 h-6 text-emerald-500" /> : <XCircle className="w-6 h-6 text-rose-500" />}
                                     </div>
                                     <div className="space-y-4">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedOption === question.correctAnswer ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedOption === question.correctAnswer ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                                                 Detailed Resolution
                                             </p>
                                             <QuestionTrustBadge status={question.status} verificationStatus={question.verificationStatus} />
                                         </div>
-                                        <div className="text-sm font-medium text-slate-800 leading-relaxed">
+                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
                                             <MathRenderer content={question.explanation || 'No solution provided. Review the core concepts of this topic.'} />
                                         </div>
                                     </div>

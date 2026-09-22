@@ -12,10 +12,10 @@ import type { SM2Grade } from '@/lib/spaced-repetition';
 type Card = { id: string; front: string; back: string; topic: string | null };
 
 const GRADE_BUTTONS: { grade: SM2Grade; label: string; className: string }[] = [
-  { grade: 'AGAIN', label: 'Again', className: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
-  { grade: 'HARD', label: 'Hard', className: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
-  { grade: 'GOOD', label: 'Good', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
-  { grade: 'EASY', label: 'Easy', className: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' },
+  { grade: 'AGAIN', label: 'Again', className: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/30 dark:hover:bg-rose-500/20' },
+  { grade: 'HARD', label: 'Hard', className: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-accent-warm/10 dark:text-accent-warm dark:border-accent-warm/30 dark:hover:bg-accent-warm/20' },
+  { grade: 'GOOD', label: 'Good', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 dark:hover:bg-emerald-500/20' },
+  { grade: 'EASY', label: 'Easy', className: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 dark:bg-brand/10 dark:text-brand dark:border-brand/30 dark:hover:bg-brand/20' },
 ];
 
 function shuffle<T>(arr: T[]): T[] {
@@ -80,22 +80,22 @@ function FlashcardStudyInner() {
     }
   };
 
-  if (loading) return <main className="min-h-screen bg-slate-50 p-10"><Loader2 className="mx-auto my-20 h-8 w-8 animate-spin text-indigo-600" /></main>;
+  if (loading) return <main className="min-h-screen bg-slate-50 dark:bg-background p-10"><Loader2 className="mx-auto my-20 h-8 w-8 animate-spin text-indigo-600 dark:text-brand" /></main>;
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 md:p-10">
+    <main className="min-h-screen bg-slate-50 dark:bg-background p-6 md:p-10">
       <div className="mx-auto max-w-xl">
-        <Link href="/student/flashcards" className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-indigo-700">
+        <Link href="/student/flashcards" className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-indigo-700 dark:text-brand">
           <ArrowLeft className="h-4 w-4" />All flashcards
         </Link>
 
         {cards.length === 0 ? (
-          <div className="rounded-3xl border border-dashed bg-white p-16 text-center font-bold text-slate-600">
+          <div className="rounded-3xl border border-dashed dark:border-white/10 bg-white dark:bg-surface p-16 text-center font-bold text-slate-600 dark:text-slate-400">
             {dueOnly ? "No cards due for review right now — nice work!" : 'No flashcards to study yet.'}
           </div>
         ) : (
           <>
-            <p className="mb-4 text-center text-sm font-black uppercase tracking-wide text-slate-400">
+            <p className="mb-4 text-center text-sm font-black uppercase tracking-wide text-slate-400 dark:text-slate-500">
               {dueOnly ? `${cards.length} due` : `Card ${index + 1} of ${cards.length}`}
             </p>
             <AnimatePresence mode="wait">
@@ -105,11 +105,11 @@ function FlashcardStudyInner() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 onClick={() => setFlipped((f) => !f)}
-                className="flex min-h-[16rem] cursor-pointer flex-col items-center justify-center rounded-3xl border bg-white p-10 text-center shadow-lg"
+                className="flex min-h-[16rem] cursor-pointer flex-col items-center justify-center rounded-3xl border dark:border-white/10 bg-white dark:bg-surface p-10 text-center shadow-lg dark:shadow-none"
               >
-                {cards[index].topic && <span className="mb-4 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-slate-500">{cards[index].topic}</span>}
-                <p className="text-lg font-black text-slate-900">{flipped ? cards[index].back : cards[index].front}</p>
-                {!flipped && <p className="mt-6 flex items-center gap-1 text-xs font-bold text-slate-400"><RotateCw className="h-3 w-3" />Tap to flip</p>}
+                {cards[index].topic && <span className="mb-4 rounded-full bg-slate-100 dark:bg-white/5 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">{cards[index].topic}</span>}
+                <p className="text-lg font-black text-slate-900 dark:text-white">{flipped ? cards[index].back : cards[index].front}</p>
+                {!flipped && <p className="mt-6 flex items-center gap-1 text-xs font-bold text-slate-400 dark:text-slate-500"><RotateCw className="h-3 w-3" />Tap to flip</p>}
               </motion.div>
             </AnimatePresence>
 
@@ -133,7 +133,7 @@ function FlashcardStudyInner() {
                   type="button"
                   onClick={() => go(-1)}
                   disabled={index === 0}
-                  className="inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 px-5 py-3 text-sm font-black text-slate-600 disabled:opacity-30"
+                  className="inline-flex items-center gap-2 rounded-2xl border-2 border-slate-200 dark:border-white/10 px-5 py-3 text-sm font-black text-slate-600 dark:text-slate-400 disabled:opacity-30"
                 >
                   <ChevronLeft className="h-4 w-4" />Previous
                 </button>
@@ -141,7 +141,7 @@ function FlashcardStudyInner() {
                   type="button"
                   onClick={() => go(1)}
                   disabled={index === cards.length - 1}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white disabled:opacity-30"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-5 py-3 text-sm font-black text-white disabled:opacity-30"
                 >
                   Next<ChevronRight className="h-4 w-4" />
                 </button>
@@ -157,7 +157,7 @@ function FlashcardStudyInner() {
 export default function FlashcardStudyClient() {
   return (
     <Suspense fallback={
-      <main className="min-h-screen bg-slate-50 p-10"><Loader2 className="mx-auto my-20 h-8 w-8 animate-spin text-indigo-600" /></main>
+      <main className="min-h-screen bg-slate-50 dark:bg-background p-10"><Loader2 className="mx-auto my-20 h-8 w-8 animate-spin text-indigo-600 dark:text-brand" /></main>
     }>
       <FlashcardStudyInner />
     </Suspense>

@@ -129,8 +129,8 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Fee Management Ledger</h2>
-                    <p className="text-gray-500 font-medium text-sm">Monitor student financial vectors and generate verified tax receipts.</p>
+                    <h2 className="font-display text-2xl font-black text-gray-900 tracking-tight dark:text-white">Fee Management Ledger</h2>
+                    <p className="text-gray-500 font-medium text-sm dark:text-slate-400">Monitor student financial vectors and generate verified tax receipts.</p>
                 </div>
             </div>
 
@@ -141,35 +141,35 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
                     { label: 'Total Unpaid (Upcoming)', value: payments.filter(p => p.status === 'UPCOMING').reduce((sum, p) => sum + p.amount, 0), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
                     { label: 'Overdue Amount', value: payments.filter(p => p.status === 'UNPAID').reduce((sum, p) => sum + p.amount, 0), icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' },
                 ].map((m, i) => (
-                    <div key={i} className={`bg-white p-5 rounded-2xl border ${m.border} shadow-sm flex items-center gap-4`}>
+                    <div key={i} className={`bg-white dark:bg-surface p-5 rounded-2xl border dark:border-white/10 ${m.border} shadow-sm flex items-center gap-4`}>
                         <div className={`p-3 ${m.bg} ${m.color} rounded-xl shrink-0`}>
                             <m.icon className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-xs font-black text-gray-500 uppercase tracking-widest">{m.label}</p>
-                            <p className="text-3xl font-black text-gray-900 leading-none mt-1">₹{m.value.toLocaleString('en-IN')}</p>
+                            <p className="text-xs font-black text-gray-500 uppercase tracking-widest dark:text-slate-400">{m.label}</p>
+                            <p className="text-3xl font-black text-gray-900 leading-none mt-1 dark:text-white">₹{m.value.toLocaleString('en-IN')}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden dark:bg-surface dark:border-white/10">
                 <div className="p-4 border-b border-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500" />
                         <input 
                             type="text" 
                             placeholder="Search by student name or mobile..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-xs"
+                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-xs dark:border-white/10 dark:bg-surface-muted"
                         />
                     </div>
                     <div className="flex gap-2">
                         {filterStatus !== 'ALL' && (
                             <button 
                                 onClick={() => setFilterStatus('ALL')}
-                                className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all font-bold"
+                                className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all font-bold dark:bg-white/5 dark:text-slate-400"
                             >
                                 Clear
                             </button>
@@ -179,9 +179,9 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
                                 key={status}
                                 onClick={() => setFilterStatus(status)}
                                 className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                                    filterStatus === status 
-                                    ? 'bg-gray-900 text-white shadow-md' 
-                                    : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'
+                                    filterStatus === status
+                                    ? 'bg-gray-900 dark:bg-white/10 text-white shadow-md'
+                                    : 'bg-white dark:bg-surface text-gray-500 dark:text-slate-400 border border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5'
                                 }`}
                             >
                                 {status === 'UNPAID' ? 'Overdue' : status}
@@ -192,44 +192,44 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50/50">
+                        <thead className="bg-gray-50/50 dark:bg-surface-muted">
                             <tr>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Student & Batch</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Amount</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Due Date</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Student & Batch</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right dark:text-slate-500">Amount</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Due Date</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Status</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right dark:text-slate-500">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {filteredPayments.map((p: any) => (
-                                <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                                <tr key={p.id} className="hover:bg-gray-50/50 transition-colors dark:bg-surface-muted">
                                     <td className="px-6 py-5">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black">
+                                            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black dark:text-brand dark:bg-brand/10">
                                                 {p.enrollment?.student?.firstName?.charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-bold text-gray-900">{p.enrollment?.student?.firstName} {p.enrollment?.student?.lastName}</p>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{p.enrollment?.batch?.name}</p>
+                                                <p className="text-sm font-bold text-gray-900 dark:text-white">{p.enrollment?.student?.firstName} {p.enrollment?.student?.lastName}</p>
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter dark:text-slate-500">{p.enrollment?.batch?.name}</p>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-5 text-right">
-                                        <p className="text-sm font-black text-gray-900">₹{p.amount.toLocaleString()}</p>
-                                        <p className="text-[10px] text-gray-400 font-bold">{p.description}</p>
+                                        <p className="text-sm font-black text-gray-900 dark:text-white">₹{p.amount.toLocaleString()}</p>
+                                        <p className="text-[10px] text-gray-400 font-bold dark:text-slate-500">{p.description}</p>
                                     </td>
                                     <td className="px-6 py-5">
-                                        <div className="flex items-center gap-1 text-xs font-bold text-gray-600" suppressHydrationWarning>
-                                            <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                                        <div className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-slate-400" suppressHydrationWarning>
+                                            <Calendar className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                                             {new Date(p.dueDate).toLocaleDateString()}
                                         </div>
                                     </td>
                                     <td className="px-6 py-5">
                                         <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border uppercase tracking-widest ${
-                                            p.status === 'PAID' ? 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-emerald-50' :
-                                            p.status === 'UNPAID' ? 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse' :
-                                            'bg-amber-50 border-amber-100 text-amber-600'
+                                            p.status === 'PAID' ? 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400' :
+                                            p.status === 'UNPAID' ? 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400' :
+                                            'bg-amber-50 border-amber-100 text-amber-600 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400'
                                         }`}>
                                             {p.status}
                                         </span>
@@ -239,7 +239,7 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
                                             {p.status !== 'PAID' && (
                                                 <button 
                                                     onClick={() => handleMarkPaid(p.id)}
-                                                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
+                                                    className="flex items-center gap-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white px-4 py-2 rounded-xl text-[10px] font-black hover:opacity-90 transition shadow-lg shadow-indigo-100 dark:shadow-none"
                                                 >
                                                     <CheckCircle2 className="w-3.5 h-3.5" /> MARK PAID
                                                 </button>
@@ -247,7 +247,7 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
                                             {p.status === 'PAID' && (
                                                 <button 
                                                     onClick={() => generateReceipt(p)}
-                                                    className="p-2 text-indigo-600 hover:bg-white rounded-xl transition shadow-sm border border-transparent hover:border-indigo-100"
+                                                    className="p-2 text-indigo-600 hover:bg-white rounded-xl transition shadow-sm border border-transparent hover:border-indigo-100 dark:text-brand hover:dark:bg-surface"
                                                     title="Download Receipt"
                                                 >
                                                     <Printer className="w-4 h-4" />

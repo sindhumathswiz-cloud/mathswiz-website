@@ -245,28 +245,28 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
                       <m.icon className="w-6 h-6" />
                   </div>
                   <div>
-                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest">{m.label}</p>
-                      <p className="text-3xl font-black text-gray-900 leading-none mt-1">{m.value}</p>
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest dark:text-slate-400">{m.label}</p>
+                      <p className="text-3xl font-black text-gray-900 leading-none mt-1 dark:text-white">{m.value}</p>
                   </div>
               </div>
           ))}
       </div>
 
-      <div className="flex h-screen w-full bg-slate-50 text-slate-900 overflow-hidden font-sans border border-gray-200 rounded-2xl shadow-sm">
+      <div className="flex h-screen w-full bg-slate-50 text-slate-900 overflow-hidden font-sans border border-gray-200 rounded-2xl shadow-sm dark:bg-surface-muted dark:border-white/10 dark:text-white">
       {/* LEFT PANEL */}
-      <div className="w-1/2 flex flex-col border-r border-slate-200 bg-white">
-        <div className="p-4 border-b border-slate-200 bg-slate-50">
-          <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-            <Search className="w-5 h-5 text-indigo-500" /> Question Repository
+      <div className="w-1/2 flex flex-col border-r border-slate-200 bg-white dark:bg-surface dark:border-white/10">
+        <div className="p-4 border-b border-slate-200 bg-slate-50 dark:bg-surface-muted dark:border-white/10">
+          <h2 className="font-display text-lg font-black text-slate-800 mb-4 flex items-center gap-2 dark:text-slate-200">
+            <Search className="w-5 h-5 text-indigo-500 dark:text-brand" /> Question Repository
           </h2>
           <div className="grid grid-cols-2 gap-3">
-            <select value={filterSubject} onChange={e => setFilterSubject(e.target.value)} className="bg-white border rounded p-2 text-sm">
+            <select value={filterSubject} onChange={e => setFilterSubject(e.target.value)} className="bg-white border rounded p-2 text-sm dark:bg-surface">
               <option value="All">All Subjects</option>
               <option value="Mathematics">Mathematics</option>
               <option value="Physics">Physics</option>
               <option value="Chemistry">Chemistry</option>
             </select>
-            <select value={filterDifficulty} onChange={e => setFilterDifficulty(e.target.value)} className="bg-white border rounded p-2 text-sm">
+            <select value={filterDifficulty} onChange={e => setFilterDifficulty(e.target.value)} className="bg-white border rounded p-2 text-sm dark:bg-surface">
               <option value="All">All Difficulties</option>
               <option value="EASY">Easy</option>
               <option value="MEDIUM">Medium</option>
@@ -275,16 +275,16 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 bg-slate-100">
+        <div className="flex-1 overflow-y-auto p-4 bg-slate-100 dark:bg-white/5">
           {isLoadingQuestions ? (
-            <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-indigo-500" /></div>
+            <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-indigo-500 dark:text-brand" /></div>
           ) : (
             <div className="space-y-4">
               {availableQuestions.map((q) => (
-                <div key={q.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3">
+                <div key={q.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3 dark:bg-surface dark:border-white/10">
                   <div className="flex justify-between items-start">
-                    <span className="bg-slate-100 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{q.difficulty}</span>
-                    <button onClick={() => addQuestionToTest(q)} className="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold">+ Add</button>
+                    <span className="bg-slate-100 text-[10px] font-bold px-2 py-0.5 rounded uppercase dark:bg-white/5">{q.difficulty}</span>
+                    <button onClick={() => addQuestionToTest(q)} className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white px-3 py-1 rounded text-xs font-bold">+ Add</button>
                   </div>
                   <div className="text-sm"><MathRenderer content={q.content} /></div>
                 </div>
@@ -295,10 +295,10 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
       </div>
 
       {/* RIGHT PANEL */}
-      <div className="w-1/2 flex flex-col bg-white overflow-hidden">
-        <div className="p-6 border-b border-slate-200">
+      <div className="w-1/2 flex flex-col bg-white overflow-hidden dark:bg-surface">
+        <div className="p-6 border-b border-slate-200 dark:border-white/10">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-black text-slate-900">Test Creator</h1>
+            <h1 className="font-display text-2xl font-black text-slate-900 dark:text-white">Test Creator</h1>
             <div className="flex gap-2">
                <button onClick={() => setIsAIModalOpen(true)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2"><Sparkles size={14} /> AI Blueprint</button>
                <button onClick={handleSaveTest} disabled={isSaving} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2">
@@ -307,22 +307,22 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
             </div>
           </div>
           <div className="space-y-4">
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Test Title..." className="w-full text-xl font-black outline-none border-b-2 border-slate-100 focus:border-indigo-500" />
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Test Title..." className="w-full text-xl font-black outline-none border-b-2 border-slate-100 focus:border-indigo-500 dark:border-white/10" />
             <div className="flex gap-4">
               <select value={mode} onChange={e => setMode(e.target.value)} className="text-sm font-bold border rounded p-1">
                 <option value="STRICT">Strict</option>
                 <option value="PRACTICE">Practice</option>
               </select>
               <input type="number" value={duration} onChange={e => setDuration(e.target.value)} className="w-20 border rounded p-1 text-sm font-bold" />
-              <span className="text-xs text-gray-500 self-center">mins</span>
+              <span className="text-xs text-gray-500 self-center dark:text-slate-400">mins</span>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 dark:bg-surface-muted">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold">Sections</h3>
-            <button onClick={addSection} className="text-indigo-600 text-xs font-bold border px-2 py-1 rounded">+ Section</button>
+            <h3 className="font-display font-bold">Sections</h3>
+            <button onClick={addSection} className="text-indigo-600 text-xs font-bold border px-2 py-1 rounded dark:text-brand">+ Section</button>
           </div>
           <div className="space-y-6">
             {sections.map((section, sIdx) => (
@@ -334,7 +334,7 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
                 <div className="space-y-3">
                    {section.questions.map((q, qIdx) => (
                      <div key={q.id} className="text-xs flex justify-between gap-2 border-b pb-2">
-                        <div className="flex gap-2 font-bold"><span className="text-gray-400">{qIdx + 1}.</span> <MathRenderer content={q.content} /></div>
+                        <div className="flex gap-2 font-bold"><span className="text-gray-400 dark:text-slate-500">{qIdx + 1}.</span> <MathRenderer content={q.content} /></div>
                         <button onClick={() => removeQuestionFromTest(section.id, q.id)}><X size={12} /></button>
                      </div>
                    ))}
@@ -348,12 +348,12 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
       {/* AI MODAL */}
       {isAIModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 flex flex-col gap-4">
-            <h3 className="text-lg font-black flex items-center gap-2"><Sparkles className="text-purple-600" /> AI Blueprint</h3>
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 flex flex-col gap-4 dark:bg-surface">
+            <h3 className="font-display text-lg font-black flex items-center gap-2"><Sparkles className="text-purple-600" /> AI Blueprint</h3>
             <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder="Describe your test... e.g. 10 Calculus questions, Medium difficulty." className="w-full border-2 rounded-xl p-4 h-32 outline-none focus:border-purple-400" />
             <div className="flex justify-end gap-2">
                <button onClick={() => setIsAIModalOpen(false)} className="px-4 py-2 font-bold text-sm">Cancel</button>
-               <button onClick={handleGenerateBlueprint} disabled={isGeneratingBlueprint || !aiPrompt.trim()} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-sm flex items-center gap-2">
+               <button onClick={handleGenerateBlueprint} disabled={isGeneratingBlueprint || !aiPrompt.trim()} className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white px-6 py-2 rounded-xl font-bold text-sm flex items-center gap-2">
                  {isGeneratingBlueprint ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Generate
                </button>
             </div>

@@ -29,7 +29,7 @@ interface Message {
 
 export default function DoubtBuddyPage() {
     return (
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>}>
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-[#F8FAFF] dark:bg-background"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 dark:text-brand" /></div>}>
             <DoubtBuddyContent />
         </Suspense>
     );
@@ -121,44 +121,44 @@ function DoubtBuddyContent() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F8FAFF] dark:bg-slate-950 flex flex-col md:flex-row font-sans">
+        <div className="min-h-screen bg-[#F8FAFF] dark:bg-background flex flex-col md:flex-row font-sans">
             {/* Sidebar / Context Panel */}
-            <aside className="w-full md:w-80 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 p-8 flex flex-col shrink-0">
+            <aside className="w-full md:w-80 bg-white dark:bg-surface border-r border-slate-100 dark:border-white/10 p-8 flex flex-col shrink-0">
                 <div className="flex items-center gap-3 mb-10">
-                    <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-100 dark:shadow-none">
+                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-100 dark:shadow-none">
                         <Bot className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight leading-none">Doubt Buddy</h1>
-                        <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mt-1 block">AI Tutor v2</span>
+                        <h1 className="font-display text-xl font-black text-slate-900 dark:text-white tracking-tight leading-none">Doubt Buddy</h1>
+                        <span className="text-[10px] font-black text-indigo-600 dark:text-brand uppercase tracking-widest mt-1 block">AI Tutor v2</span>
                     </div>
                 </div>
 
                 <div className="space-y-6 flex-1">
                     {contextQ ? (
                         <div className="animate-in slide-in-from-left-4">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Active Question</h3>
-                            <div className="bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/40 p-6 rounded-3xl text-sm font-bold text-slate-800 dark:text-slate-300">
+                            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4">Active Question</h3>
+                            <div className="bg-indigo-50 dark:bg-brand/10 border border-indigo-100 dark:border-brand/20 p-6 rounded-3xl text-sm font-bold text-slate-800 dark:text-slate-300">
                                 <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                                     {decodeURIComponent(contextQ)}
                                 </ReactMarkdown>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => { window.history.pushState({}, '', '/student/doubt-buddy'); window.location.reload(); }}
-                                className="mt-4 text-xs font-black text-rose-500 hover:text-rose-700 flex items-center gap-1 transition-colors"
+                                className="mt-4 text-xs font-black text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 flex items-center gap-1 transition-colors"
                             >
                                 <XCircle className="w-3 h-3" /> Clear Context
                             </button>
                         </div>
                     ) : (
-                        <div className="p-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-[2.5rem] text-center">
-                            <UploadCloud className="w-10 h-10 text-slate-300 mx-auto mb-4" />
-                            <p className="text-slate-400 text-xs font-bold leading-relaxed">No active question context found. Upload an image to start a new tutor session.</p>
+                        <div className="p-8 border-2 border-dashed border-slate-100 dark:border-white/10 rounded-[2.5rem] text-center">
+                            <UploadCloud className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+                            <p className="text-slate-400 dark:text-slate-500 text-xs font-bold leading-relaxed">No active question context found. Upload an image to start a new tutor session.</p>
                         </div>
                     )}
                 </div>
 
-                <div className="mt-auto pt-8 border-t border-slate-100 dark:border-slate-800">
+                <div className="mt-auto pt-8 border-t border-slate-100 dark:border-white/10">
                     <Link href="/student/practice-arena" className="flex items-center gap-2 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold transition">
                         <ArrowLeft className="w-4 h-4" />
                         Back to Practice
@@ -176,19 +176,19 @@ function DoubtBuddyContent() {
                             exit={{ opacity: 0 }}
                             className="flex-1 flex flex-col items-center justify-center p-10"
                         >
-                            <label className="group w-full max-w-2xl aspect-[16/9] bg-white dark:bg-slate-900 border-4 border-dashed border-slate-100 dark:border-slate-800 rounded-[4rem] flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-white dark:hover:bg-slate-900 transition-all shadow-2xl shadow-indigo-50/50 dark:shadow-none">
+                            <label className="group w-full max-w-2xl aspect-[16/9] bg-white dark:bg-surface border-4 border-dashed border-slate-100 dark:border-white/10 rounded-[4rem] flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 dark:hover:border-brand hover:bg-white dark:hover:bg-surface transition-all shadow-2xl shadow-indigo-50/50 dark:shadow-none">
                                 <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])} />
                                 {isAnalyzing ? (
                                     <div className="flex flex-col items-center gap-4">
-                                        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+                                        <Loader2 className="w-12 h-12 text-indigo-600 dark:text-brand animate-spin" />
                                         <p className="font-black text-slate-900 dark:text-white">AI is reading the problem...</p>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center text-center px-10">
-                                        <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-[2rem] flex items-center justify-center text-indigo-600 mb-6 group-hover:scale-110 transition-transform">
+                                        <div className="w-20 h-20 bg-indigo-50 dark:bg-brand/10 rounded-[2rem] flex items-center justify-center text-indigo-600 dark:text-brand mb-6 group-hover:scale-110 transition-transform">
                                             <UploadCloud className="w-10 h-10" />
                                         </div>
-                                        <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Drop your math doubt here</h2>
+                                        <h2 className="font-display text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Drop your math doubt here</h2>
                                         <p className="text-slate-400 font-bold max-w-xs">Snap a photo of your school worksheet or handwritten notes.</p>
                                     </div>
                                 )}
@@ -205,9 +205,9 @@ function DoubtBuddyContent() {
                                 {messages.map((m, i) => (
                                     <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[80%] rounded-[2rem] p-8 shadow-sm ${
-                                            m.role === 'user' 
-                                                ? 'bg-indigo-600 text-white rounded-br-none' 
-                                                : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-100 dark:border-slate-800 rounded-bl-none'
+                                            m.role === 'user'
+                                                ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white rounded-br-none'
+                                                : 'bg-white dark:bg-surface text-slate-900 dark:text-white border border-slate-100 dark:border-white/10 rounded-bl-none'
                                         }`}>
                                             <div className="font-medium text-sm lg:text-base leading-relaxed">
                                                 <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
@@ -219,28 +219,28 @@ function DoubtBuddyContent() {
                                 ))}
                                 {isLoading && (
                                     <div className="flex justify-start">
-                                        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] rounded-bl-none border border-slate-100 dark:border-slate-800 flex items-center gap-3">
-                                            <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
-                                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Tutor is thinking...</span>
+                                        <div className="bg-white dark:bg-surface p-8 rounded-[2rem] rounded-bl-none border border-slate-100 dark:border-white/10 flex items-center gap-3">
+                                            <Loader2 className="w-4 h-4 text-indigo-600 dark:text-brand animate-spin" />
+                                            <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Tutor is thinking...</span>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
                             {/* Chat Input */}
-                            <div className="sticky bottom-0 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-[2.5rem] flex items-center gap-2 shadow-2xl">
-                                <input 
+                            <div className="sticky bottom-0 bg-white dark:bg-surface border border-slate-100 dark:border-white/10 p-4 rounded-[2.5rem] flex items-center gap-2 shadow-2xl">
+                                <input
                                     onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-                                    type="text" 
+                                    type="text"
                                     placeholder="Explain your approach or ask for a hint..."
                                     value={input}
                                     onChange={e => setInput(e.target.value)}
                                     className="flex-1 bg-transparent px-6 py-4 font-bold text-slate-900 dark:text-white focus:outline-none"
                                 />
-                                <button 
+                                <button
                                     onClick={handleSendMessage}
                                     disabled={!input.trim() || isLoading}
-                                    className="w-14 h-14 bg-indigo-600 text-white rounded-[1.5rem] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-100 dark:shadow-none disabled:opacity-50"
+                                    className="w-14 h-14 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white rounded-[1.5rem] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-100 dark:shadow-none disabled:opacity-50"
                                 >
                                     <Send className="w-6 h-6" />
                                 </button>

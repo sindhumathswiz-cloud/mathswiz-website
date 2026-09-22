@@ -162,30 +162,30 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
 
     if (isEditingPage && draftContent) {
         return (
-            <div className="fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden animate-in fade-in duration-300">
+            <div className="fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden animate-in fade-in duration-300 dark:bg-surface">
                 {/* Editor Top Bar */}
-                <header className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0 shadow-sm">
+                <header className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between shrink-0 shadow-sm dark:bg-surface dark:border-white/10">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setIsEditingPage(null)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-                            <ChevronLeft className="w-5 h-5 text-gray-500" />
+                        <button onClick={() => setIsEditingPage(null)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors hover:dark:bg-white/5">
+                            <ChevronLeft className="w-5 h-5 text-gray-500 dark:text-slate-400" />
                         </button>
                         <div className="h-8 w-px bg-gray-200 mx-1" />
                         <div>
-                            <h2 className="text-sm font-black text-gray-900 tracking-tight leading-none">{isEditingPage.title}</h2>
-                            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-1">/{isEditingPage.slug === 'home' ? '' : isEditingPage.slug}</p>
+                            <h2 className="font-display text-sm font-black text-gray-900 tracking-tight leading-none dark:text-white">{isEditingPage.title}</h2>
+                            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-1 dark:text-brand">/{isEditingPage.slug === 'home' ? '' : isEditingPage.slug}</p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 mr-4">
-                            <button className="p-2 bg-white shadow-sm rounded-lg text-indigo-600"><Monitor className="w-4 h-4" /></button>
-                            <button className="p-2 text-gray-400 hover:text-gray-600"><Tablet className="w-4 h-4" /></button>
-                            <button className="p-2 text-gray-400 hover:text-gray-600"><Smartphone className="w-4 h-4" /></button>
+                        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 mr-4 dark:bg-white/5 dark:border-white/10">
+                            <button className="p-2 bg-white shadow-sm rounded-lg text-indigo-600 dark:bg-surface dark:text-brand"><Monitor className="w-4 h-4" /></button>
+                            <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-slate-500 hover:dark:text-slate-400"><Tablet className="w-4 h-4" /></button>
+                            <button className="p-2 text-gray-400 hover:text-gray-600 dark:text-slate-500 hover:dark:text-slate-400"><Smartphone className="w-4 h-4" /></button>
                         </div>
                         <button 
                             onClick={handleSave}
                             disabled={isSaving}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 disabled:opacity-50"
+                            className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100 dark:shadow-none flex items-center gap-2 disabled:opacity-50"
                         >
                             {isSaving ? <Clock className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                             Publish Live
@@ -195,35 +195,35 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
 
                 <div className="flex-1 flex overflow-hidden">
                     {/* Left Sidebar: Controls */}
-                    <aside className="w-[420px] bg-gray-50 border-r border-gray-200 overflow-y-auto p-6 space-y-6 custom-scrollbar shrink-0">
+                    <aside className="w-[420px] bg-gray-50 border-r border-gray-200 overflow-y-auto p-6 space-y-6 custom-scrollbar shrink-0 dark:border-white/10 dark:bg-surface-muted">
                         {/* Section: Global Settings */}
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 mb-2">
-                                <Layout className="w-4 h-4 text-indigo-600" />
-                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Identity</h3>
+                                <Layout className="w-4 h-4 text-indigo-600 dark:text-brand" />
+                                <h3 className="font-display text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Global Identity</h3>
                             </div>
                             
-                            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+                            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4 dark:bg-surface dark:border-white/10">
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Institute Name</label>
+                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1 dark:text-slate-500">Institute Name</label>
                                     <input 
                                         type="text" 
                                         value={draftContent.global.instituteName} 
                                         onChange={(e) => setDraftContent({ ...draftContent, global: { ...draftContent.global, instituteName: e.target.value } })}
-                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none dark:border-white/10 dark:bg-surface-muted"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Logo URL</label>
+                                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1 dark:text-slate-500">Logo URL</label>
                                     <div className="flex gap-3">
-                                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 overflow-hidden">
-                                            {draftContent.global.logoUrl ? <img src={draftContent.global.logoUrl} className="w-full h-full object-contain" /> : <ImageIcon className="w-4 h-4 text-gray-400" />}
+                                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 overflow-hidden dark:bg-white/5 dark:border-white/10">
+                                            {draftContent.global.logoUrl ? <img src={draftContent.global.logoUrl} className="w-full h-full object-contain" /> : <ImageIcon className="w-4 h-4 text-gray-400 dark:text-slate-500" />}
                                         </div>
                                         <input 
                                             type="text" 
                                             value={draftContent.global.logoUrl} 
                                             onChange={(e) => setDraftContent({ ...draftContent, global: { ...draftContent.global, logoUrl: e.target.value } })}
-                                            className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:border-white/10 dark:bg-surface-muted"
                                             placeholder="/logo.png"
                                         />
                                     </div>
@@ -234,8 +234,8 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                         {/* Section: Block Editor */}
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 mb-2">
-                                <Layers className="w-4 h-4 text-indigo-600" />
-                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Page Blocks</h3>
+                                <Layers className="w-4 h-4 text-indigo-600 dark:text-brand" />
+                                <h3 className="font-display text-[10px] font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">Page Blocks</h3>
                             </div>
 
                             {/* Hero Block Accordion */}
@@ -248,28 +248,28 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                             >
                                 <div className="space-y-4 pt-4">
                                     <div className="space-y-1.5">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Headline</label>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase ml-1 dark:text-slate-500">Headline</label>
                                         <textarea 
                                             value={draftContent.content.hero.title}
                                             onChange={(e) => setDraftContent({ ...draftContent, content: { ...draftContent.content, hero: { ...draftContent.content.hero, title: e.target.value } } })}
-                                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold h-24 resize-none outline-none focus:ring-2 focus:ring-indigo-500"
+                                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold h-24 resize-none outline-none focus:ring-2 focus:ring-indigo-500 dark:border-white/10 dark:bg-surface-muted"
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1.5">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Title Color</label>
+                                            <label className="text-[9px] font-black text-gray-400 uppercase ml-1 dark:text-slate-500">Title Color</label>
                                             <div className="flex gap-2">
                                                 <input 
                                                     type="color" 
                                                     value={draftContent.content.hero.style.titleColor}
                                                     onChange={(e) => setDraftContent({ ...draftContent, content: { ...draftContent.content, hero: { ...draftContent.content.hero, style: { ...draftContent.content.hero.style, titleColor: e.target.value } } } })}
-                                                    className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200"
+                                                    className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 dark:border-white/10"
                                                 />
                                                 <input type="text" value={draftContent.content.hero.style.titleColor} className="flex-1 text-[10px] font-mono px-2 border rounded-lg" readOnly />
                                             </div>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase ml-1">Title Size</label>
+                                            <label className="text-[9px] font-black text-gray-400 uppercase ml-1 dark:text-slate-500">Title Size</label>
                                             <select 
                                                 value={draftContent.content.hero.style.titleFontSize}
                                                 onChange={(e) => setDraftContent({ ...draftContent, content: { ...draftContent.content, hero: { ...draftContent.content.hero, style: { ...draftContent.content.hero.style, titleFontSize: e.target.value } } } })}
@@ -295,13 +295,13 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                             >
                                 <div className="space-y-4 pt-4">
                                     {(draftContent.content.testimonialsBlock.testimonials || []).map((t: any, idx: number) => (
-                                        <div key={t.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-200 relative group">
+                                        <div key={t.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-200 relative group dark:border-white/10 dark:bg-surface-muted">
                                             <button 
                                                 onClick={() => {
                                                     const news = draftContent.content.testimonialsBlock.testimonials.filter((_: any, i: number) => i !== idx);
                                                     setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonialsBlock: { ...draftContent.content.testimonialsBlock, testimonials: news } } });
                                                 }}
-                                                className="absolute -top-2 -right-2 bg-white shadow-md border w-6 h-6 rounded-full flex items-center justify-center text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                className="absolute -top-2 -right-2 bg-white shadow-md border w-6 h-6 rounded-full flex items-center justify-center text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity dark:bg-surface"
                                             >
                                                 <X className="w-3 h-3" />
                                             </button>
@@ -313,7 +313,7 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                                                         news[idx].name = e.target.value;
                                                         setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonialsBlock: { ...draftContent.content.testimonialsBlock, testimonials: news } } });
                                                     }}
-                                                    className="w-full bg-transparent border-b border-gray-300 focus:border-indigo-500 outline-none text-xs font-black p-1"
+                                                    className="w-full bg-transparent border-b border-gray-300 focus:border-indigo-500 outline-none text-xs font-black p-1 dark:border-white/10"
                                                     placeholder="Student Name"
                                                 />
                                                 <textarea 
@@ -334,7 +334,7 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                                             const news = [...(draftContent.content.testimonialsBlock.testimonials || []), { id: Date.now().toString(), name: "New Student", quote: "", photoUrl: "/boy.png" }];
                                             setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonialsBlock: { ...draftContent.content.testimonialsBlock, testimonials: news } } });
                                         }}
-                                        className="w-full py-3 border-2 border-dashed border-gray-300 rounded-2xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-400 transition-all flex items-center justify-center gap-2"
+                                        className="w-full py-3 border-2 border-dashed border-gray-300 rounded-2xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-400 transition-all flex items-center justify-center gap-2 dark:border-white/10 dark:text-slate-500"
                                     >
                                         <Plus className="w-4 h-4" /> Add Story
                                     </button>
@@ -350,10 +350,10 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                                 icon={Palette}
                             >
                                 <div className="space-y-4 pt-4">
-                                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
+                                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border dark:bg-surface-muted">
                                         <div className="flex items-center gap-3">
-                                            <MobileIcon className="w-4 h-4 text-gray-500" />
-                                            <span className="text-[10px] font-black text-gray-600 uppercase">Dark Mode Support</span>
+                                            <MobileIcon className="w-4 h-4 text-gray-500 dark:text-slate-400" />
+                                            <span className="text-[10px] font-black text-gray-600 uppercase dark:text-slate-400">Dark Mode Support</span>
                                         </div>
                                         <button 
                                             onClick={() => setDraftContent({ ...draftContent, theme: { ...draftContent.theme, enableDarkMode: !draftContent.theme.enableDarkMode } })}
@@ -368,15 +368,15 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                     </aside>
 
                     {/* Right: Live Preview Iframe Container */}
-                    <main className="flex-1 bg-gray-100 flex flex-col relative overflow-hidden">
-                        <div className="h-10 bg-gray-200 border-b border-gray-300 flex items-center justify-center gap-4 shrink-0">
-                             <div className="bg-white px-8 py-1 rounded-full border border-gray-300 text-[10px] font-black text-gray-400 flex items-center gap-2">
+                    <main className="flex-1 bg-gray-100 flex flex-col relative overflow-hidden dark:bg-white/5">
+                        <div className="h-10 bg-gray-200 border-b border-gray-300 flex items-center justify-center gap-4 shrink-0 dark:border-white/10">
+                             <div className="bg-white px-8 py-1 rounded-full border border-gray-300 text-[10px] font-black text-gray-400 flex items-center gap-2 dark:bg-surface dark:border-white/10 dark:text-slate-500">
                                 <Globe className="w-3 h-3" /> mathswiz.com/{isEditingPage.slug === 'home' ? '' : isEditingPage.slug}
                              </div>
                         </div>
 
                         <div className="flex-1 overflow-auto p-12 bg-pattern" ref={previewScrollRef}>
-                            <div className="mx-auto w-[1024px] bg-white shadow-2xl rounded-[32px] overflow-hidden border-8 border-gray-900 min-h-[800px] relative">
+                            <div className="mx-auto w-[1024px] bg-white shadow-2xl rounded-[32px] overflow-hidden border-8 border-gray-900 min-h-[800px] relative dark:bg-surface">
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-6 bg-gray-900 rounded-b-2xl z-20" />
                                 <div className="transform origin-top">
                                     <HomePageClient content={draftContent.content} globalSettings={draftContent.global} isPreview={true} />
@@ -393,8 +393,8 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
         <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Manage Website</h2>
-                    <p className="text-gray-500 font-medium text-sm mt-1">Design, edit, and publish your institution's public-facing pages.</p>
+                    <h2 className="font-display text-3xl font-black text-gray-900 tracking-tight dark:text-white">Manage Website</h2>
+                    <p className="text-gray-500 font-medium text-sm mt-1 dark:text-slate-400">Design, edit, and publish your institution's public-facing pages.</p>
                 </div>
                 <button 
                     onClick={handleCreatePage}
@@ -406,32 +406,32 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {sitePages.map((page) => (
-                    <div key={page.id} className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                    <div key={page.id} className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group dark:bg-surface dark:border-white/10">
                         <div className="flex justify-between items-start mb-6">
-                            <div className="p-3 bg-indigo-50 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                            <div className="p-3 bg-indigo-50 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300 dark:bg-brand/10">
                                 <Globe className="w-6 h-6" />
                             </div>
                             <div className="flex gap-2">
-                                <button className="p-2 text-gray-400 hover:text-indigo-600"><Copy className="w-4 h-4" /></button>
-                                <button onClick={() => handleDelete(page.id)} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 className="w-4 h-4" /></button>
+                                <button className="p-2 text-gray-400 hover:text-indigo-600 dark:text-slate-500 hover:dark:text-brand"><Copy className="w-4 h-4" /></button>
+                                <button onClick={() => handleDelete(page.id)} className="p-2 text-gray-400 hover:text-rose-600 dark:text-slate-500 hover:dark:text-rose-400"><Trash2 className="w-4 h-4" /></button>
                             </div>
                         </div>
                         
                         <div className="space-y-1">
-                            <h3 className="text-lg font-black text-gray-900">{page.title}</h3>
-                            <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">/{page.slug === 'home' ? '' : page.slug}</p>
+                            <h3 className="font-display text-lg font-black text-gray-900 dark:text-white">{page.title}</h3>
+                            <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest dark:text-brand">/{page.slug === 'home' ? '' : page.slug}</p>
                         </div>
 
-                        <div className="mt-8 flex items-center justify-between pt-6 border-t border-gray-100">
+                        <div className="mt-8 flex items-center justify-between pt-6 border-t border-gray-100 dark:border-white/10">
                             <div className="flex items-center gap-3">
                                 <button className={`w-10 h-5 rounded-full transition-colors relative ${page.isPublished ? 'bg-emerald-500' : 'bg-gray-300'}`}>
                                     <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${page.isPublished ? 'right-1' : 'left-1'}`} />
                                 </button>
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{page.isPublished ? 'Published' : 'Draft'}</span>
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter dark:text-slate-500">{page.isPublished ? 'Published' : 'Draft'}</span>
                             </div>
                             <button 
                                 onClick={() => handleOpenEditor(page)}
-                                className="bg-gray-100 hover:bg-indigo-600 hover:text-white text-gray-900 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                                className="bg-gray-100 hover:bg-indigo-600 hover:text-white text-gray-900 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all dark:bg-white/5 dark:text-white"
                             >
                                 Edit Visuals
                             </button>
@@ -448,10 +448,10 @@ const EditorAccordion = ({ title, icon: Icon, id, isActive, onClick, children }:
         <div id={`section-${id}`} className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden ${isActive ? 'border-indigo-200 shadow-lg shadow-indigo-50' : 'border-gray-200 shadow-sm'}`}>
             <button 
                 onClick={onClick}
-                className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors hover:dark:bg-surface-muted"
             >
                 <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${isActive ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    <div className={`p-2 rounded-lg ${isActive ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-slate-400'}`}>
                         <Icon className="w-3.5 h-3.5" />
                     </div>
                     <span className={`text-[11px] font-black uppercase tracking-widest ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>{title}</span>
@@ -459,7 +459,7 @@ const EditorAccordion = ({ title, icon: Icon, id, isActive, onClick, children }:
                 <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isActive ? 'rotate-180' : ''}`} />
             </button>
             {isActive && (
-                <div className="px-5 pb-5 border-t border-gray-100">
+                <div className="px-5 pb-5 border-t border-gray-100 dark:border-white/10">
                     {children}
                 </div>
             )}

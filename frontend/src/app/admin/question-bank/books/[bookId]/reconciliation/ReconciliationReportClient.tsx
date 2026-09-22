@@ -137,21 +137,21 @@ export default function ReconciliationReportClient({ bookId }: { bookId: string 
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <Link href="/admin/question-bank/books" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-indigo-600">
+      <Link href="/admin/question-bank/books" className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-indigo-600 dark:text-brand">
         <ArrowLeft className="h-4 w-4" /> Book Ingestion Library
       </Link>
 
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Exercise Reconciliation</h1>
-          <p className="mt-1 text-sm text-slate-500">{book ? <>{book.title} · {book.className}</> : 'Loading…'}</p>
-          <p className="mt-1 text-xs font-bold text-slate-400">
+          <h1 className="font-display text-2xl font-black text-slate-900 dark:text-white">Exercise Reconciliation</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{book ? <>{book.title} · {book.className}</> : 'Loading…'}</p>
+          <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">
             Expected vs. extracted vs. answer/solution-matched, per confirmed exercise — the gate that decides whether this book may be marked complete.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => void recalculate()} disabled={recalculating || loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
             {recalculating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Recalculate
           </button>
           <button onClick={() => void markComplete()} disabled={completing || loading || !runId || runStage === 'COMPLETED'}
@@ -171,9 +171,9 @@ export default function ReconciliationReportClient({ bookId }: { bookId: string 
             ['Extracted', summary.totalExtracted],
             ['Unresolved', summary.totalUnresolved],
           ].map(([label, value]) => (
-            <div key={label as string} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-              <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">{label}</div>
-              <div className={`text-lg font-black ${label === 'With a gap' && (value as number) > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{value}</div>
+            <div key={label as string} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:bg-surface dark:border-white/10">
+              <div className="text-[11px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</div>
+              <div className={`text-lg font-black ${label === 'With a gap' && (value as number) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>{value}</div>
             </div>
           ))}
         </div>
@@ -181,16 +181,16 @@ export default function ReconciliationReportClient({ bookId }: { bookId: string 
 
       {message && (
         <div className={`mb-4 rounded-xl border px-4 py-3 text-sm font-bold ${
-          message.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-          : message.kind === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800'
-          : 'border-indigo-200 bg-indigo-50 text-indigo-800'
+          message.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
+          : message.kind === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-400'
+          : 'border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-brand/20 dark:bg-brand/10 dark:text-brand'
         }`}>{message.text}</div>
       )}
 
       {completionBlockers && completionBlockers.length > 0 && (
-        <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4">
+        <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 dark:bg-rose-500/10 dark:border-rose-500/20">
           <div className="mb-2 flex items-center gap-2 text-sm font-black text-rose-800"><AlertTriangle className="h-4 w-4" /> Left in review — not marked complete</div>
-          <ul className="space-y-1 text-xs text-rose-700">
+          <ul className="space-y-1 text-xs text-rose-700 dark:text-rose-400">
             {completionBlockers.map((row) => (
               <li key={row.exerciseId}>
                 <span className="font-black">{row.chapterName}{row.code ? ` · ${row.code}` : ''}{row.title ? ` — ${row.title}` : ''}:</span> {row.discrepancies.join('; ')}
@@ -201,16 +201,16 @@ export default function ReconciliationReportClient({ bookId }: { bookId: string 
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
       ) : exercises.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:bg-surface dark:border-white/10 dark:text-slate-400">
           No confirmed, question-bearing exercise found yet. Confirm this book&apos;s chapter manifest first, then recalculate.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:bg-surface dark:border-white/10">
           <table className="w-full min-w-[880px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-black uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-black uppercase tracking-wide text-slate-500 dark:bg-surface-muted dark:border-white/10 dark:text-slate-400">
                 <th className="px-3 py-2.5">Chapter / Exercise</th>
                 <th className="px-3 py-2.5">Expected</th>
                 <th className="px-3 py-2.5">Extracted</th>
@@ -225,10 +225,10 @@ export default function ReconciliationReportClient({ bookId }: { bookId: string 
                 const clean = row.discrepancies.length === 0;
                 const isEditing = row.exerciseId in editing;
                 return (
-                  <tr key={row.exerciseId} className="border-b border-slate-100 last:border-0">
+                  <tr key={row.exerciseId} className="border-b border-slate-100 last:border-0 dark:border-white/10">
                     <td className="px-3 py-2.5">
-                      <div className="font-black text-slate-800">{row.chapterName}</div>
-                      <div className="text-xs text-slate-500">{[row.code, row.title].filter(Boolean).join(' — ') || row.sectionType || '—'}</div>
+                      <div className="font-black text-slate-800 dark:text-slate-200">{row.chapterName}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{[row.code, row.title].filter(Boolean).join(' — ') || row.sectionType || '—'}</div>
                     </td>
                     <td className="px-3 py-2.5">
                       <input
@@ -238,20 +238,20 @@ export default function ReconciliationReportClient({ bookId }: { bookId: string 
                         onChange={(e) => setEditing((prev) => ({ ...prev, [row.exerciseId]: e.target.value.replace(/[^0-9]/g, '') }))}
                         onBlur={() => { if (isEditing) void saveExpected(row.exerciseId); }}
                         disabled={savingId === row.exerciseId}
-                        className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-sm disabled:opacity-60"
+                        className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-sm disabled:opacity-60 dark:border-white/10"
                       />
                     </td>
-                    <td className="px-3 py-2.5 font-bold text-slate-700">{row.extractedQuestionCount}</td>
-                    <td className="px-3 py-2.5 font-bold text-slate-700">{row.matchedQuestionCount}</td>
-                    <td className={`px-3 py-2.5 font-bold ${row.unresolvedQuestionCount > 0 ? 'text-rose-600' : 'text-slate-700'}`}>{row.unresolvedQuestionCount}</td>
+                    <td className="px-3 py-2.5 font-bold text-slate-700 dark:text-slate-300">{row.extractedQuestionCount}</td>
+                    <td className="px-3 py-2.5 font-bold text-slate-700 dark:text-slate-300">{row.matchedQuestionCount}</td>
+                    <td className={`px-3 py-2.5 font-bold ${row.unresolvedQuestionCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`}>{row.unresolvedQuestionCount}</td>
                     <td className="px-3 py-2.5">
                       {clean ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" /> Clean</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700 dark:text-emerald-400 dark:bg-emerald-500/10"><CheckCircle2 className="h-3.5 w-3.5" /> Clean</span>
                       ) : (
-                        <span title={row.discrepancies.join('; ')} className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-black text-rose-700"><AlertTriangle className="h-3.5 w-3.5" /> {row.discrepancies.length} gap{row.discrepancies.length > 1 ? 's' : ''}</span>
+                        <span title={row.discrepancies.join('; ')} className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-black text-rose-700 dark:text-rose-400 dark:bg-rose-500/10"><AlertTriangle className="h-3.5 w-3.5" /> {row.discrepancies.length} gap{row.discrepancies.length > 1 ? 's' : ''}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-400">{fmtDate(row.reconciledAt)}</td>
+                    <td className="px-3 py-2.5 text-xs text-slate-400 dark:text-slate-500">{fmtDate(row.reconciledAt)}</td>
                   </tr>
                 );
               })}

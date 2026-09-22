@@ -68,17 +68,17 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg dark:bg-surface">
                 <div className="px-6 py-4 border-b flex items-center justify-between">
-                    <h3 className="text-lg font-bold">Add New User</h3>
-                    <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                    <h3 className="font-display text-lg font-bold">Add New User</h3>
+                    <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg hover:dark:bg-white/5">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">First Name *</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-slate-400">First Name *</label>
                             <input
                                 required
                                 value={form.firstName}
@@ -87,7 +87,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Last Name *</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-slate-400">Last Name *</label>
                             <input
                                 required
                                 value={form.lastName}
@@ -97,7 +97,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                         </div>
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email *</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-slate-400">Email *</label>
                         <input
                             type="email"
                             required
@@ -107,7 +107,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-slate-400">Phone</label>
                         <input
                             value={form.phone}
                             onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
@@ -116,7 +116,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role *</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-slate-400">Role *</label>
                             <select
                                 value={form.role}
                                 onChange={e => setForm(prev => ({ ...prev, role: e.target.value }))}
@@ -128,7 +128,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status *</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-slate-400">Status *</label>
                             <select
                                 value={form.accountStatus}
                                 onChange={e => setForm(prev => ({ ...prev, accountStatus: e.target.value }))}
@@ -142,7 +142,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                     </div>
                     {form.role === 'STUDENT' && (
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Class</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-slate-400">Class</label>
                             <input
                                 value={form.class}
                                 onChange={e => setForm(prev => ({ ...prev, class: e.target.value }))}
@@ -155,14 +155,14 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg"
+                            className="flex-1 px-4 py-2 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg dark:bg-white/5 dark:text-slate-400"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-2 text-sm font-bold text-white bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                             Create User
@@ -230,38 +230,38 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                         className={`p-4 rounded-2xl border transition-all text-left flex flex-col gap-1 hover:shadow-md hover:scale-[1.02] active:scale-100 bg-white ${filterRole === stat.role ? 'border-indigo-600 ring-2 ring-indigo-50' : 'border-gray-100'}`}
                     >
                         <p className={`text-[10px] font-black uppercase tracking-widest ${stat.color}`}>{stat.label}</p>
-                        <p className="text-2xl font-black text-gray-900 leading-none">{stat.count}</p>
+                        <p className="text-2xl font-black text-gray-900 leading-none dark:text-white">{stat.count}</p>
                     </button>
                 ))}
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden dark:bg-surface dark:border-white/10">
+                <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 dark:border-white/10">
                     <div>
                         <div className="flex items-center gap-3">
-                            <h2 className="text-xl font-bold text-gray-900">User Directory</h2>
+                            <h2 className="font-display text-xl font-bold text-gray-900 dark:text-white">User Directory</h2>
                             {filterRole !== 'ALL' && (
                                 <button 
                                     onClick={() => setFilterRole('ALL')}
-                                    className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200"
+                                    className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 dark:bg-white/5 dark:text-slate-400"
                                 >
                                     Clear Filter: {filterRole}
                                 </button>
                             )}
                         </div>
-                        <p className="text-sm text-gray-500 font-medium">Manage students, teachers, and account verified status.</p>
+                        <p className="text-sm text-gray-500 font-medium dark:text-slate-400">Manage students, teachers, and account verified status.</p>
                     </div>
                     <div className="flex gap-2">
                         <button 
                             onClick={() => setShowAddModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white text-sm font-bold rounded-lg transition-colors"
                         >
                             <Plus className="w-4 h-4" /> Add User
                         </button>
-                        <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600">
+                        <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600 dark:border-white/10 dark:text-slate-400 hover:dark:bg-surface-muted">
                             <Filter className="w-4 h-4" />
                         </button>
-                        <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600">
+                        <button className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600 dark:border-white/10 dark:text-slate-400 hover:dark:bg-surface-muted">
                             <Download className="w-4 h-4" />
                         </button>
                     </div>
@@ -270,7 +270,7 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
-                        <tr className="bg-gray-50/50 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">
+                        <tr className="bg-gray-50/50 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 dark:border-white/10 dark:text-slate-400 dark:bg-surface-muted">
                             <th className="px-6 py-4">User Details</th>
                             <th className="px-6 py-4">Status & Role</th>
                             <th className="px-6 py-4">Engagement</th>
@@ -280,16 +280,16 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {filteredUsers.map((user: any) => (
-                            <tr key={user.id} className="hover:bg-indigo-50/30 transition-colors group">
+                            <tr key={user.id} className="hover:bg-indigo-50/30 transition-colors group dark:bg-brand/10">
                                 <td className="px-6 py-5">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold uppercase ring-2 ring-white">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold uppercase ring-2 ring-white dark:text-brand dark:bg-brand/15">
                                             {user.firstName?.[0]}{user.lastName?.[0]}
                                         </div>
                                         <div>
-                                            <div className="text-sm font-bold text-gray-900 group-hover:text-indigo-700 transition-colors">{user.firstName} {user.lastName}</div>
-                                            <div className="text-xs text-gray-400 font-medium">{user.email || 'No Email'}</div>
-                                            <div className="text-[10px] text-gray-400 font-bold">{user.phone || 'No phone'}</div>
+                                            <div className="text-sm font-bold text-gray-900 group-hover:text-indigo-700 transition-colors dark:text-white group-hover:dark:text-brand">{user.firstName} {user.lastName}</div>
+                                            <div className="text-xs text-gray-400 font-medium dark:text-slate-500">{user.email || 'No Email'}</div>
+                                            <div className="text-[10px] text-gray-400 font-bold dark:text-slate-500">{user.phone || 'No phone'}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -301,22 +301,22 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                                 </td>
                                 <td className="px-6 py-5">
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-xs font-bold text-gray-700 flex items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-700 flex items-center gap-2 dark:text-slate-300">
                                             <LayoutDashboard className="w-3 h-3 text-indigo-400" /> 
                                             {user._count?.enrollments || 0} Batches
                                         </span>
-                                        <span className="text-xs font-bold text-gray-700 flex items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-700 flex items-center gap-2 dark:text-slate-300">
                                             <Activity className="w-3 h-3 text-emerald-400" /> 
                                             {user._count?.testAttempts || 0} Attempts
                                         </span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-5">
-                                    <div className="text-xs font-bold text-gray-700 flex items-center gap-2" suppressHydrationWarning>
-                                        <Clock className="w-3 h-3 text-gray-400" />
+                                    <div className="text-xs font-bold text-gray-700 flex items-center gap-2 dark:text-slate-300" suppressHydrationWarning>
+                                        <Clock className="w-3 h-3 text-gray-400 dark:text-slate-500" />
                                         {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleDateString() : 'Never'}
                                     </div>
-                                    <div className="text-[10px] text-gray-400 font-medium ml-5 italic">
+                                    <div className="text-[10px] text-gray-400 font-medium ml-5 italic dark:text-slate-500">
                                         {user.loginDevice?.slice(0, 15) || 'Unknown Device'}...
                                     </div>
                                 </td>
@@ -324,14 +324,14 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                                     <div className="flex items-center justify-end gap-2">
                                         <Link 
                                             href={`/admin/users/${user.id}`}
-                                            className="px-3 py-1.5 bg-white border border-gray-200 text-xs font-bold text-indigo-600 rounded-lg shadow-sm hover:border-indigo-600 hover:bg-indigo-50 transition-all inline-flex items-center gap-2"
+                                            className="px-3 py-1.5 bg-white border border-gray-200 text-xs font-bold text-indigo-600 rounded-lg shadow-sm hover:border-indigo-600 hover:bg-indigo-50 transition-all inline-flex items-center gap-2 dark:bg-surface dark:border-white/10 dark:text-brand hover:dark:bg-brand/10"
                                         >
                                             <Eye className="w-3 h-3" /> Profile
                                         </Link>
                                         <button
                                             onClick={() => handleDelete(user.id, `${user.firstName} ${user.lastName}`)}
                                             disabled={deletingId === user.id}
-                                            className="p-1.5 bg-white border border-gray-200 text-red-500 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all disabled:opacity-50"
+                                            className="p-1.5 bg-white border border-gray-200 text-red-500 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all disabled:opacity-50 dark:bg-surface dark:border-white/10 hover:dark:bg-red-500/10"
                                             title="Delete User"
                                         >
                                             {deletingId === user.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -341,7 +341,7 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                             </tr>
                         ))}
                         {filteredUsers.length === 0 && (
-                            <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 font-medium italic">No users matching search criteria.</td></tr>
+                            <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 font-medium italic dark:text-slate-400">No users matching search criteria.</td></tr>
                         )}
                     </tbody>
                 </table>

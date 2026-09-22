@@ -10,7 +10,7 @@ export default async function StudentPerformancePage() {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id;
 
-    if (!userId) return <div>Please log in</div>;
+    if (!userId) return <div className="min-h-screen bg-gray-50 dark:bg-background text-gray-900 dark:text-foreground p-8">Please log in</div>;
 
     const pastAttempts = await (prisma as any).testAttempt.findMany({
         where: { userId: userId, status: 'SUBMITTED' },

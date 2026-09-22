@@ -42,17 +42,17 @@ const typeIcons: Record<string, React.ReactNode> = {
 };
 
 const typeColors: Record<string, string> = {
-    CLASS: 'bg-indigo-100 text-indigo-700',
-    SUBJECT: 'bg-emerald-100 text-emerald-700',
-    TOPIC: 'bg-amber-100 text-amber-700',
-    SUBTOPIC: 'bg-purple-100 text-purple-700',
+    CLASS: 'bg-indigo-100 text-indigo-700 dark:bg-brand/15 dark:text-brand',
+    SUBJECT: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+    TOPIC: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+    SUBTOPIC: 'bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400',
 };
 
 const boardColors: Record<string, string> = {
-    CBSE: 'bg-blue-100 text-blue-700',
-    NDA: 'bg-green-100 text-green-700',
-    CUET: 'bg-orange-100 text-orange-700',
-    JEE_MAIN: 'bg-red-100 text-red-700',
+    CBSE: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
+    NDA: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400',
+    CUET: 'bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400',
+    JEE_MAIN: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',
 };
 
 const BOARDS = ['CBSE', 'NDA', 'CUET', 'JEE_MAIN'] as const;
@@ -294,7 +294,7 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
 
             return (
                 <div key={item.id} style={{ paddingLeft: level * 20 }}>
-                    <div className={`flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-all ${level === 0 ? 'bg-white mb-2' : ''}`}>
+                    <div className={`flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg border border-transparent hover:border-gray-200 dark:hover:border-white/10 transition-all ${level === 0 ? 'bg-white dark:bg-surface mb-2' : ''}`}>
                         <div className="flex items-center gap-3">
                             {hasChildren && (
                                 <button onClick={() => toggleExpand(item.id)} className="p-1 hover:bg-gray-200 rounded transition-colors">
@@ -309,13 +309,13 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
 
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-gray-900">{item.name}</span>
-                                    {item.isLocked && <Lock className="w-3 h-3 text-gray-400" />}
+                                    <span className="font-semibold text-gray-900 dark:text-white">{item.name}</span>
+                                    {item.isLocked && <Lock className="w-3 h-3 text-gray-400 dark:text-slate-500" />}
                                     {item.source === 'OFFICIAL' && (
-                                        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">OFFICIAL</span>
+                                        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold dark:text-blue-400 dark:bg-blue-500/10">OFFICIAL</span>
                                     )}
                                     {!item.isApproved && (
-                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 dark:text-amber-400 dark:bg-amber-500/10">
                                             <Clock className="w-3 h-3" /> PENDING
                                         </span>
                                     )}
@@ -330,7 +330,7 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                                         </span>
                                     )}
                                     {item._count?.questionTags !== undefined && item._count.questionTags > 0 && (
-                                        <span className="text-[10px] text-gray-500">
+                                        <span className="text-[10px] text-gray-500 dark:text-slate-400">
                                             {item._count.questionTags} questions
                                         </span>
                                     )}
@@ -357,10 +357,10 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                                         className="px-3 py-1 border rounded-lg text-sm"
                                         autoFocus
                                     />
-                                    <button onClick={() => handleUpdateTag(item.id)} disabled={loading} className="p-1 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200">
+                                    <button onClick={() => handleUpdateTag(item.id)} disabled={loading} className="p-1 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 dark:text-emerald-400 dark:bg-emerald-500/10">
                                         <CheckCircle className="w-4 h-4" />
                                     </button>
-                                    <button onClick={() => { setEditingId(null); setEditName(''); }} className="p-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                                    <button onClick={() => { setEditingId(null); setEditName(''); }} className="p-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 dark:bg-white/5 dark:text-slate-300">
                                         <XCircle className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -370,14 +370,14 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                                         <>
                                             <button
                                                 onClick={() => { setEditingId(item.id); setEditName(item.name); }}
-                                                className="p-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                                                className="p-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 dark:bg-white/5 dark:text-slate-300"
                                                 title="Edit"
                                             >
                                                 <Edit2 className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteTag(item.id)}
-                                                className="p-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                                                className="p-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 dark:text-red-400 dark:bg-red-500/10"
                                                 title="Delete"
                                             >
                                                 <Trash2 className="w-4 h-4" />
@@ -390,7 +390,7 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                     </div>
 
                     {isExpanded && hasChildren && (
-                        <div className="border-l-2 border-gray-200 ml-4">
+                        <div className="border-l-2 border-gray-200 ml-4 dark:border-white/10">
                             {renderTree(item.children!, level + 1)}
                         </div>
                     )}
@@ -400,19 +400,19 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-gray-50 p-6 dark:bg-background">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Curriculum Manager</h1>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <h1 className="font-display text-2xl font-bold text-gray-900 dark:text-white">Curriculum Manager</h1>
+                        <p className="text-sm text-gray-500 mt-1 dark:text-slate-400">
                             Manage the hierarchical taxonomy structure for curriculum classification
                         </p>
                     </div>
                     <button
                         onClick={() => { setIsAdding(true); setNewTag({ name: '', type: 'TOPIC', boardType: '' }); resetCascade(); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700"
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white rounded-lg font-bold hover:opacity-90"
                     >
                         <Plus className="w-4 h-4" /> Add Tag
                     </button>
@@ -426,31 +426,31 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                         { label: 'Approved', value: classes.reduce((acc, c) => acc + 1 + (c.children?.length || 0), 0), color: 'blue' },
                         { label: 'Pending Approval', value: pendingCount, color: 'amber' },
                     ].map((stat, i) => (
-                        <div key={i} className={`bg-white p-4 rounded-xl border border-gray-200`}>
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">{stat.label}</p>
+                        <div key={i} className={`bg-white p-4 rounded-xl border border-gray-200 dark:bg-surface dark:border-white/10`}>
+                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest dark:text-slate-500">{stat.label}</p>
                             <p className={`text-2xl font-black text-${stat.color}-600 mt-1`}>{stat.value}</p>
                         </div>
                     ))}
                 </div>
 
                 {/* Filters */}
-                <div className="bg-white p-4 rounded-xl border border-gray-200 mb-6 flex items-center gap-4">
+                <div className="bg-white p-4 rounded-xl border border-gray-200 mb-6 flex items-center gap-4 dark:bg-surface dark:border-white/10">
                     <div className="flex-1">
                         <div className="relative">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search tags..."
-                                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:border-white/10 dark:bg-surface-muted"
                             />
                         </div>
                     </div>
                     <select
                         value={selectedBoard}
                         onChange={(e) => setSelectedBoard(e.target.value)}
-                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:border-white/10 dark:bg-surface-muted"
                     >
                         <option value="ALL">All Boards</option>
                         <option value="CBSE">CBSE</option>
@@ -463,11 +463,11 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                 {/* Add Tag Modal */}
                 {isAdding && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-                            <h2 className="text-xl font-bold text-gray-900 mb-4">Add New Tag</h2>
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl dark:bg-surface">
+                            <h2 className="font-display text-xl font-bold text-gray-900 mb-4 dark:text-white">Add New Tag</h2>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Tag Name</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase dark:text-slate-400">Tag Name</label>
                                     <input
                                         type="text"
                                         value={newTag.name}
@@ -477,7 +477,7 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Type</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase dark:text-slate-400">Type</label>
                                     <select
                                         value={newTag.type}
                                         onChange={(e) => { setNewTag({ ...newTag, type: e.target.value }); resetCascade(); }}
@@ -493,7 +493,7 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                                 {/* Board selector for CLASS and SUBJECT */}
                                 {(newTag.type === 'CLASS' || newTag.type === 'SUBJECT') && (
                                     <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Board</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase dark:text-slate-400">Board</label>
                                         <select
                                             value={addBoard}
                                             onChange={(e) => setAddBoard(e.target.value)}
@@ -510,7 +510,7 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                                 {/* Cascade selectors for non-CLASS types */}
                                 {(newTag.type !== 'CLASS') && (
                                     <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase">
+                                        <label className="text-xs font-bold text-gray-500 uppercase dark:text-slate-400">
                                             Parent {newTag.type === 'SUBJECT' ? 'Class' : newTag.type === 'TOPIC' ? 'Subject' : 'Topic'}
                                         </label>
                                         {(newTag.type === 'TOPIC' || newTag.type === 'SUBTOPIC') && (
@@ -572,7 +572,7 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                                 {/* Board selector for TOPIC/SUBTOPIC */}
                                 {(newTag.type === 'TOPIC' || newTag.type === 'SUBTOPIC') && (
                                     <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Board (Optional)</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase dark:text-slate-400">Board (Optional)</label>
                                         <select
                                             value={newTag.boardType}
                                             onChange={(e) => setNewTag({ ...newTag, boardType: e.target.value })}
@@ -590,14 +590,14 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                             <div className="flex justify-end gap-3 mt-6">
                                 <button
                                     onClick={() => setIsAdding(false)}
-                                    className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200"
+                                    className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 dark:bg-white/5 dark:text-slate-300"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleAddTag}
                                     disabled={loading}
-                                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 flex items-center gap-2"
+                                    className="px-6 py-2 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white rounded-lg font-bold hover:opacity-90 flex items-center gap-2"
                                 >
                                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                                     Create Tag
@@ -608,12 +608,12 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                 )}
 
                 {/* Tree View */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 dark:bg-surface dark:border-white/10">
                     {filteredClasses.length === 0 ? (
                         <div className="text-center py-12">
                             <FolderTree className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                            <p className="text-gray-500">No curriculum entries found</p>
-                            <p className="text-sm text-gray-400">Run the seeding script to populate the curriculum</p>
+                            <p className="text-gray-500 dark:text-slate-400">No curriculum entries found</p>
+                            <p className="text-sm text-gray-400 dark:text-slate-500">Run the seeding script to populate the curriculum</p>
                         </div>
                     ) : (
                         renderTree(filteredClasses)
