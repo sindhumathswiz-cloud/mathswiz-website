@@ -114,6 +114,8 @@ model User {
   flashcards                StudentFlashcard[]
   learningPathProgress      LearningPathProgress[]
   spacedRepetitionCards     SpacedRepetitionCard[]
+  questionFlagsRaised       QuestionFlag[]          @relation("QuestionFlagsRaised")
+  questionFlagsResolved     QuestionFlag[]          @relation("QuestionFlagsResolved")
 }
 
 model AuditLog {
@@ -573,6 +575,7 @@ model Question {
   mistakeNotebookEntries MistakeNotebookEntry[]
   bookmarkItems          BookmarkItem[]
   spacedRepetitionCards  SpacedRepetitionCard[]
+  flags                  QuestionFlag[]
 
   @@index([contentHash])
   @@index([bookId, bookChapterId, bookExerciseId])
@@ -885,6 +888,7 @@ enum MasterySource {
   PRACTICE
   TEST
   HOMEWORK
+  DECAY // automatic reset after prolonged inactivity on a topic -- see lib/mastery.ts sweepStaleMastery()
 }
 
 // Student-flagged questions for the "My Mistakes" notebook. Auto-captured
@@ -904,6 +908,38 @@ model MistakeNotebookEntry {
 
   @@unique([userId, questionId])
   @@index([userId, createdAt])
+}
+
+// A student reporting a question as incorrect -- distinct from the
+// tag-based AI-content-QA "second review" pipeline (see resolve-flag route
+// and QuestionTrustBadge), which has no concept of a specific reporter.
+// Each row tracks one student's report so admin resolution can notify that
+// exact student, and so multiple students flagging the same question don't
+// clobber each other's reason.
+model QuestionFlag {
+  id           String             @id @default(cuid())
+  questionId   String
+  flaggedById  String
+  reason       String             @db.Text
+  status       QuestionFlagStatus @default(PENDING)
+  resolution   String?            @db.Text // admin's note explaining the resolution
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime           @default(now())
+
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  flaggedBy  User     @relation("QuestionFlagsRaised", fields: [flaggedById], references: [id], onDelete: Cascade)
+  resolvedBy User?    @relation("QuestionFlagsResolved", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([questionId])
+  @@index([flaggedById, createdAt])
+  @@index([status, createdAt])
+}
+
+enum QuestionFlagStatus {
+  PENDING
+  CORRECTED
+  REJECTED
 }
 
 model BookmarkList {

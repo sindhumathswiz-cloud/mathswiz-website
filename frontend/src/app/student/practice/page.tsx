@@ -23,7 +23,8 @@ import {
     Clock,
     SkipForward,
     Pin,
-    Bookmark
+    Bookmark,
+    AlertTriangle
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 import QuestionTags from '@/components/QuestionTags';
@@ -64,6 +65,9 @@ function PracticeArenaInner() {
     const [isHintLoading, setIsHintLoading] = useState(false);
     const [isFlagging, setIsFlagging] = useState(false);
     const [isBookmarking, setIsBookmarking] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportReason, setReportReason] = useState('');
+    const [isReporting, setIsReporting] = useState(false);
     const [streak, setStreak] = useState(0);
     const [startTime, setStartTime] = useState(Date.now());
     const [stats, setStats] = useState({ correct: 0, total: 0 });
@@ -380,6 +384,28 @@ function PracticeArenaInner() {
         }
     };
 
+    const reportQuestionIncorrect = async () => {
+        if (!question || isReporting || !reportReason.trim()) return;
+        setIsReporting(true);
+        try {
+            const res = await fetch(`/api/student/questions/${question.id}/flag`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reportReason.trim() }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(data?.error || 'Report failed');
+            toast.success("Reported — an admin will review it. We'll let you know what happens.");
+            setShowReportModal(false);
+            setReportReason('');
+            fetchNextQuestion();
+        } catch (err: any) {
+            toast.error(err?.message || 'Could not report this question right now.');
+        } finally {
+            setIsReporting(false);
+        }
+    };
+
     const getHint = async () => {
         if (!question || isHintLoading) return;
         setIsHintLoading(true);
@@ -685,7 +711,7 @@ function PracticeArenaInner() {
                                     className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-black text-xs uppercase tracking-widest hover:text-amber-600 dark:hover:text-accent-warm disabled:opacity-30"
                                 >
                                     {isFlagging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pin className="w-4 h-4" />}
-                                    Flag
+                                    Save for Later
                                 </button>
                                 <button
                                     data-testid="bookmark-question"
@@ -696,6 +722,16 @@ function PracticeArenaInner() {
                                 >
                                     {isBookmarking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bookmark className="w-4 h-4" />}
                                     Save
+                                </button>
+                                <button
+                                    data-testid="report-question"
+                                    onClick={() => setShowReportModal(true)}
+                                    disabled={!question}
+                                    title="Report this question as incorrect"
+                                    className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-black text-xs uppercase tracking-widest hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-30"
+                                >
+                                    <AlertTriangle className="w-4 h-4" />
+                                    Report Incorrect
                                 </button>
                                 </div>
 
@@ -782,6 +818,58 @@ function PracticeArenaInner() {
                     </motion.div>
                 </AnimatePresence>
             </div>
+
+            <AnimatePresence>
+                {showReportModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => !isReporting && setShowReportModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white dark:bg-surface rounded-3xl p-8 w-full max-w-md shadow-2xl"
+                        >
+                            <div className="flex items-center gap-3 mb-2">
+                                <AlertTriangle className="w-6 h-6 text-rose-500" />
+                                <h3 className="font-display text-xl font-black text-slate-900 dark:text-white">Report this question</h3>
+                            </div>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+                                Tell us what's wrong — a wrong answer, a bad option, a typo. An admin will review it, and you'll be notified once it's resolved.
+                            </p>
+                            <textarea
+                                autoFocus
+                                value={reportReason}
+                                onChange={(e) => setReportReason(e.target.value)}
+                                placeholder="e.g. Option C should be the correct answer, not B..."
+                                rows={4}
+                                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400 mb-5 resize-none"
+                            />
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowReportModal(false)}
+                                    disabled={isReporting}
+                                    className="flex-1 py-3 rounded-2xl font-black text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={reportQuestionIncorrect}
+                                    disabled={isReporting || !reportReason.trim()}
+                                    className="flex-1 py-3 rounded-2xl font-black text-sm text-white bg-rose-600 hover:bg-rose-700 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                                >
+                                    {isReporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                                    Submit Report
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

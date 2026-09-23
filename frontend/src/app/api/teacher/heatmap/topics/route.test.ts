@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getServerSession = vi.fn();
 const batchEnrollment = { findMany: vi.fn() };
-const studentProgress = { groupBy: vi.fn() };
+const studentProgress = { groupBy: vi.fn(), findMany: vi.fn(), update: vi.fn() };
+const masteryEvent = { create: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { batchEnrollment, studentProgress } }));
+vi.mock('@/lib/prisma', () => ({ default: { batchEnrollment, studentProgress, masteryEvent } }));
 
 function get(url: string) {
   return import('./route').then(({ GET }) => GET(new Request(url)));
@@ -16,6 +17,11 @@ describe('GET /api/teacher/heatmap/topics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    // sweepStaleMastery() runs before the route's own groupBy -- no stale
+    // rows in these tests, so it's a no-op.
+    studentProgress.findMany.mockResolvedValue([]);
+    studentProgress.update.mockResolvedValue({});
+    masteryEvent.create.mockResolvedValue({});
   });
 
   it('rejects non-teacher roles', async () => {

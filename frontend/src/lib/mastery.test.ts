@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applyMasteryUpdate, deltaForAttempt } from './mastery';
+import { applyMasteryUpdate, deltaForAttempt, sweepStaleMastery } from './mastery';
 
 function makeClient(masteryScore: number, currentStreak = 0) {
   return {
-    studentProgress: { findUnique: vi.fn().mockResolvedValue({ masteryScore, currentStreak }), upsert: vi.fn().mockResolvedValue({}) },
+    studentProgress: {
+      findUnique: vi.fn().mockResolvedValue({ masteryScore, currentStreak }),
+      upsert: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+    },
     masteryEvent: { create: vi.fn().mockResolvedValue({}) },
   };
 }
@@ -51,5 +56,47 @@ describe('applyMasteryUpdate', () => {
     const easyResult = await applyMasteryUpdate(easyClient, { userId: 'student-1', topic: 'Calculus', isCorrect: false, source: 'PRACTICE', difficulty: 'EASY' });
     const hardResult = await applyMasteryUpdate(hardClient, { userId: 'student-1', topic: 'Calculus', isCorrect: false, source: 'PRACTICE', difficulty: 'HARD' });
     expect(easyResult.delta).toBeLessThan(hardResult.delta);
+  });
+});
+
+describe('sweepStaleMastery', () => {
+  it('does nothing when given no user ids', async () => {
+    const client = makeClient(0);
+    expect(await sweepStaleMastery(client, [])).toBe(0);
+    expect(client.studentProgress.findMany).not.toHaveBeenCalled();
+  });
+
+  it('resets every stale topic to zero and logs a DECAY event', async () => {
+    const client = makeClient(0);
+    client.studentProgress.findMany.mockResolvedValue([
+      { userId: 'student-1', topic: 'Algebra', masteryScore: 72 },
+      { userId: 'student-1', topic: 'Geometry', masteryScore: 15 },
+    ]);
+    const count = await sweepStaleMastery(client, ['student-1']);
+    expect(count).toBe(2);
+    expect(client.studentProgress.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId_topic: { userId: 'student-1', topic: 'Algebra' } },
+      data: { masteryScore: 0, currentStreak: 0 },
+    }));
+    expect(client.masteryEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ userId: 'student-1', topic: 'Algebra', source: 'DECAY', previousScore: 72, newScore: 0, delta: -72, isCorrect: false }),
+    }));
+  });
+
+  it('only queries topics with a positive score, past the inactivity cutoff', async () => {
+    const client = makeClient(0);
+    const at = new Date('2026-06-01T00:00:00.000Z');
+    await sweepStaleMastery(client, ['student-1'], at);
+    const call = client.studentProgress.findMany.mock.calls[0][0] as any;
+    expect(call.where.masteryScore).toEqual({ gt: 0 });
+    expect(call.where.lastPracticedAt.lt.toISOString()).toBe('2026-05-02T00:00:00.000Z');
+  });
+
+  it('leaves already-zero topics untouched', async () => {
+    const client = makeClient(0);
+    client.studentProgress.findMany.mockResolvedValue([]);
+    expect(await sweepStaleMastery(client, ['student-1'])).toBe(0);
+    expect(client.studentProgress.update).not.toHaveBeenCalled();
+    expect(client.masteryEvent.create).not.toHaveBeenCalled();
   });
 });

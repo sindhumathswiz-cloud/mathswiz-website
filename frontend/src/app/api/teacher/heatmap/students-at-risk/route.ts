@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { sweepStaleMastery } from '@/lib/mastery';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,7 @@ export async function GET(req: Request) {
   if (enrollments.length === 0) return NextResponse.json({ students: [] });
   const studentIds = [...new Set(enrollments.map((e) => e.studentId))];
   const studentById = new Map(enrollments.map((e) => [e.studentId, e.student]));
+  await sweepStaleMastery(prisma, studentIds);
 
   const weakProgress = await prisma.studentProgress.findMany({
     where: { userId: { in: studentIds }, masteryScore: { lt: 40 } },

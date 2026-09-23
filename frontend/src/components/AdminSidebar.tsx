@@ -18,6 +18,7 @@ import {
     FileStack,
     Library,
     Globe,
+    AlertTriangle,
     LogOut,
     ChevronRight,
     Zap,
@@ -79,6 +80,7 @@ export default function AdminSidebar() {
 
     const pageItems = [
         { href: '/admin/approvals', icon: <CheckSquare size={18} />, label: 'Approvals' },
+        { href: '/admin/flagged-questions', icon: <AlertTriangle size={18} />, label: 'Flagged Questions' },
         { href: '/admin/question-bank', icon: <BookOpen size={18} />, label: 'Question Bank' },
         { href: '/admin/ingestion', icon: <FileStack size={18} />, label: 'Book Ingestion' },
         { href: '/admin/curriculum', icon: <Library size={18} />, label: 'Curriculum Manager' },

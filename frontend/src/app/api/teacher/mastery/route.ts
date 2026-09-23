@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { sweepStaleMastery } from '@/lib/mastery';
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
   });
   if (enrollments.length === 0) return NextResponse.json({ error: 'No authorized students found' }, { status: 404 });
   const studentIds = [...new Set(enrollments.map((item) => item.studentId))];
+  await sweepStaleMastery(prisma, studentIds);
   const progress = await prisma.studentProgress.findMany({ where: { userId: { in: studentIds } }, orderBy: [{ userId: 'asc' }, { masteryScore: 'asc' }] });
   return NextResponse.json({ students: enrollments.map((item) => item.student), progress });
 }

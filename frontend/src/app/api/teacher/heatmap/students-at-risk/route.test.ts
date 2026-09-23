@@ -2,20 +2,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getServerSession = vi.fn();
 const batchEnrollment = { findMany: vi.fn() };
-const studentProgress = { findMany: vi.fn() };
+const studentProgress = { findMany: vi.fn(), update: vi.fn() };
+const masteryEvent = { create: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { batchEnrollment, studentProgress } }));
+vi.mock('@/lib/prisma', () => ({ default: { batchEnrollment, studentProgress, masteryEvent } }));
 
 function get(url: string) {
   return import('./route').then(({ GET }) => GET(new Request(url)));
 }
 
 describe('GET /api/teacher/heatmap/students-at-risk', () => {
+  let weakProgressData: unknown[] = [];
+
   beforeEach(() => {
     vi.clearAllMocks();
+    weakProgressData = [];
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    studentProgress.update.mockResolvedValue({});
+    masteryEvent.create.mockResolvedValue({});
+    // sweepStaleMastery() also calls studentProgress.findMany(), with a
+    // masteryScore: { gt: 0 } shape distinct from the route's own
+    // masteryScore: { lt: 40 } query -- route each to the right data so the
+    // sweep (always a no-op here) doesn't consume the route's own mock.
+    studentProgress.findMany.mockImplementation((args: any) =>
+      Promise.resolve(args?.where?.masteryScore?.gt !== undefined ? [] : weakProgressData)
+    );
   });
 
   it('rejects a missing batchId', async () => {
@@ -25,7 +38,7 @@ describe('GET /api/teacher/heatmap/students-at-risk', () => {
 
   it('reuses the <40 mastery threshold, batch-scoped', async () => {
     batchEnrollment.findMany.mockResolvedValue([{ studentId: 's-1', student: { id: 's-1', firstName: 'A', lastName: 'B' } }]);
-    studentProgress.findMany.mockResolvedValue([]);
+    weakProgressData = [];
     await get('http://localhost/api/teacher/heatmap/students-at-risk?batchId=batch-1');
     expect(studentProgress.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId: { in: ['s-1'] }, masteryScore: { lt: 40 } },
@@ -37,11 +50,11 @@ describe('GET /api/teacher/heatmap/students-at-risk', () => {
       { studentId: 's-1', student: { id: 's-1', firstName: 'Asha', lastName: 'K' } },
       { studentId: 's-2', student: { id: 's-2', firstName: 'Ravi', lastName: 'M' } },
     ]);
-    studentProgress.findMany.mockResolvedValue([
+    weakProgressData = [
       { userId: 's-1', masteryScore: 30 },
       { userId: 's-1', masteryScore: 10 },
       { userId: 's-2', masteryScore: 35 },
-    ]);
+    ];
     const response = await get('http://localhost/api/teacher/heatmap/students-at-risk?batchId=batch-1');
     const body = await response.json();
     expect(body.students).toHaveLength(2);

@@ -11,6 +11,13 @@ export const dynamic = 'force-dynamic';
  * LearningPathProgress. Topics with no progress row yet synthesize a
  * default EXAMPLES view without writing to the DB (write-on-first-
  * interaction, not write-on-list).
+ *
+ * Scoped to the student's own curriculum: only questions matching their
+ * `User.class` are eligible, and the student must have at least one
+ * APPROVED batch enrollment. Note the schema has no batch-level topic/
+ * subject restriction beyond `class` (a batch only carries a `class`
+ * field, same as Question) -- so "part of the batch" and "part of the
+ * curriculum" collapse to the same class-match check today.
  */
 export async function GET() {
   try {
@@ -20,9 +27,18 @@ export async function GET() {
     }
     const studentId = session.user.id;
 
+    const [user, enrollmentCount] = await Promise.all([
+      prisma.user.findUnique({ where: { id: studentId }, select: { class: true } }),
+      prisma.batchEnrollment.count({ where: { studentId, status: 'APPROVED' } }),
+    ]);
+
+    if (!user?.class || enrollmentCount === 0) {
+      return NextResponse.json({ paths: [] });
+    }
+
     const [topicRows, progressRows] = await Promise.all([
       prisma.question.findMany({
-        where: { status: 'APPROVED', scope: 'PUBLIC', topic: { not: null }, explanation: { not: null } },
+        where: { status: 'APPROVED', scope: 'PUBLIC', topic: { not: null }, explanation: { not: null }, class: user.class },
         distinct: ['topic'],
         select: { topic: true },
       }),

@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getServerSession = vi.fn();
 const learningPathProgress = { findUnique: vi.fn() };
 const question = { findMany: vi.fn() };
+const user = { findUnique: vi.fn() };
+const batchEnrollment = { count: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { learningPathProgress, question } }));
+vi.mock('@/lib/prisma', () => ({ default: { learningPathProgress, question, user, batchEnrollment } }));
 
 const params = (topic: string) => Promise.resolve({ topic });
 
@@ -14,6 +16,8 @@ describe('GET /api/student/learning-paths/[topic]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'student-1', role: 'STUDENT' } });
+    user.findUnique.mockResolvedValue({ class: 'Class 12' });
+    batchEnrollment.count.mockResolvedValue(1);
   });
 
   it('rejects non-student roles', async () => {
@@ -40,6 +44,14 @@ describe('GET /api/student/learning-paths/[topic]', () => {
     const response = await GET(new Request('http://localhost'), { params: params(encodeURIComponent('Linear Programming')) });
     const body = await response.json();
     expect(body.topic).toBe('Linear Programming');
-    expect(question.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ topic: 'Linear Programming' }) }));
+    expect(question.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ topic: 'Linear Programming', class: 'Class 12' }) }));
+  });
+
+  it('blocks a student with no approved batch enrollment', async () => {
+    batchEnrollment.count.mockResolvedValue(0);
+    const { GET } = await import('./route');
+    const response = await GET(new Request('http://localhost'), { params: params('Algebra') });
+    expect(response.status).toBe(403);
+    expect(question.findMany).not.toHaveBeenCalled();
   });
 });

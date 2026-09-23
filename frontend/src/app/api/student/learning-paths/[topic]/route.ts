@@ -16,13 +16,23 @@ export async function GET(_request: Request, { params }: { params: Promise<{ top
     const { topic: topicParam } = await params;
     const topic = decodeURIComponent(topicParam);
 
+    // Same curriculum/batch gate as the list route -- blocks direct-URL
+    // access to a topic outside the student's own class.
+    const [user, enrollmentCount] = await Promise.all([
+      prisma.user.findUnique({ where: { id: studentId }, select: { class: true } }),
+      prisma.batchEnrollment.count({ where: { studentId, status: 'APPROVED' } }),
+    ]);
+    if (!user?.class || enrollmentCount === 0) {
+      return NextResponse.json({ error: 'This topic is not part of your curriculum.' }, { status: 403 });
+    }
+
     const progress = await prisma.learningPathProgress.findUnique({
       where: { userId_topic: { userId: studentId, topic } },
     });
     const stage = progress?.stage ?? 'EXAMPLES';
 
     const exampleQuestions = await prisma.question.findMany({
-      where: { topic, status: 'APPROVED', scope: 'PUBLIC', explanation: { not: null } },
+      where: { topic, status: 'APPROVED', scope: 'PUBLIC', explanation: { not: null }, class: user.class },
       select: { id: true, content: true, explanation: true, difficulty: true },
       take: 10,
     });

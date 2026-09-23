@@ -2,6 +2,8 @@ type MasteryClient = {
   studentProgress: {
     findUnique(args: unknown): Promise<{ masteryScore: number; currentStreak: number } | null>;
     upsert(args: unknown): Promise<unknown>;
+    findMany(args: unknown): Promise<{ userId: string; topic: string; masteryScore: number }[]>;
+    update(args: unknown): Promise<unknown>;
   };
   masteryEvent: { create(args: unknown): Promise<unknown> };
 };
@@ -35,7 +37,7 @@ export async function applyMasteryUpdate(client: MasteryClient, input: {
   userId: string;
   topic: string;
   isCorrect: boolean;
-  source: 'PRACTICE' | 'TEST' | 'HOMEWORK';
+  source: 'PRACTICE' | 'TEST' | 'HOMEWORK' | 'DECAY';
   difficulty?: QuestionDifficulty | string | null;
   attemptId?: string | null;
   questionId?: string | null;
@@ -59,4 +61,42 @@ export async function applyMasteryUpdate(client: MasteryClient, input: {
     data: { userId: input.userId, topic: input.topic, source: input.source, previousScore, newScore, delta, isCorrect: input.isCorrect, attemptId: input.attemptId ?? null, questionId: input.questionId ?? null, createdAt: at },
   });
   return { previousScore, newScore, delta };
+}
+
+// Tunable placeholder, not confirmed pedagogy -- same status as the
+// thresholds in lib/learning-path.ts. A month with zero practice on a
+// topic is treated as "gone stale" for spaced-repetition purposes.
+export const MASTERY_INACTIVITY_RESET_DAYS = 30;
+
+// This codebase has no cron/scheduled-job infrastructure (see the same
+// on-demand pattern in lib/alerts.ts) -- so staleness is swept lazily,
+// scoped to whichever students' data is actually being read right now
+// (their own mastery page, or a teacher's batch view), rather than via a
+// background job scanning every student on a timer.
+export async function sweepStaleMastery(client: MasteryClient, userIds: string[], at: Date = new Date()) {
+  if (userIds.length === 0) return 0;
+  const cutoff = new Date(at.getTime() - MASTERY_INACTIVITY_RESET_DAYS * 24 * 60 * 60 * 1000);
+  const stale = await client.studentProgress.findMany({
+    where: { userId: { in: userIds }, masteryScore: { gt: 0 }, lastPracticedAt: { lt: cutoff } },
+    select: { userId: true, topic: true, masteryScore: true },
+  });
+  for (const row of stale) {
+    await client.studentProgress.update({
+      where: { userId_topic: { userId: row.userId, topic: row.topic } },
+      data: { masteryScore: 0, currentStreak: 0 },
+    });
+    await client.masteryEvent.create({
+      data: {
+        userId: row.userId,
+        topic: row.topic,
+        source: 'DECAY',
+        previousScore: row.masteryScore,
+        newScore: 0,
+        delta: -row.masteryScore,
+        isCorrect: false,
+        createdAt: at,
+      },
+    });
+  }
+  return stale.length;
 }
