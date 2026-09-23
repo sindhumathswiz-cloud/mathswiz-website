@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-    Folder, 
-    Plus, 
-    FileText, 
+    Folder,
+    FileText,
     Globe, 
     Youtube, 
     Upload, 
@@ -44,9 +43,7 @@ export default function KnowledgeBasePage() {
     const [folders, setFolders] = useState<KnowledgeFolder[]>([]);
     const [activeFolder, setActiveFolder] = useState<KnowledgeFolder | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-    const [newTopicName, setNewTopicName] = useState('');
-    
+
     // Upload State
     const [isUploading, setIsUploading] = useState(false);
     const [urlInput, setUrlInput] = useState('');
@@ -86,33 +83,6 @@ export default function KnowledgeBasePage() {
             if (data.success) setActiveFolder(data.folder);
         } catch (err) {
             toast.error("Failed to load folder details");
-        }
-    };
-
-    const createFolder = async () => {
-        if (!newTopicName.trim()) return;
-        try {
-            const res = await fetch('/api/teacher/knowledge/folders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topicName: newTopicName })
-            });
-            const data = await res.json();
-            if (data.success) {
-                if (folders.find(f => f.id === data.folder.id)) {
-                    // Update if already exists
-                    setFolders(folders.map(f => f.id === data.folder.id ? data.folder : f));
-                } else {
-                    setFolders([...folders, data.folder]);
-                }
-                setIsCreatingFolder(false);
-                setNewTopicName('');
-                toast.success(`Folder "${newTopicName}" created!`);
-            } else {
-                toast.error(data.error || "Failed to create folder");
-            }
-        } catch (err) {
-            toast.error("Network error");
         }
     };
 
@@ -302,13 +272,9 @@ export default function KnowledgeBasePage() {
             <div className="flex items-center justify-between mb-4">
                 <div></div>
                 {!activeFolder && (
-                    <button 
-                        onClick={() => setIsCreatingFolder(true)}
-                        className="bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet hover:opacity-90 text-white font-black px-6 py-4 rounded-3xl shadow-xl shadow-indigo-100 dark:shadow-none flex items-center gap-2 transition-all hover:scale-[1.02]"
-                    >
-                        <Plus className="w-5 h-5" />
-                        New Topic Folder
-                    </button>
+                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                        Topic folders are managed by admins — browse and train on them below
+                    </p>
                 )}
             </div>
 
@@ -541,22 +507,6 @@ export default function KnowledgeBasePage() {
                 )}
             </AnimatePresence>
 
-            {/* Creation Modal */}
-            <AnimatePresence>
-                {isCreatingFolder && (
-                    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-surface p-12 rounded-[3.5rem] w-full max-w-md shadow-2xl border border-white dark:border-white/10">
-                            <h2 className="font-display text-3xl font-black text-slate-900 dark:text-white mb-2">New Topic</h2>
-                            <p className="text-slate-400 dark:text-slate-500 font-bold mb-8">Group your school notes and URLs into a specialized AI training library.</p>
-                            <input autoFocus type="text" placeholder="e.g. Calculus: Limits" value={newTopicName} onChange={e => setNewTopicName(e.target.value)} className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-50 dark:border-white/10 rounded-3xl p-6 font-bold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-400 dark:focus:border-brand focus:bg-white dark:focus:bg-white/10 mb-8" />
-                            <div className="flex gap-4">
-                                <button onClick={() => setIsCreatingFolder(false)} className="flex-1 py-5 text-slate-400 dark:text-slate-400 font-black">Cancel</button>
-                                <button disabled={!newTopicName.trim()} onClick={createFolder} className="flex-1 py-5 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white rounded-3xl font-black shadow-xl disabled:opacity-30">Create</button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
 
             {/* Generation Modal */}
             <AnimatePresence>

@@ -41,7 +41,7 @@ export async function GET(req: Request) {
                     select: { role: true }
                 },
                 _count: {
-                    select: { questions: true }
+                    select: { documents: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
@@ -62,6 +62,9 @@ export async function POST(req: Request) {
 
         if (!user || !user.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        if (user.role !== 'ADMIN') {
+            return NextResponse.json({ error: "Only admins can create knowledge folders." }, { status: 403 });
         }
 
         const { topicName, className, subject, parentId } = await req.json();

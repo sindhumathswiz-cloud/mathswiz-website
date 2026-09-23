@@ -6,7 +6,8 @@ import mammoth from "mammoth";
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!session?.user || (session.user as any).role !== "TEACHER") {
+    const role = (session?.user as any)?.role;
+    if (!session?.user || (role !== "TEACHER" && role !== "ADMIN")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

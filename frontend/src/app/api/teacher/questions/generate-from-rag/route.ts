@@ -16,7 +16,14 @@ export async function POST(request: NextRequest) {
     const userRole = (session.user as any).role;
 
     const body = await request.json();
-    const { topic, topicId, folderId, count = 5, types = ['MCQ'], difficulties = ['MEDIUM'], taxonomyIds } = body;
+    const { topic, topicId, folderId, count = 5, difficulties = ['MEDIUM'], taxonomyIds } = body;
+    // Knowledge-base generation only ever produces options-based questions —
+    // SCQ (one correct answer) or MCQ (multiple correct answers allowed).
+    const allowedTypes = ['SCQ', 'MCQ'];
+    const requestedTypes = (Array.isArray(body.types) ? body.types : ['SCQ'])
+      .map((t: string) => (t === 'SINGLE_CHOICE' ? 'SCQ' : t === 'MULTIPLE_CHOICE' ? 'MCQ' : t))
+      .filter((t: string) => allowedTypes.includes(t));
+    const types = requestedTypes.length > 0 ? requestedTypes : ['SCQ'];
 
     if (!topic && !topicId && !folderId && !taxonomyIds) {
       return NextResponse.json({ success: false, error: "topic, topicId, folderId, or taxonomyIds required" }, { status: 400 });
@@ -30,10 +37,13 @@ export async function POST(request: NextRequest) {
     if (folderId) {
       folderIds = [folderId];
       const folder = await prisma.knowledgeFolder.findFirst({
-        where: { id: folderId, ...(userRole === "ADMIN" ? {} : { userId }) },
+        where: {
+          id: folderId,
+          ...(userRole === "ADMIN" ? {} : { OR: [{ userId }, { user: { role: 'ADMIN' } }] })
+        },
         select: { topicName: true, className: true, subject: true }
       });
-      if (!folder) return NextResponse.json({ success: false, error: "Folder not found or not owned by you" }, { status: 403 });
+      if (!folder) return NextResponse.json({ success: false, error: "Folder not found or not accessible to you" }, { status: 403 });
       if (folder && !searchQuery) searchQuery = folder.topicName || folder.subject || folder.className || '';
     }
 
@@ -117,19 +127,19 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = `You are a mathematics question generator for CBSE/JEE/CUET/NDA exams.
 
-Use the provided textbook excerpts AND similar existing questions (if any) to create exam-quality questions.
-Questions must be DIRECTLY based on concepts from the provided excerpts.
-You may use the similar existing questions as a reference for style, difficulty, and format — but generate NEW questions, do not duplicate them.
-Use the same notation and terminology as the source material.
+EXTRACTION vs GENERATION RULE (apply this per question, in order):
+1. First, check whether the SOURCE MATERIAL already contains a real question matching the requested topic/difficulty. If it does, use that question's stem VERBATIM (do not reword or invent a different problem) and set "sourced": true. If the source question doesn't already present 4 answer options, write plausible distractor options yourself, but keep the correct option faithful to the source material — never guess at or fabricate an answer that isn't supported by the source text.
+2. Only when the source material does not contain enough real questions to reach ${count}, generate a brand-new original question in the same style/notation as the source and set "sourced": false. You may use the similar existing questions below as a style/format reference, but never duplicate them.
 
 Rules:
 - Generate exactly ${count} questions
-- Types allowed: ${types.join(', ')}
+- Types allowed: ${types.join(', ')} (SCQ = single correct answer, MCQ = one or more correct answers)
 - Difficulty: ${difficulties.join(', ')}
+- Every question MUST have exactly 4 options (A, B, C, D) — never generate a free-text or fill-in-the-blank question
+- SCQ: correctAnswer is exactly one letter, e.g. "B"
+- MCQ: correctAnswer is a comma-separated list of every correct letter, e.g. "A,C"
 - Every question MUST have a complete solution/explanation
 - Format all LaTeX properly with $...$ for inline and $$...$$ for display math
-- For MCQs: provide exactly 4 options (A, B, C, D) with one correct answer
-- Questions should be original (not copied verbatim from the text)
 - Tag each question with relevant topic keywords
 - Return ONLY valid JSON, no markdown wrapping
 
@@ -137,13 +147,14 @@ Return format:
 {
   "questions": [
     {
-      "type": "MCQ" | "VERY_SHORT_ANSWER" | "SHORT_ANSWER" | "LONG_ANSWER" | "FILL_IN_THE_BLANK",
+      "type": "SCQ" | "MCQ",
       "content": "full question text",
-      "options": ["option A", "option B", "option C", "option D"] | null,
-      "correctAnswer": "A" | null,
+      "options": ["option A", "option B", "option C", "option D"],
+      "correctAnswer": "B",
       "explanation": "detailed solution",
       "difficulty": "EASY" | "MEDIUM" | "HARD",
-      "tags": ["topic1", "topic2"]
+      "tags": ["topic1", "topic2"],
+      "sourced": true
     }
   ]
 }`;
@@ -153,7 +164,7 @@ Return format:
 SOURCE MATERIAL (textbook excerpts):
 ${contextText}${examplesText}
 
-Generate ${count} questions of type(s) ${types.join(', ')} at ${difficulties.join(', ')} difficulty based on the above material.`;
+Generate ${count} questions of type(s) ${types.join(', ')} at ${difficulties.join(', ')} difficulty. Prefer extracting real questions from the source material above generating new ones — follow the EXTRACTION vs GENERATION RULE.`;
 
     const llmResponse = await fetchFromLLM(systemPrompt, userPrompt);
 
@@ -174,18 +185,19 @@ Generate ${count} questions of type(s) ${types.join(', ')} at ${difficulties.joi
     // Save questions to the Question bank
     const scope = userRole === 'ADMIN' ? 'PUBLIC' : 'TEACHER_PRIVATE';
     let savedCount = 0;
+    let extractedCount = 0;
 
     for (const q of questions) {
-      let questionType = 'SINGLE_CHOICE';
-      if (q.type === 'VERY_SHORT_ANSWER') questionType = 'VERY_SHORT_ANSWER';
-      else if (q.type === 'SHORT_ANSWER') questionType = 'SHORT_ANSWER';
-      else if (q.type === 'LONG_ANSWER') questionType = 'LONG_ANSWER';
-      else if (q.type === 'FILL_IN_THE_BLANK') questionType = 'FILL_IN_BLANKS';
+      // Skip anything the LLM produced without real options — this pipeline
+      // only ever saves options-based (SCQ/MCQ) questions.
+      if (!Array.isArray(q.options) || q.options.length < 2 || !q.correctAnswer) continue;
+
+      const questionType = q.type === 'MCQ' ? 'MULTIPLE_CHOICE' : 'SINGLE_CHOICE';
 
       await prisma.question.create({
         data: {
           content: q.content || '',
-          options: q.options || [],
+          options: q.options,
           correctAnswer: q.correctAnswer || q.correctOption || '',
           explanation: q.explanation || q.solution || '',
           type: questionType as any,
@@ -193,15 +205,17 @@ Generate ${count} questions of type(s) ${types.join(', ')} at ${difficulties.joi
           status: 'PENDING_REVIEW',
           scope: scope as any,
           createdById: userId,
-          tags: ['AI-GENERATED', ...(q.tags || [])],
+          tags: [q.sourced ? 'EXTRACTED-FROM-SOURCE' : 'AI-GENERATED', ...(q.tags || [])],
         }
       });
       savedCount++;
+      if (q.sourced) extractedCount++;
     }
 
     return NextResponse.json({
       success: true,
       generated: savedCount,
+      extracted: extractedCount,
       questions,
       status: 'PENDING_REVIEW',
       scope,

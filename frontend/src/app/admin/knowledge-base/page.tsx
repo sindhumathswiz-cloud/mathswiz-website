@@ -58,7 +58,7 @@ export default function KnowledgeBasePage() {
     const [isGenModalOpen, setIsGenModalOpen] = useState(false);
     const [genConfig, setGenConfig] = useState({
         count: 5,
-        types: ['SINGLE_CHOICE'],
+        types: ['SCQ'] as ('SCQ' | 'MCQ')[],
         difficulties: ['MEDIUM']
     });
     const [isGenerating, setIsGenerating] = useState(false);
@@ -131,21 +131,41 @@ export default function KnowledgeBasePage() {
     const handleRenameFolder = async (folderId: string, oldName: string) => {
         const newName = prompt("Enter new topic name:", oldName);
         if (!newName || newName === oldName) return;
-        
+
         try {
-            const res = await fetch('/api/knowledge-folders', {
+            const res = await fetch(`/api/admin/knowledge-folders/${folderId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ folderId, newTopicName: newName })
+                body: JSON.stringify({ topicName: newName })
             });
             const data = await res.json();
             if (data.success) {
                 setFolders(prev => prev.map(f => f.id === folderId ? { ...f, topicName: newName } : f));
                 if (activeFolder?.id === folderId) setActiveFolder({ ...activeFolder, topicName: newName });
                 toast.success("Topic renamed!");
+            } else {
+                toast.error(data.error || "Rename failed");
             }
         } catch (err) {
             toast.error("Rename failed");
+        }
+    };
+
+    const handleDeleteFolder = async (folderId: string, topicName: string) => {
+        if (!confirm(`Delete "${topicName}"? This removes every source, flashcard, and RAG chunk in it — this cannot be undone.`)) return;
+
+        try {
+            const res = await fetch(`/api/admin/knowledge-folders/${folderId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                setFolders(prev => prev.filter(f => f.id !== folderId));
+                if (activeFolder?.id === folderId) setActiveFolder(null);
+                toast.success(`"${topicName}" deleted.`);
+            } else {
+                toast.error(data.error || "Delete failed");
+            }
+        } catch (err) {
+            toast.error("Delete failed");
         }
     };
 
@@ -187,7 +207,8 @@ export default function KnowledgeBasePage() {
             const pdfjsLib = window['pdfjs-dist/build/pdf'];
             const pdfData = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-            
+
+            const pageTexts: string[] = [];
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const viewport = page.getViewport({ scale: 2.0 });
@@ -199,15 +220,28 @@ export default function KnowledgeBasePage() {
                 await page.render({ canvasContext: context!, viewport }).promise;
                 const base64Image = canvas.toDataURL('image/jpeg', 0.8);
 
-                await fetch('/api/extract', {
+                const res = await fetch('/api/extract', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: 'image', fileBase64: base64Image, folderId })
+                    body: JSON.stringify({ type: 'image', fileBase64: base64Image })
                 });
+                const data = await res.json();
+                if (data.text) pageTexts.push(data.text);
             }
+
+            const fullText = pageTexts.join('\n\n').trim();
+            if (!fullText) throw new Error("No text could be extracted from this PDF");
+
+            const saveRes = await fetch('/api/admin/knowledge-documents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folderId, title: file.name, sourceType: 'PDF', content: fullText })
+            });
+            if (!saveRes.ok) throw new Error((await saveRes.json()).error || "Failed to save extracted content");
+
             toast.success(`Extracted ${pdf.numPages} pages from ${file.name}!`, { id: loadingPage });
-        } catch (err) {
-            toast.error(`PDF extraction failed for ${file.name}`, { id: loadingPage });
+        } catch (err: any) {
+            toast.error(err?.message || `PDF extraction failed for ${file.name}`, { id: loadingPage });
         }
     };
 
@@ -259,7 +293,7 @@ export default function KnowledgeBasePage() {
             
             const data = await res.json();
             if (data.success) {
-                toast.success(`Generated ${data.generated} questions (${data.similarQuestionSources} similar Qs as context)!`, { id: loadingToast });
+                toast.success(`Generated ${data.generated} questions — ${data.extracted} pulled directly from your source material, ${data.generated - data.extracted} newly written by AI.`, { id: loadingToast });
                 setIsGenModalOpen(false);
             } else {
                 toast.error(data.error || "Generation failed", { id: loadingToast });
@@ -396,8 +430,21 @@ export default function KnowledgeBasePage() {
                                     </span>
                                 </div>
                                 
-                                <div className="absolute top-8 right-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Sparkles className="w-5 h-5 text-indigo-200" />
+                                <div className="absolute top-6 right-6 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleRenameFolder(folder.id, folder.topicName); }}
+                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-brand/10 dark:hover:text-brand rounded-xl transition-all"
+                                        title="Rename Folder"
+                                    >
+                                        <Edit3 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id, folder.topicName); }}
+                                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all"
+                                        title="Delete Folder"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
                             </motion.div>
                         ))}
@@ -424,14 +471,32 @@ export default function KnowledgeBasePage() {
                                 <Folder className="w-40 h-40" />
                             </div>
                             
-                            <button 
-                                onClick={() => setActiveFolder(null)}
-                                className="flex items-center gap-2 text-indigo-400 font-black text-xs uppercase tracking-widest hover:text-white transition-colors mb-6"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                                Back to Lab
-                            </button>
-                            
+                            <div className="flex items-center justify-between mb-6">
+                                <button
+                                    onClick={() => setActiveFolder(null)}
+                                    className="flex items-center gap-2 text-indigo-400 font-black text-xs uppercase tracking-widest hover:text-white transition-colors"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                    Back to Lab
+                                </button>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => handleRenameFolder(activeFolder.id, activeFolder.topicName)}
+                                        className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+                                        title="Rename Folder"
+                                    >
+                                        <Edit3 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteFolder(activeFolder.id, activeFolder.topicName)}
+                                        className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
+                                        title="Delete Folder"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="relative z-10 flex items-end justify-between gap-8">
                                 <div>
                                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] block mb-2">Topic Folder</span>
@@ -443,7 +508,7 @@ export default function KnowledgeBasePage() {
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                  <button 
                                      onClick={handleProcessForRAG}
                                      disabled={isProcessingRAG}
@@ -646,6 +711,14 @@ export default function KnowledgeBasePage() {
                                     <div className="flex flex-wrap gap-2">
                                         {['EASY', 'MEDIUM', 'HARD'].map(d => (
                                             <button key={d} onClick={() => setGenConfig({...genConfig, difficulties: [d]})} className={`px-6 py-3 rounded-2xl text-[10px] font-black transition-all ${genConfig.difficulties.includes(d) ? 'bg-slate-900 dark:bg-brand text-white' : 'bg-slate-50 dark:bg-white/5 text-slate-400 dark:text-slate-500'}`}>{d}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-4 dark:text-slate-500">Question Type</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {(['SCQ', 'MCQ'] as const).map(t => (
+                                            <button key={t} onClick={() => setGenConfig({...genConfig, types: [t]})} className={`px-6 py-3 rounded-2xl text-[10px] font-black transition-all ${genConfig.types.includes(t) ? 'bg-slate-900 dark:bg-brand text-white' : 'bg-slate-50 dark:bg-white/5 text-slate-400 dark:text-slate-500'}`}>{t === 'SCQ' ? 'Single Correct' : 'Multiple Correct'}</button>
                                         ))}
                                     </div>
                                 </div>

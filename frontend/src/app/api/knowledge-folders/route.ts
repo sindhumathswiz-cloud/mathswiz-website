@@ -11,6 +11,9 @@ export async function POST(req: Request) {
         if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        if ((session?.user as any)?.role !== 'ADMIN') {
+            return NextResponse.json({ error: "Only admins can create knowledge folders." }, { status: 403 });
+        }
 
         // CRITICAL FIX: Look up the actual database user ID
         const dbUser = await prisma.user.findUnique({

@@ -66,16 +66,20 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         const userId = (session?.user as any)?.id;
-        
-        if (!userId || (session?.user as any)?.role !== "TEACHER") {
+        const role = (session?.user as any)?.role;
+
+        if (!userId || (role !== "TEACHER" && role !== "ADMIN")) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const { folderId } = await req.json();
         if (!folderId) return NextResponse.json({ error: "Folder ID required" }, { status: 400 });
 
-        const folder = await prisma.knowledgeFolder.findUnique({
-            where: { id: folderId, userId: userId },
+        const folder = await prisma.knowledgeFolder.findFirst({
+            where: {
+                id: folderId,
+                ...(role === "ADMIN" ? {} : { OR: [{ userId }, { user: { role: 'ADMIN' } }] })
+            },
             include: { documents: { where: { isActive: true } } }
         });
 

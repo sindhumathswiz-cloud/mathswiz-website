@@ -1,8 +1,15 @@
+import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { YoutubeTranscript } from 'youtube-transcript';
+import { authOptions } from "@/lib/auth";
 
 export async function POST(req: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
 
         // 1. MATHPIX FOR IMAGES & RASTERIZED PDF PAGES
