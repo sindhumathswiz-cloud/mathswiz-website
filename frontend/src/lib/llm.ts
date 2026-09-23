@@ -10,7 +10,7 @@ const GROQ_MODELS = ["openai/gpt-oss-120b"];
 // gemini-2.0-flash was retired too (404 "no longer available ... use
 // models/gemini-3.6-flash"). Mirrors GEMINI_MODELS in structure-questions.ts,
 // which is confirmed reaching the API successfully today.
-const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash"];
+const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash"];
 
 interface ProviderEntry {
   key: string;

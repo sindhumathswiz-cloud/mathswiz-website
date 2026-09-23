@@ -45,7 +45,9 @@ const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) =>
         const key = groqKeys[Math.floor(Math.random() * groqKeys.length)];
         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "system", content: safeSystemPrompt }, { role: "user", content: safeUserPrompt }], response_format: { type: "json_object" } })
+            // llama-3.1-8b-instant was retired by Groq (404 model_not_found);
+            // openai/gpt-oss-120b is confirmed working (see lib/llm.ts).
+            body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: [{ role: "system", content: safeSystemPrompt }, { role: "user", content: safeUserPrompt }], response_format: { type: "json_object" } })
         });
         const data = await readJsonResponse<any>(res);
         if (!res.ok) throw new Error(`Groq API Error: ${data?.error?.message || res.statusText}`);
@@ -54,12 +56,19 @@ const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) =>
         return data.choices[0].message.content;
     } else {
         const key = geminiKeys[Math.floor(Math.random() * geminiKeys.length)];
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ systemInstruction: { parts: [{ text: safeSystemPrompt }] }, contents: [{ parts: [{ text: safeUserPrompt }] }], generationConfig: { responseMimeType: "application/json" } })
-        });
-        const data = await readJsonResponse<any>(res);
-        if (!res.ok) throw new Error(`Gemini API Error: ${data?.error?.message || res.statusText}`);
+        // gemini-1.5-flash and gemini-2.0-flash were both retired by Google;
+        // gemini-3.5-flash / gemini-2.5-flash are confirmed working (lib/llm.ts).
+        let res: Response | null = null;
+        let data: any = null;
+        for (const model of ["gemini-3.6-flash", "gemini-3.5-flash"]) {
+            res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ systemInstruction: { parts: [{ text: safeSystemPrompt }] }, contents: [{ parts: [{ text: safeUserPrompt }] }], generationConfig: { responseMimeType: "application/json" } })
+            });
+            data = await readJsonResponse<any>(res);
+            if (res.ok) break;
+        }
+        if (!res || !res.ok) throw new Error(`Gemini API Error: ${data?.error?.message || res?.statusText}`);
         if (!data) throw new Error("Gemini returned an empty or invalid response.");
         if (!data.candidates || !data.candidates[0]) throw new Error("Invalid response format from Gemini API.");
         return data.candidates[0].content.parts[0].text;

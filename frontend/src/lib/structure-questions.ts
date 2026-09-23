@@ -82,7 +82,7 @@ function geminiKeys(): string[] {
 }
 
 // Newest GA flash first; fall back to the prior GA flash if a key/model is busy.
-const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash'];
 
 // PRIMARY: Gemini 3.5 Flash with model + key rotation (large free-tier quota).
 async function callGemini(prompt: string): Promise<string> {

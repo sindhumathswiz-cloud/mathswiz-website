@@ -19,8 +19,10 @@ const fetchFromBalancedLLM = async (systemPrompt: string, messages: any[]) => {
         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: { "Authorization": `Bearer ${key.trim()}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                model: "llama-3.1-8b-instant", 
+            body: JSON.stringify({
+                // llama-3.1-8b-instant was retired by Groq (404 model_not_found);
+                // openai/gpt-oss-120b is confirmed working (see lib/llm.ts).
+                model: "openai/gpt-oss-120b",
                 messages: [{ role: "system", content: systemPrompt }, ...messages]
             })
         });
@@ -29,18 +31,24 @@ const fetchFromBalancedLLM = async (systemPrompt: string, messages: any[]) => {
         return data.choices[0].message.content;
     } else {
         const key = geminiKeys[Math.floor(Math.random() * geminiKeys.length)];
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key.trim()}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                contents: messages.map(m => ({ 
-                    role: m.role === 'assistant' ? 'model' : m.role, 
-                    parts: [{ text: m.content }] 
-                }))
-            })
-        });
-        if (!res.ok) throw new Error("Gemini API failed");
+        // gemini-1.5-flash and gemini-2.0-flash were both retired by Google;
+        // gemini-3.5-flash / gemini-2.5-flash are confirmed working (lib/llm.ts).
+        let res: Response | null = null;
+        for (const model of ["gemini-3.6-flash", "gemini-3.5-flash"]) {
+            res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key.trim()}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    contents: messages.map(m => ({
+                        role: m.role === 'assistant' ? 'model' : m.role,
+                        parts: [{ text: m.content }]
+                    }))
+                })
+            });
+            if (res.ok) break;
+        }
+        if (!res || !res.ok) throw new Error("Gemini API failed");
         const data = await res.json();
         return data.candidates[0].content.parts[0].text;
     }

@@ -39,22 +39,30 @@ export async function POST(req: NextRequest) {
         Return STRICT JSON array of objects: 
         { "samples": [ { "question": "...", "answer": "...", "explanation": "..." } ] }`;
 
+        // gemini-1.5-flash and gemini-2.0-flash were both retired by Google;
+        // gemini-3.5-flash / gemini-2.5-flash are the confirmed-working models
+        // used elsewhere in this codebase (lib/llm.ts).
         const geminiKey = process.env.GEMINI_API_KEY;
-        const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { responseMimeType: "application/json" }
-                })
-            }
-        );
+        let res: Response | null = null;
+        let lastErrText = "";
+        for (const model of ["gemini-3.6-flash", "gemini-3.5-flash"]) {
+            res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                }
+            );
+            if (res.ok) break;
+            lastErrText = await res.text();
+        }
 
-        if (!res.ok) {
-            const errText = await res.text();
-            return NextResponse.json({ success: false, error: `Gemini Error: ${errText}` }, { status: 500 });
+        if (!res || !res.ok) {
+            return NextResponse.json({ success: false, error: `Gemini Error: ${lastErrText}` }, { status: 500 });
         }
 
         const data = await res.json();

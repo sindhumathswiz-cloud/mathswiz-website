@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { parseLLMJson } from "./llm-json";
 import { normalizeExtractedQuestions, type CanonicalQuestion } from "./extract-normalizer";
 
-const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash"];
+const GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash"];
 
 function geminiKeys(): string[] {
   return [
