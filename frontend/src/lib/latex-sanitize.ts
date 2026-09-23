@@ -84,7 +84,12 @@ export function sanitizeLatex(text: string): string {
     const segments = result.split(/(\$\$[\s\S]*?\$\$|\$[^$]*?\$)/g);
     result = segments.map(seg => {
       if (seg.startsWith('$')) return seg;
-      if (LATEX_CMD.test(seg) || /[∀-⋿⨀-⫿]/.test(seg)) {
+      // Unicode symbols such as ∩ are valid text in Markdown.  Wrapping an
+      // entire prose sentence just because it includes one of them turns any
+      // percent sign in that sentence into a TeX comment (for example,
+      // "P(A ∩ B) = 70% and P(B) = 85%" rendered only through "70").
+      // Only actual LaTeX commands need an automatic math wrapper.
+      if (LATEX_CMD.test(seg)) {
         return '$' + seg.trim() + '$';
       }
       return seg;
@@ -120,7 +125,7 @@ export function sanitizeLatex(text: string): string {
     const segs2 = result.split(/(\$\$[\s\S]*?\$\$|\$[^$]*?\$)/g);
     result = segs2.map(seg => {
       if (seg.startsWith('$')) return seg;
-      if (LATEX_CMD.test(seg) || /[∀-⋿⨀-⫿]/.test(seg)) {
+      if (LATEX_CMD.test(seg)) {
         return '$' + seg.trim() + '$';
       }
       return seg;

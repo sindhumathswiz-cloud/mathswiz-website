@@ -25,6 +25,11 @@ describe('sanitizeLatex', () => {
     expect(sanitizeLatex('Choose the correct option.')).toBe('Choose the correct option.');
   });
 
+  it('does not turn prose containing a Unicode math symbol and percentages into one LaTeX block', () => {
+    const question = 'If P(A ∩ B) = 70% and P(B) = 85%, then P(A/B) is equal to:';
+    expect(sanitizeLatex(question)).toBe(question);
+  });
+
   it('does not double-wrap content already inside $...$', () => {
     expect(sanitizeLatex('$\\vec{a}$')).toBe('$\\vec{a}$');
   });
