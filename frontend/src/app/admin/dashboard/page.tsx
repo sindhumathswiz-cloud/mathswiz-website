@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import prisma from "@/lib/prisma";
 import AdminDashboardClient from "./AdminDashboardClient";
 import { unstable_noStore as noStore } from "next/cache";
@@ -121,16 +122,18 @@ export default async function AdminDashboardPage() {
     });
 
     return (
-        <AdminDashboardClient 
-            stats={stats} 
-            users={users} 
-            leads={leads} 
-            coupons={coupons}
-            banners={banners}
-            notifications={notifications}
-            sitePages={sitePages}
-            payments={payments}
-            pendingReviewQuestions={pendingReviewQuestions}
-        />
+        <Suspense>
+            <AdminDashboardClient
+                stats={stats}
+                users={users}
+                leads={leads}
+                coupons={coupons}
+                banners={banners}
+                notifications={notifications}
+                sitePages={sitePages}
+                payments={payments}
+                pendingReviewQuestions={pendingReviewQuestions}
+            />
+        </Suspense>
     );
 }

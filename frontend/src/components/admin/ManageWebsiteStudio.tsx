@@ -294,34 +294,44 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                                 icon={Star}
                             >
                                 <div className="space-y-4 pt-4">
-                                    {(draftContent.content.testimonialsBlock.testimonials || []).map((t: any, idx: number) => (
+                                    {(draftContent.content.testimonials.items || []).map((t: any, idx: number) => (
                                         <div key={t.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-200 relative group dark:border-white/10 dark:bg-surface-muted">
-                                            <button 
+                                            <button
                                                 onClick={() => {
-                                                    const news = draftContent.content.testimonialsBlock.testimonials.filter((_: any, i: number) => i !== idx);
-                                                    setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonialsBlock: { ...draftContent.content.testimonialsBlock, testimonials: news } } });
+                                                    const news = draftContent.content.testimonials.items.filter((_: any, i: number) => i !== idx);
+                                                    setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonials: { ...draftContent.content.testimonials, items: news } } });
                                                 }}
                                                 className="absolute -top-2 -right-2 bg-white shadow-md border w-6 h-6 rounded-full flex items-center justify-center text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity dark:bg-surface"
                                             >
                                                 <X className="w-3 h-3" />
                                             </button>
                                             <div className="space-y-3">
-                                                <input 
+                                                <input
                                                     value={t.name}
                                                     onChange={(e) => {
-                                                        const news = [...draftContent.content.testimonialsBlock.testimonials];
+                                                        const news = [...draftContent.content.testimonials.items];
                                                         news[idx].name = e.target.value;
-                                                        setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonialsBlock: { ...draftContent.content.testimonialsBlock, testimonials: news } } });
+                                                        setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonials: { ...draftContent.content.testimonials, items: news } } });
                                                     }}
                                                     className="w-full bg-transparent border-b border-gray-300 focus:border-indigo-500 outline-none text-xs font-black p-1 dark:border-white/10"
                                                     placeholder="Student Name"
                                                 />
-                                                <textarea 
-                                                    value={t.quote}
+                                                <input
+                                                    value={t.role || ''}
                                                     onChange={(e) => {
-                                                        const news = [...draftContent.content.testimonialsBlock.testimonials];
-                                                        news[idx].quote = e.target.value;
-                                                        setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonialsBlock: { ...draftContent.content.testimonialsBlock, testimonials: news } } });
+                                                        const news = [...draftContent.content.testimonials.items];
+                                                        news[idx].role = e.target.value;
+                                                        setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonials: { ...draftContent.content.testimonials, items: news } } });
+                                                    }}
+                                                    className="w-full bg-transparent border-b border-gray-300 focus:border-indigo-500 outline-none text-[10px] font-bold p-1 dark:border-white/10"
+                                                    placeholder="e.g. Class 10 Student"
+                                                />
+                                                <textarea
+                                                    value={t.comment}
+                                                    onChange={(e) => {
+                                                        const news = [...draftContent.content.testimonials.items];
+                                                        news[idx].comment = e.target.value;
+                                                        setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonials: { ...draftContent.content.testimonials, items: news } } });
                                                     }}
                                                     className="w-full bg-transparent border-none outline-none text-[11px] font-medium resize-none h-16 leading-relaxed"
                                                     placeholder="Student testimonial..."
@@ -329,10 +339,10 @@ export const ManageWebsiteStudio = ({ sitePages: initialPages }: ManageWebsiteSt
                                             </div>
                                         </div>
                                     ))}
-                                    <button 
+                                    <button
                                         onClick={() => {
-                                            const news = [...(draftContent.content.testimonialsBlock.testimonials || []), { id: Date.now().toString(), name: "New Student", quote: "", photoUrl: "/boy.png" }];
-                                            setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonialsBlock: { ...draftContent.content.testimonialsBlock, testimonials: news } } });
+                                            const news = [...(draftContent.content.testimonials.items || []), { id: Date.now().toString(), name: "New Student", role: "", comment: "", avatar: "/boy.png" }];
+                                            setDraftContent({ ...draftContent, content: { ...draftContent.content, testimonials: { ...draftContent.content.testimonials, items: news } } });
                                         }}
                                         className="w-full py-3 border-2 border-dashed border-gray-300 rounded-2xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-400 transition-all flex items-center justify-center gap-2 dark:border-white/10 dark:text-slate-500"
                                     >

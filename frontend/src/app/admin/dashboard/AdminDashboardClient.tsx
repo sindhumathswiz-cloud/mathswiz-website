@@ -54,6 +54,7 @@ import {
     Cell
 } from 'recharts';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useTheme } from 'next-themes';
 import { signOut } from 'next-auth/react';
@@ -69,7 +70,6 @@ import { AdminReportingPanel } from "@/components/admin/AdminReportingPanel";
 import { SystemFeatures } from "@/components/admin/SystemFeatures";
 import { FeeManagement } from "@/components/admin/FeeManagement";
 import { FeeStructureGenerator } from "@/components/admin/FeeStructureGenerator";
-import { ManageWebsiteStudio } from "@/components/admin/ManageWebsiteStudio";
 
 import { QuestionReviewQueue } from "@/components/admin/QuestionReviewQueue";
 import { TodayDashboard } from "@/components/dashboard/TodayDashboard";
@@ -120,7 +120,17 @@ export default function AdminDashboardClient({
     const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
     const [newLead, setNewLead] = useState({ name: '', phone: '', courseInterest: '' });
     const [leads, setLeads] = useState(initialLeads);
-    const [activeTab, setActiveTab] = useState<'Platform Overview' | 'User Directory' | 'Manage Website' | 'Approvals' | 'Lead CRM' | 'Curriculum Manager' | 'Test & Exam Engine' | 'Reports & Export' | 'System Features' | 'Fee Management' | 'Question Bank'>('Platform Overview');
+    type AdminTab = 'Platform Overview' | 'User Directory' | 'Approvals' | 'Lead CRM' | 'Test & Exam Engine' | 'Reports & Export' | 'System Features' | 'Fee Management' | 'Question Bank';
+    const searchParams = useSearchParams();
+    const [activeTab, setActiveTab] = useState<AdminTab>('Platform Overview');
+
+    // The sidebar drives navigation between dashboard sections via ?tab=,
+    // since it's the single merged nav for the admin area (no in-page tab strip).
+    useEffect(() => {
+        const tabParam = searchParams.get('tab') as AdminTab | null;
+        setActiveTab(tabParam || 'Platform Overview');
+    }, [searchParams]);
+
     const [isCreateBatchOpen, setIsCreateBatchOpen] = useState(false);
     const [newBatch, setNewBatch] = useState({ name: '', code: '', teacherId: '', class: 'Class 12', startDate: '' });
 
@@ -303,12 +313,10 @@ export default function AdminDashboardClient({
             <div className="bg-white dark:bg-surface border-b border-gray-200 dark:border-white/10 sticky top-0 z-30">
                 <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-8">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet rounded-lg flex items-center justify-center">
-                                <Activity className="w-5 h-5 text-white" />
-                            </div>
-                            <span className="font-display font-extrabold text-xl tracking-tight text-gray-900 dark:text-white">ADMIN <span className="text-indigo-600 dark:text-brand">COMMAND</span></span>
-                        </div>
+                        <Link href="/" className="flex items-center gap-2 shrink-0">
+                            <img src="/logo.png" alt="Sindhu's Mathswiz Classes" className="w-9 h-9 rounded-lg object-contain" />
+                            <span className="font-display font-extrabold text-lg tracking-tight text-gray-900 dark:text-white whitespace-nowrap">Sindhu&apos;s Mathswiz <span className="text-indigo-600 dark:text-brand">Classes</span></span>
+                        </Link>
                         <div className="hidden md:flex items-center bg-gray-100 dark:bg-white/5 rounded-xl px-4 py-2 w-96 border border-gray-200 dark:border-white/10 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
                             <Search className="w-4 h-4 text-gray-400" />
                             <input
@@ -339,10 +347,7 @@ export default function AdminDashboardClient({
                         </button>
                         <div className="h-8 w-px bg-gray-200 dark:bg-white/10 mx-2"></div>
                         <div className="flex items-center gap-3 pl-2">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-sm font-bold text-gray-900 dark:text-white">Master Admin</p>
-                                <p className="text-[10px] font-bold text-indigo-600 dark:text-brand uppercase tracking-widest">Global Control</p>
-                            </div>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white hidden sm:block">Master Admin</p>
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 dark:from-brand dark:to-brand-violet flex items-center justify-center text-white font-black text-lg border-2 border-white dark:border-surface shadow-sm">A</div>
                         </div>
                         <button
@@ -437,23 +442,6 @@ export default function AdminDashboardClient({
                     </button>
                 </div>
 
-                {/* Pill-Shaped Secondary Navigation */}
-                <div className="dashboard-tabs mb-8" aria-label="Administrator workspace sections">
-                    {['Platform Overview', 'User Directory', 'Curriculum Manager', 'Manage Website', 'Approvals', 'Lead CRM', 'Test & Exam Engine', 'Fee Management', 'Reports & Export', 'System Features', 'Question Bank'].map((tab) => (
-                        <button 
-                            key={tab} 
-                            onClick={() => setActiveTab(tab as any)} 
-                            className={`dashboard-tab ${
-                                activeTab === tab 
-                                    ? 'dashboard-tab-active'
-                                    : ''
-                            }`}
-                        >
-                            {tab === 'Manage Website' ? 'Manage Website' : tab}
-                        </button>
-                    ))}
-                </div>
-
                 <div className="animate-in fade-in duration-300">
                     {/* Platform Overview Tab */}
                     {activeTab === 'Platform Overview' && (
@@ -512,19 +500,6 @@ export default function AdminDashboardClient({
                         </div>
                     )}
 
-                    {/* Curriculum Manager Tab */}
-                    {activeTab === 'Curriculum Manager' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-2xl text-white mb-6">
-                                <h2 className="text-xl font-bold mb-2">Curriculum Manager</h2>
-                                <p className="text-indigo-100 text-sm">Manage the hierarchical taxonomy structure for curriculum classification. View, add, or edit topics across CBSE, NDA, CUET, and JEE Main syllabi.</p>
-                                <a href="/admin/curriculum" className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold transition-colors">
-                                    Open Full Manager <ExternalLink className="w-4 h-4" />
-                                </a>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Test Engine Tab */}
                     {activeTab === 'Test & Exam Engine' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -536,13 +511,6 @@ export default function AdminDashboardClient({
                         </div>
                     )}
                     
-                    {/* Manage Website Tab */}
-                    {activeTab === 'Manage Website' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <ManageWebsiteStudio sitePages={sitePages} />
-                        </div>
-                    )}
-
                     {/* CRM & Features Tabs */}
                     {activeTab === 'Lead CRM' && <div className="animate-in fade-in duration-500"><LeadCRM leads={leads} /></div>}
                     {activeTab === 'Reports & Export' && (
@@ -570,7 +538,6 @@ export default function AdminDashboardClient({
                             <FeeManagement payments={payments} />
                         </div>
                     )}
-
                 </div>
             </div>
 
