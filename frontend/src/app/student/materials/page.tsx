@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -21,15 +21,17 @@ export default async function StudentMaterialsPage() {
     }).catch(() => []);
 
     return (
-        <StudentDashboardClient 
-            initialEnrollments={[]} 
-            initialPayments={[]} 
-            initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} 
-            initialMaterials={materials} 
-            initialTests={[]}
-            initialAttempts={[]}
-            initialGoal={null}
-            defaultTab="materials"
-        />
+        <Suspense>
+            <StudentDashboardClient
+                initialEnrollments={[]}
+                initialPayments={[]}
+                initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }}
+                initialMaterials={materials}
+                initialTests={[]}
+                initialAttempts={[]}
+                initialGoal={null}
+                defaultTab="materials"
+            />
+        </Suspense>
     );
 }

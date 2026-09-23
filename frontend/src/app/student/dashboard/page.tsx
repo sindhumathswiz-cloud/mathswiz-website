@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -25,7 +25,7 @@ export default async function StudentDashboard() {
     }
 
     if (!userId) {
-        return <StudentDashboardClient initialEnrollments={[]} initialPayments={[]} initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} initialMaterials={[]} initialTests={[]} initialAttempts={[]} initialGoal={null} />;
+        return <Suspense><StudentDashboardClient initialEnrollments={[]} initialPayments={[]} initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} initialMaterials={[]} initialTests={[]} initialAttempts={[]} initialGoal={null} /></Suspense>;
     }
 
     try {
@@ -128,19 +128,21 @@ export default async function StudentDashboard() {
             .reduce((sum: number, p: any) => sum + p.amount, 0);
 
         return (
-            <StudentDashboardClient 
-                initialEnrollments={enrollments} 
-                initialPayments={payments} 
-                initialSummary={{ totalAmount, totalPaid, totalOutstanding, overdueAmount }} 
-                initialMaterials={materials}
-                initialTests={tests}
-                initialAttempts={pastAttempts}
-                initialGoal={goal}
-                initialNotices={notices}
-            />
+            <Suspense>
+                <StudentDashboardClient
+                    initialEnrollments={enrollments}
+                    initialPayments={payments}
+                    initialSummary={{ totalAmount, totalPaid, totalOutstanding, overdueAmount }}
+                    initialMaterials={materials}
+                    initialTests={tests}
+                    initialAttempts={pastAttempts}
+                    initialGoal={goal}
+                    initialNotices={notices}
+                />
+            </Suspense>
         );
     } catch (error) {
         console.error("Student Dashboard Server Fetch Error:", error);
-        return <StudentDashboardClient initialEnrollments={[]} initialPayments={[]} initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} initialMaterials={[]} initialTests={[]} initialAttempts={[]} initialGoal={null} initialNotices={[]} />;
+        return <Suspense><StudentDashboardClient initialEnrollments={[]} initialPayments={[]} initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} initialMaterials={[]} initialTests={[]} initialAttempts={[]} initialGoal={null} initialNotices={[]} /></Suspense>;
     }
 }

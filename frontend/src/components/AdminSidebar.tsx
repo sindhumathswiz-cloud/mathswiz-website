@@ -18,7 +18,6 @@ import {
     FileStack,
     Library,
     Globe,
-    ShieldCheck,
     LogOut,
     ChevronRight,
     Zap,
@@ -96,10 +95,13 @@ export default function AdminSidebar() {
         <aside className="w-72 bg-white dark:bg-surface border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
             <div className="p-6">
                 <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 bg-indigo-100 dark:bg-brand/15 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-brand shadow-inner shrink-0">
-                        <ShieldCheck size={20} />
-                    </div>
-                    <span className="font-body text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex-1">Admin</span>
+                    <Link href="/" className="flex items-center gap-3 flex-1 min-w-0">
+                        <img src="/logo.png" alt="Sindhu's Mathswiz Classes" className="w-10 h-10 rounded-xl object-contain shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <h2 className="font-display font-black text-slate-900 dark:text-white leading-none text-sm truncate">Sindhu&apos;s Mathswiz Classes</h2>
+                            <span className="font-body text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Admin</span>
+                        </div>
+                    </Link>
                     <button
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                         aria-label="Toggle dark mode"

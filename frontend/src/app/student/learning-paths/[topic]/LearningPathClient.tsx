@@ -69,59 +69,81 @@ export default function LearningPathClient({ topicParam }: { topicParam: string 
 }
 
 function ExamplesStage({ encodedTopic, detail, onAdvance }: { topic: string; encodedTopic: string; detail: PathDetail; onAdvance: () => void }) {
-  const [markingId, setMarkingId] = useState<string | null>(null);
-
-  const markViewed = async (questionId: string) => {
-    setMarkingId(questionId);
-    try {
-      const response = await fetch(`/api/student/learning-paths/${encodedTopic}/examples/view`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questionId }),
-      });
-      if (!response.ok) {
-        toast.error('Could not record this — try again.');
-        return;
-      }
-      onAdvance();
-    } finally {
-      setMarkingId(null);
-    }
-  };
+  const [marking, setMarking] = useState(false);
+  // Land on the first not-yet-reviewed example rather than always example 1,
+  // so returning to this stage doesn't force re-clicking through ones already done.
+  const firstUnviewed = detail.examples.findIndex((ex) => !detail.examplesViewedIds.includes(ex.id));
+  const [index, setIndex] = useState(firstUnviewed === -1 ? 0 : firstUnviewed);
 
   if (detail.examples.length === 0) {
     return <div className="rounded-3xl border border-dashed dark:border-white/10 bg-white dark:bg-surface p-16 text-center font-bold text-slate-600 dark:text-slate-400">No worked examples available for this topic yet.</div>;
   }
 
+  const example = detail.examples[index];
+  const viewed = detail.examplesViewedIds.includes(example.id);
+
+  const markViewed = async () => {
+    setMarking(true);
+    try {
+      const response = await fetch(`/api/student/learning-paths/${encodedTopic}/examples/view`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId: example.id }),
+      });
+      if (!response.ok) {
+        toast.error('Could not record this — try again.');
+        return;
+      }
+      if (index + 1 < detail.examples.length) {
+        setIndex(index + 1);
+      }
+      onAdvance();
+    } finally {
+      setMarking(false);
+    }
+  };
+
   return (
     <div>
-      <div className="mb-6 rounded-2xl bg-indigo-50 dark:bg-brand/10 p-4 text-sm font-bold text-indigo-700 dark:text-brand">
-        Reviewed {detail.examplesViewedCount} of {detail.examplesRequired} required examples.
+      <div className="mb-6 flex items-center justify-between rounded-2xl bg-indigo-50 dark:bg-brand/10 p-4 text-sm font-black text-indigo-700 dark:text-brand">
+        <span>Example {index + 1} of {detail.examples.length}</span>
+        <span>Reviewed {detail.examplesViewedCount} of {detail.examplesRequired} required</span>
       </div>
-      <div className="space-y-4">
-        {detail.examples.map((ex) => {
-          const viewed = detail.examplesViewedIds.includes(ex.id);
-          return (
-            <div key={ex.id} className={`rounded-2xl border dark:border-white/10 bg-white dark:bg-surface p-5 ${viewed ? 'border-emerald-300 dark:border-emerald-500/40' : ''}`}>
-              <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                <BookOpen className="h-4 w-4" />Worked example · {ex.difficulty}
-                {viewed && <span className="ml-auto inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" />Reviewed</span>}
-              </div>
-              <div className="mb-3 text-sm font-bold text-slate-900 dark:text-white"><MathRenderer content={ex.content} /></div>
-              <div className="mb-4 rounded-xl bg-slate-50 dark:bg-white/5 p-4 text-sm text-slate-700 dark:text-slate-300"><MathRenderer content={ex.explanation} /></div>
-              {!viewed && (
-                <button
-                  type="button"
-                  onClick={() => markViewed(ex.id)}
-                  disabled={markingId === ex.id}
-                  className="rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-4 py-2 text-xs font-black text-white disabled:opacity-50"
-                >
-                  {markingId === ex.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Mark as reviewed'}
-                </button>
-              )}
-            </div>
-          );
-        })}
+      <div key={example.id} className={`rounded-2xl border dark:border-white/10 bg-white dark:bg-surface p-5 ${viewed ? 'border-emerald-300 dark:border-emerald-500/40' : ''}`}>
+        <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <BookOpen className="h-4 w-4" />Worked example · {example.difficulty}
+          {viewed && <span className="ml-auto inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" />Reviewed</span>}
+        </div>
+        <div className="mb-3 text-sm font-bold text-slate-900 dark:text-white"><MathRenderer content={example.content} /></div>
+        <div className="mb-4 rounded-xl bg-slate-50 dark:bg-white/5 p-4 text-sm text-slate-700 dark:text-slate-300"><MathRenderer content={example.explanation} /></div>
+        {!viewed && (
+          <button
+            type="button"
+            onClick={markViewed}
+            disabled={marking}
+            className="rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet px-4 py-2 text-xs font-black text-white disabled:opacity-50"
+          >
+            {marking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Mark as reviewed'}
+          </button>
+        )}
+      </div>
+      <div className="mt-4 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setIndex((i) => Math.max(0, i - 1))}
+          disabled={index === 0}
+          className="rounded-xl border-2 border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-black text-slate-600 dark:text-slate-400 disabled:opacity-30"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          onClick={() => setIndex((i) => Math.min(detail.examples.length - 1, i + 1))}
+          disabled={index === detail.examples.length - 1}
+          className="rounded-xl border-2 border-slate-200 dark:border-white/10 px-4 py-2 text-xs font-black text-slate-600 dark:text-slate-400 disabled:opacity-30"
+        >
+          Next
+        </button>
       </div>
     </div>
   );

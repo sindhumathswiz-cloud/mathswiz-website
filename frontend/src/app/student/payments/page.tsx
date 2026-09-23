@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -31,15 +31,17 @@ export default async function StudentPaymentsPage() {
         .reduce((sum: number, p: any) => sum + p.amount, 0);
 
     return (
-        <StudentDashboardClient 
-            initialEnrollments={[]} 
-            initialPayments={payments} 
-            initialSummary={{ totalAmount, totalPaid, totalOutstanding, overdueAmount }} 
-            initialMaterials={[]} 
-            initialTests={[]}
-            initialAttempts={[]}
-            initialGoal={null}
-            defaultTab="payments"
-        />
+        <Suspense>
+            <StudentDashboardClient
+                initialEnrollments={[]}
+                initialPayments={payments}
+                initialSummary={{ totalAmount, totalPaid, totalOutstanding, overdueAmount }}
+                initialMaterials={[]}
+                initialTests={[]}
+                initialAttempts={[]}
+                initialGoal={null}
+                defaultTab="payments"
+            />
+        </Suspense>
     );
 }

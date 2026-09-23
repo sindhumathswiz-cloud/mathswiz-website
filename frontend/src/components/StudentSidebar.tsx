@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import {
     LayoutDashboard,
@@ -24,6 +24,8 @@ import {
     Trophy,
     CalendarClock,
     Swords,
+    Video,
+    TrendingUp,
     Zap
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
@@ -62,26 +64,35 @@ const SidebarItem = ({ href, icon, label, isActive, badge }: SidebarItemProps) =
 
 export default function StudentSidebar({ active }: { active?: string }) {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => setMounted(true), []);
 
+    const onDashboard = pathname === '/student/dashboard';
+    const currentTab = onDashboard ? (searchParams.get('tab') || 'batches') : null;
+    const dashboardTab = (tab: string) => `/student/dashboard?tab=${encodeURIComponent(tab)}`;
+
     const menuItems = [
-        { href: '/student/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-        { href: '/student/tests', icon: <ClipboardList size={18} />, label: 'My Tests' },
-        { href: '/student/mock-tests', icon: <Trophy size={18} />, label: 'Mock Exams' },
-        { href: '/student/leaderboard', icon: <Trophy size={18} />, label: 'Leaderboard' },
-        { href: '/student/challenges/class', icon: <Swords size={18} />, label: 'Class Challenge' },
-        { href: '/student/practice', icon: <Target size={18} />, label: 'Practice Arena' },
-        { href: '/student/materials', icon: <FileText size={18} />, label: 'Study Materials' },
-        { href: '/student/performance', icon: <BarChart3 size={18} />, label: 'Performance' },
-        { href: '/student/achieve', icon: <Star size={18} />, label: 'Achieve' },
-        { href: '/student/payments', icon: <CreditCard size={18} />, label: 'Fee & Payments' },
+        { href: '/student/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard', isActive: onDashboard && currentTab === 'batches' },
+        { href: dashboardTab('batches'), icon: <BookOpen size={18} />, label: 'My Batches', isActive: onDashboard && currentTab === 'batches' },
+        { href: dashboardTab('live-classes'), icon: <Video size={18} />, label: 'Live Classes', isActive: onDashboard && currentTab === 'live-classes' },
+        { href: '/student/tests', icon: <ClipboardList size={18} />, label: 'My Tests', isActive: pathname === '/student/tests' },
+        { href: '/student/mock-tests', icon: <Trophy size={18} />, label: 'Mock Exams', isActive: pathname === '/student/mock-tests' },
+        { href: '/student/leaderboard', icon: <Trophy size={18} />, label: 'Leaderboard', isActive: pathname === '/student/leaderboard' },
+        { href: '/student/challenges/class', icon: <Swords size={18} />, label: 'Class Challenge', isActive: pathname === '/student/challenges/class' },
+        { href: '/student/practice', icon: <Target size={18} />, label: 'Practice Arena', isActive: pathname === '/student/practice' },
+        { href: '/student/materials', icon: <FileText size={18} />, label: 'Study Materials', isActive: pathname === '/student/materials' },
+        { href: '/student/performance', icon: <BarChart3 size={18} />, label: 'Performance', isActive: pathname === '/student/performance' },
+        { href: '/student/achieve', icon: <Star size={18} />, label: 'Achieve', isActive: pathname === '/student/achieve' },
+        { href: dashboardTab('profile'), icon: <UserCircle size={18} />, label: 'Profile', isActive: onDashboard && currentTab === 'profile' },
+        { href: '/student/payments', icon: <CreditCard size={18} />, label: 'Fee & Payments', isActive: pathname === '/student/payments' },
     ];
 
     const learningItems = [
         { href: '/student/learning-paths', icon: <Compass size={18} />, label: 'Learning Paths' },
         { href: '/student/mastery', icon: <Target size={18} />, label: 'My Mastery' },
+        { href: '/student/interventions', icon: <TrendingUp size={18} />, label: 'Support Plans' },
         { href: '/student/mistakes', icon: <BookX size={18} />, label: 'My Mistakes' },
         { href: '/student/bookmarks', icon: <Bookmark size={18} />, label: 'Bookmarks' },
         { href: '/student/flashcards', icon: <Layers size={18} />, label: 'Flashcards' },
@@ -98,14 +109,14 @@ export default function StudentSidebar({ active }: { active?: string }) {
         <aside className="w-72 bg-white dark:bg-surface border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
             {/* Profile Brief */}
             <div className="p-8">
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="w-12 h-12 bg-indigo-100 dark:bg-brand/15 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-brand shadow-inner">
-                        <UserCircle size={28} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h2 className="font-display font-black text-slate-900 dark:text-white leading-none">Student Portal</h2>
-                        <span className="font-body text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Mathswiz Premium</span>
-                    </div>
+                <div className="flex items-center gap-3 mb-8">
+                    <Link href="/" className="flex items-center gap-3 flex-1 min-w-0">
+                        <img src="/logo.png" alt="Sindhu's Mathswiz Classes" className="w-10 h-10 rounded-xl object-contain shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <h2 className="font-display font-black text-slate-900 dark:text-white leading-none text-sm truncate">Sindhu&apos;s Mathswiz Classes</h2>
+                            <span className="font-body text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Student</span>
+                        </div>
+                    </Link>
                     <button
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                         aria-label="Toggle dark mode"
@@ -119,11 +130,7 @@ export default function StudentSidebar({ active }: { active?: string }) {
                 <div className="space-y-2">
                     <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Command Center</p>
                     {menuItems.map((item) => (
-                        <SidebarItem
-                            key={item.href}
-                            {...item}
-                            isActive={pathname === item.href}
-                        />
+                        <SidebarItem key={item.href} {...item} />
                     ))}
                 </div>
 

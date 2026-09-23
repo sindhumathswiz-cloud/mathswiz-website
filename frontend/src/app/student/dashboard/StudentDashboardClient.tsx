@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { BookOpen, FileText, CheckCircle, PlayCircle, Lock, Download, Calendar, BarChart3, PlusCircle, Bot, Sparkles, UserCircle, Loader2, XCircle, ClipboardList, Clock, CreditCard, Target, Star, MessageSquare, TrendingUp, Video } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -42,7 +43,17 @@ export default function StudentDashboardClient({
     defaultTab
 }: Props) {
     const { data: session } = useSession();
-    const [activeTab, setActiveTab] = useState<'batches' | 'tests' | 'materials' | 'performance' | 'profile' | 'payments' | 'achieve' | 'live-classes'>(defaultTab || 'batches');
+    type StudentTab = 'batches' | 'tests' | 'materials' | 'performance' | 'profile' | 'payments' | 'achieve' | 'live-classes';
+    const searchParams = useSearchParams();
+    const [activeTab, setActiveTab] = useState<StudentTab>(defaultTab || 'batches');
+
+    // The sidebar drives navigation for the dashboard-hosted sections (My
+    // Batches / Live Classes / Profile) via ?tab= -- the routed sections
+    // (tests/materials/performance/achieve/payments) keep using defaultTab.
+    useEffect(() => {
+        const tabParam = searchParams.get('tab') as StudentTab | null;
+        if (tabParam) setActiveTab(tabParam);
+    }, [searchParams]);
     const [goal, setGoal] = useState<{ targetExam: string; targetScore: number } | null>(initialGoal);
     const [goalFormExam, setGoalFormExam] = useState('');
     const [goalFormScore, setGoalFormScore] = useState('');
@@ -213,41 +224,6 @@ export default function StudentDashboardClient({
                         {joinSuccess && <p className="mt-2 flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle className="w-4 h-4" /> Successfully requested!</p>}
                         {joinError && <p className="mt-2 text-sm text-rose-600">{joinError}</p>}
                     </div>
-                </div>
-
-                {/* Navigation Tabs */}
-                <div className="dashboard-tabs mb-8" aria-label="Student dashboard sections">
-                    <button onClick={() => setActiveTab('batches')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'batches' ? 'dashboard-tab-active' : ''}`}>
-                        <BookOpen className="w-4 h-4" /> My Batches
-                    </button>
-                    <button onClick={() => setActiveTab('live-classes')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'live-classes' ? 'dashboard-tab-active' : ''}`}>
-                        <Video className="w-4 h-4" /> Live Classes
-                    </button>
-                    <button onClick={() => setActiveTab('tests')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'tests' ? 'dashboard-tab-active' : ''}`}>
-                        <ClipboardList className="w-4 h-4" /> Assigned Tests
-                        {assignedTests.length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{assignedTests.length}</span>}
-                    </button>
-                    <button onClick={() => setActiveTab('materials')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'materials' ? 'dashboard-tab-active' : ''}`}>
-                        <FileText className="w-4 h-4" /> Study Materials
-                    </button>
-                    <button onClick={() => setActiveTab('performance')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'performance' ? 'dashboard-tab-active' : ''}`}>
-                        <BarChart3 className="w-4 h-4" /> Performance
-                    </button>
-                    <Link href="/student/mastery" className="dashboard-tab flex items-center gap-2">
-                        <Target className="w-4 h-4" /> My Mastery
-                    </Link>
-                    <Link href="/student/interventions" className="dashboard-tab flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" /> Support Plans
-                    </Link>
-                    <button onClick={() => setActiveTab('achieve')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'achieve' ? 'dashboard-tab-active' : ''}`}>
-                        <Star className="w-4 h-4" /> Achieve
-                    </button>
-                    <button onClick={() => setActiveTab('profile')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'profile' ? 'dashboard-tab-active' : ''}`}>
-                        <UserCircle className="w-4 h-4" /> Profile
-                    </button>
-                    <button onClick={() => setActiveTab('payments')} className={`dashboard-tab flex items-center gap-2 ${activeTab === 'payments' ? 'dashboard-tab-active' : ''}`}>
-                        <CreditCard className="w-4 h-4" /> Fee & Payments
-                    </button>
                 </div>
 
                 {/* Tab Content */}

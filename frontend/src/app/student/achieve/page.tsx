@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -28,16 +28,18 @@ export default async function StudentAchievePage() {
     }).catch(() => []);
 
     return (
-        <StudentDashboardClient 
-            initialEnrollments={[]} 
-            initialPayments={[]} 
-            initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} 
-            initialMaterials={[]} 
-            initialTests={[]}
-            initialAttempts={pastAttempts}
-            initialGoal={goal}
-            initialProgress={progress}
-            defaultTab="achieve"
-        />
+        <Suspense>
+            <StudentDashboardClient
+                initialEnrollments={[]}
+                initialPayments={[]}
+                initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }}
+                initialMaterials={[]}
+                initialTests={[]}
+                initialAttempts={pastAttempts}
+                initialGoal={goal}
+                initialProgress={progress}
+                defaultTab="achieve"
+            />
+        </Suspense>
     );
 }

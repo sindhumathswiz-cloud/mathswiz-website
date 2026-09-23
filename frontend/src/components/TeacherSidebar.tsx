@@ -15,7 +15,6 @@ import {
     HeartHandshake,
     Library,
     MessageSquareQuote,
-    UserCircle,
     ChevronRight,
     LogOut,
     Zap,
@@ -81,14 +80,14 @@ export default function TeacherSidebar() {
     return (
         <aside className="w-72 bg-white dark:bg-surface border-r border-slate-200 dark:border-white/10 h-screen sticky top-0 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
             <div className="p-8">
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="w-12 h-12 bg-indigo-100 dark:bg-brand/15 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-brand shadow-inner">
-                        <UserCircle size={28} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h2 className="font-display font-black text-slate-900 dark:text-white leading-none">Teacher Portal</h2>
-                        <span className="font-body text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Mathswiz Premium</span>
-                    </div>
+                <div className="flex items-center gap-3 mb-8">
+                    <Link href="/" className="flex items-center gap-3 flex-1 min-w-0">
+                        <img src="/logo.png" alt="Sindhu's Mathswiz Classes" className="w-10 h-10 rounded-xl object-contain shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <h2 className="font-display font-black text-slate-900 dark:text-white leading-none text-sm truncate">Sindhu&apos;s Mathswiz Classes</h2>
+                            <span className="font-body text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 block">Teacher</span>
+                        </div>
+                    </Link>
                     <button
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                         aria-label="Toggle dark mode"
