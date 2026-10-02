@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireTeacherOrAdmin } from "@/lib/teacher-api-guard";
 
 export const dynamic = 'force-dynamic';
 
@@ -9,8 +10,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     try {
         const { id } = await params; // The BatchEnrollment ID
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = requireTeacherOrAdmin(session);
+        if (!guard.ok) return guard.response;
+        const userId = guard.userId;
 
         const body = await req.json();
         const { status, feeStructureId } = body; 

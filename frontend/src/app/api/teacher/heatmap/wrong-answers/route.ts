@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { requirePremiumTeacherStrict } from '@/lib/teacher-api-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,9 +14,8 @@ const MAX_QUESTIONS = 30;
 // -- no new schema needed, just the aggregation.
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== 'TEACHER') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const guard = await requirePremiumTeacherStrict(session);
+  if (!guard.ok) return guard.response;
 
   const { searchParams } = new URL(req.url);
   const batchId = searchParams.get('batchId');
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   if (!batchId) return NextResponse.json({ error: 'batchId is required' }, { status: 400 });
 
   const enrollments = await prisma.batchEnrollment.findMany({
-    where: { status: 'APPROVED', batchId, batch: { teacherId: session.user.id } },
+    where: { status: 'APPROVED', batchId, batch: { teacherId: guard.userId } },
     select: { studentId: true },
   });
   if (enrollments.length === 0) return NextResponse.json({ questions: [] });

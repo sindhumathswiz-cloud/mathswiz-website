@@ -3,10 +3,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== 'TEACHER') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const caller = await prisma.user.findUnique({ where: { id: session.user.id }, select: { subscription: true } });
+  if (!isPremiumSubscription(caller?.subscription)) {
+    return NextResponse.json({ error: 'This feature requires a premium subscription.' }, { status: 403 });
+  }
   const { id } = await params;
   const existing = await prisma.intervention.findFirst({ where: { id, teacherId: session.user.id }, select: { id: true, studentId: true } });
   if (!existing) return NextResponse.json({ error: 'Intervention not found' }, { status: 404 });

@@ -4,8 +4,9 @@ const user = {
   findUnique: vi.fn(),
   create: vi.fn(),
 };
+const lead = { create: vi.fn() };
 
-vi.mock("@/lib/prisma", () => ({ default: { user } }));
+vi.mock("@/lib/prisma", () => ({ default: { user, lead } }));
 vi.mock("bcryptjs", () => ({ hash: vi.fn().mockResolvedValue("secure-hash") }));
 
 describe("POST /api/auth/register", () => {
@@ -57,5 +58,20 @@ describe("POST /api/auth/register", () => {
     }));
     expect(JSON.stringify(body)).not.toContain("secure-hash");
     expect(JSON.stringify(body)).not.toContain("password123");
+  });
+
+  it("records a paid-plan request without marking access as paid", async () => {
+    user.findUnique.mockResolvedValue(null);
+    user.create.mockResolvedValue({ id: "student-2", mobileNumber: "9876543210", role: "STUDENT", accountStatus: "APPROVED" });
+    lead.create.mockResolvedValue({ id: "lead-1" });
+    const { POST } = await import("./route");
+    const response = await POST(new Request("http://localhost/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ firstName: "Plan", lastName: "Student", mobileNumber: "9876543210", password: "password123", role: "STUDENT", class: "Class 11", selectedPlan: "YEARLY", paymentMethod: "UPI" }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(lead.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ courseInterest: "Class 11 Maths · Yearly ₹9,999" }) }));
+    expect(user.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.not.objectContaining({ subscription: "PREMIUM" }) }));
   });
 });

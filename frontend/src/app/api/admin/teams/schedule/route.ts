@@ -2,19 +2,34 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { isPremiumSubscription } from "@/lib/subscription";
+
+// Live Classes is a Premium-gated teacher feature (ADMIN is exempt).
+async function requireLiveClassAccess(session: any) {
+    const role = (session?.user as any)?.role;
+    if (!session || (role !== "TEACHER" && role !== "ADMIN")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (role === "TEACHER") {
+        const caller = await prisma.user.findUnique({ where: { id: (session.user as any).id }, select: { subscription: true } });
+        if (!isPremiumSubscription(caller?.subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
+    }
+    return null;
+}
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role === "STUDENT") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await requireLiveClassAccess(session);
+    if (denied) return denied;
 
     try {
         const { title, start, end, batchId } = await req.json();
         const accessToken = (session as any).accessToken;
-        const teacherId = session.user.id;
+        const teacherId = session!.user.id;
         const batch = await prisma.batch.findFirst({
-            where: { id: batchId, ...(session.user.role === "ADMIN" ? {} : { teacherId }) },
+            where: { id: batchId, ...(session!.user.role === "ADMIN" ? {} : { teacherId }) },
         });
         if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
 
@@ -111,9 +126,8 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role === "STUDENT") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await requireLiveClassAccess(session);
+    if (denied) return denied;
 
     try {
         const { id, title, start, end } = await req.json();
@@ -124,7 +138,7 @@ export async function PATCH(req: Request) {
         }
 
         const liveClass = await prisma.liveClass.findFirst({
-            where: { id, ...(session.user.role === "ADMIN" ? {} : { batch: { teacherId: session.user.id } }) },
+            where: { id, ...(session!.user.role === "ADMIN" ? {} : { batch: { teacherId: session!.user.id } }) },
         });
         if (!liveClass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
@@ -163,9 +177,8 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role === "STUDENT") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await requireLiveClassAccess(session);
+    if (denied) return denied;
 
     try {
         const { searchParams } = new URL(req.url);
@@ -175,7 +188,7 @@ export async function DELETE(req: Request) {
         if (!id) return NextResponse.json({ error: "Missing class ID" }, { status: 400 });
 
         const liveClass = await prisma.liveClass.findFirst({
-            where: { id, ...(session.user.role === "ADMIN" ? {} : { batch: { teacherId: session.user.id } }) },
+            where: { id, ...(session!.user.role === "ADMIN" ? {} : { batch: { teacherId: session!.user.id } }) },
         });
         if (!liveClass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 

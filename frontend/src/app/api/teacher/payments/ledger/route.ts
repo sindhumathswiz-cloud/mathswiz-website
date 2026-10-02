@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacherStrict } from "@/lib/teacher-api-guard";
 
 import { unstable_noStore as noStore } from "next/cache";
 
@@ -11,9 +12,9 @@ export async function GET(req: Request) {
     noStore();
     try {
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        const teacherId = userId;
+        const guard = await requirePremiumTeacherStrict(session);
+        if (!guard.ok) return guard.response;
+        const teacherId = guard.userId;
 
         const { searchParams } = new URL(req.url);
         const status = searchParams.get('status'); // PAID, UNPAID, UPCOMING

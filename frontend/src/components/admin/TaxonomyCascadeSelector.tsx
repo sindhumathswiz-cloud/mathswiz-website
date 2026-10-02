@@ -33,7 +33,7 @@ interface TaxonomyCascadeSelectorProps {
     onSelect?: (id: string) => void;
 }
 
-const BOARDS = ['CBSE', 'NDA', 'CUET', 'JEE_MAIN'] as const;
+const BOARDS = ['CBSE', 'NDA', 'CUET'] as const;
 
 export default function TaxonomyCascadeSelector({ 
     selectedIds, 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
+import { isFreePreviewQuestion } from '@/lib/free-preview-content';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
     const studentId = (session.user as any).id;
+    const student = await prisma.user.findUnique({ where: { id: studentId }, select: { subscription: true } });
+    const isPremium = isPremiumSubscription(student?.subscription);
     const now = new Date();
 
     const assignment = await (prisma as any).testAssignment.findFirst({
@@ -56,6 +60,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
                     subject: true,
                     class: true,
                     tags: true,
+                    topic: true,
+                    bookChapter: { select: { orderIndex: true } },
                   }
                 }
               }
@@ -67,6 +73,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     if (!test) {
       return NextResponse.json({ error: 'Test not found' }, { status: 404 });
+    }
+
+    const testQuestions = test.sections.flatMap((section: any) => section.questions.map((item: any) => item.question));
+    if (!isPremium) {
+      // isFreePreviewQuestion is async -- must be awaited per question
+      // rather than called inside a synchronous .some(), which would negate
+      // a Promise object (always truthy) and never actually block anything.
+      const eligibility = await Promise.all(testQuestions.map((question: any) => isFreePreviewQuestion(question)));
+      if (testQuestions.length === 0 || eligibility.some((ok: boolean) => !ok)) {
+        return NextResponse.json({ error: 'This assessment is available with a premium subscription. Try the free first-chapter mock from the preview.' }, { status: 403 });
+      }
     }
 
     let attempt = await prisma.testAttempt.findFirst({

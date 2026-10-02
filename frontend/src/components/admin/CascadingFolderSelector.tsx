@@ -41,7 +41,7 @@ interface CascadingFolderSelectorProps {
     onDelete?: (id: string) => Promise<any>;
 }
 
-const CLASSES = ['Class 11', 'Class 12', 'NDA', 'JEEMains', 'JEEAdvanced', 'NEET'];
+const CLASSES = ['Class 11', 'Class 12', 'NDA', 'NEET'];
 const SUBJECTS = [
     { name: 'Mathematics', icon: <Calculator className="w-4 h-4" /> },
     { name: 'Physics', icon: <Atom className="w-4 h-4" /> },

@@ -3,10 +3,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { sweepStaleMastery } from '@/lib/mastery';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== 'TEACHER') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const caller = await prisma.user.findUnique({ where: { id: session.user.id }, select: { subscription: true } });
+  if (!isPremiumSubscription(caller?.subscription)) {
+    return NextResponse.json({ error: 'This feature requires a premium subscription.' }, { status: 403 });
+  }
   const url = new URL(req.url);
   const batchId = url.searchParams.get('batchId');
   const studentId = url.searchParams.get('studentId');

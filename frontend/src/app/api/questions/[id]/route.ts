@@ -7,6 +7,7 @@ import { provenanceApprovalError } from "@/lib/question-provenance";
 import { structuralApprovalError } from "@/lib/question-qa";
 import { figureApprovalError } from "@/lib/question-figures";
 import { snapshotQuestionVersion } from "@/lib/question-version";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
         const role = (session.user as any).role;
         const userId = (session.user as any).id;
+        // Editing a TEACHER_PRIVATE question is part of the Question Bank
+        // Premium feature; ADMIN edits of any question are unaffected.
+        if (role === 'TEACHER') {
+            const caller = await prisma.user.findUnique({ where: { id: userId }, select: { subscription: true } });
+            if (!isPremiumSubscription(caller?.subscription)) {
+                return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+            }
+        }
         const questionId = (await params).id;
 
         // Check ownership/permission

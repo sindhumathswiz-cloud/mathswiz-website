@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import StudentDashboardClient from "../dashboard/StudentDashboardClient";
 import { unstable_noStore as noStore } from "next/cache";
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export default async function StudentPaymentsPage() {
     noStore();
@@ -11,6 +12,7 @@ export default async function StudentPaymentsPage() {
     const userId = (session?.user as any)?.id;
 
     if (!userId) return <div>Please log in</div>;
+    const user = await (prisma as any).user.findUnique({ where: { id: userId }, select: { subscription: true } });
 
     const payments = await (prisma as any).paymentRecord.findMany({
         where: { enrollment: { studentId: userId } },
@@ -41,6 +43,7 @@ export default async function StudentPaymentsPage() {
                 initialAttempts={[]}
                 initialGoal={null}
                 defaultTab="payments"
+                isPremium={isPremiumSubscription(user?.subscription)}
             />
         </Suspense>
     );

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacherStrict } from "@/lib/teacher-api-guard";
 
 import { unstable_noStore as noStore } from "next/cache";
 
@@ -11,8 +12,9 @@ export async function GET() {
     noStore();
     try {
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = await requirePremiumTeacherStrict(session);
+        if (!guard.ok) return guard.response;
+        const userId = guard.userId;
 
         const coupons = await (prisma as any).discountCoupon.findMany({
             where: { batch: { teacherId: userId } },
@@ -28,8 +30,9 @@ export async function GET() {
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = await requirePremiumTeacherStrict(session);
+        if (!guard.ok) return guard.response;
+        const userId = guard.userId;
 
         const { code, discountPct, discountAmt, batchId } = await req.json();
 

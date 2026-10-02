@@ -3,15 +3,16 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
+import { requirePremiumTeacherStrict } from "@/lib/teacher-api-guard";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        const teacherId = userId;
+        const guard = await requirePremiumTeacherStrict(session);
+        if (!guard.ok) return guard.response;
+        const teacherId = guard.userId;
 
         const body = await req.json();
         const { paymentId, recordedMode } = body; 

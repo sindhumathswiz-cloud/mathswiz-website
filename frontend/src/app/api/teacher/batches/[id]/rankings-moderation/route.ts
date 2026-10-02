@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
+import { requireTeacherOrAdmin } from "@/lib/teacher-api-guard";
 
 // Teacher-only moderation lever: hide one student's entry from this
 // batch's leaderboard and class challenges without unenrolling them.
@@ -13,9 +14,9 @@ export async function PATCH(
     try {
         const { id: batchId } = await params;
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
-        const role = session?.user?.role;
-        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = requireTeacherOrAdmin(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
 
         const body = await req.json().catch(() => ({}));
         const { studentId, excludedFromRankings } = body as { studentId?: unknown; excludedFromRankings?: unknown };

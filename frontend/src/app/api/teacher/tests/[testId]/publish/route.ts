@@ -3,18 +3,16 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ testId: string }> }) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
-        const role = session?.user?.role;
-        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        if (role !== "TEACHER" && role !== "ADMIN") {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
+        const guard = await requirePremiumTeacher(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
 
         const { testId } = await params;
         const body = await req.json().catch(() => null);

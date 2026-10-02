@@ -4,17 +4,27 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { masteryToDifficultyBand, selectQuestionsByFilters } from '@/lib/question-selection';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 const REMEDIAL_PRACTICE_COUNT = 8;
 
+async function requireInterventionsAccess(session: any) {
+  if (!session?.user?.id || session.user.role !== 'TEACHER') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const caller = await prisma.user.findUnique({ where: { id: session.user.id }, select: { subscription: true } });
+  if (!isPremiumSubscription(caller?.subscription)) return NextResponse.json({ error: 'This feature requires a premium subscription.' }, { status: 403 });
+  return null;
+}
+
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== 'TEACHER') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const denied = await requireInterventionsAccess(session);
+  if (denied) return denied;
+  const teacherId = (session!.user as any).id as string;
   const batchId = new URL(req.url).searchParams.get('batchId');
-  const enrollments = await prisma.batchEnrollment.findMany({ where: { status: 'APPROVED', batch: { teacherId: session.user.id }, ...(batchId ? { batchId } : {}) }, select: { batchId: true, studentId: true, student: { select: { id: true, firstName: true, lastName: true } } } });
+  const enrollments = await prisma.batchEnrollment.findMany({ where: { status: 'APPROVED', batch: { teacherId }, ...(batchId ? { batchId } : {}) }, select: { batchId: true, studentId: true, student: { select: { id: true, firstName: true, lastName: true } } } });
   const studentIds = [...new Set(enrollments.map((item) => item.studentId))];
   const [interventions, weakProgress] = await Promise.all([
-    prisma.intervention.findMany({ where: { teacherId: session.user.id, ...(batchId ? { batchId } : {}) }, include: { student: { select: { id: true, firstName: true, lastName: true } }, batch: { select: { id: true, name: true } }, testAssignment: { include: { test: { select: { id: true, title: true } } } } }, orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }] }),
+    prisma.intervention.findMany({ where: { teacherId, ...(batchId ? { batchId } : {}) }, include: { student: { select: { id: true, firstName: true, lastName: true } }, batch: { select: { id: true, name: true } }, testAssignment: { include: { test: { select: { id: true, title: true } } } } }, orderBy: [{ status: 'asc' }, { dueDate: 'asc' }, { createdAt: 'desc' }] }),
     prisma.studentProgress.findMany({ where: { userId: { in: studentIds }, masteryScore: { lt: 40 } }, orderBy: { masteryScore: 'asc' } }),
   ]);
   const students = new Map(enrollments.map((item) => [item.studentId, { ...item.student, batchId: item.batchId }]));
@@ -24,7 +34,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== 'TEACHER') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const denied = await requireInterventionsAccess(session);
+  if (denied) return denied;
+  const teacherId = (session!.user as any).id as string;
   const body = await req.json();
   const studentId = typeof body.studentId === 'string' ? body.studentId : '';
   const batchId = typeof body.batchId === 'string' ? body.batchId : '';
@@ -34,7 +46,7 @@ export async function POST(req: Request) {
   const allowedTypes = ['PRACTICE', 'HOMEWORK', 'LIVE_SUPPORT', 'MATERIAL', 'OTHER'] as const;
   const type = allowedTypes.includes(body.type) ? body.type as typeof allowedTypes[number] : 'PRACTICE';
   if (!studentId || !batchId || !topic || !title || !description) return NextResponse.json({ error: 'Student, batch, topic, title, and description are required' }, { status: 400 });
-  const enrollment = await prisma.batchEnrollment.findFirst({ where: { studentId, batchId, status: 'APPROVED', batch: { teacherId: session.user.id } }, select: { id: true } });
+  const enrollment = await prisma.batchEnrollment.findFirst({ where: { studentId, batchId, status: 'APPROVED', batch: { teacherId: teacherId } }, select: { id: true } });
   if (!enrollment) return NextResponse.json({ error: 'Student is not in your approved batch' }, { status: 404 });
   const dueDate = body.dueDate ? new Date(body.dueDate) : null;
   if (dueDate && Number.isNaN(dueDate.getTime())) return NextResponse.json({ error: 'Invalid due date' }, { status: 400 });
@@ -60,7 +72,7 @@ export async function POST(req: Request) {
           description,
           mode: 'PRACTICE',
           isPublished: true,
-          createdById: session.user.id,
+          createdById: teacherId,
           sections: {
             create: [{
               title: 'Practice',
@@ -77,7 +89,7 @@ export async function POST(req: Request) {
       testAssignmentId = assignment.id;
     }
 
-    const created = await tx.intervention.create({ data: { teacherId: session.user.id, studentId, batchId, topic, title, description, type, dueDate, testAssignmentId } });
+    const created = await tx.intervention.create({ data: { teacherId: teacherId, studentId, batchId, topic, title, description, type, dueDate, testAssignmentId } });
     await tx.notification.create({
       data: {
         userId: studentId,
@@ -92,6 +104,6 @@ export async function POST(req: Request) {
     });
     return created;
   });
-  await recordAuditLog({ actorId: session.user.id, actorRole: 'TEACHER', action: 'INTERVENTION_ASSIGNED', entityType: 'Intervention', entityId: intervention.id, metadata: { studentId, batchId, topic, type, dueDate, testAssignmentId: intervention.testAssignmentId }, ...requestAuditContext(req) });
+  await recordAuditLog({ actorId: teacherId, actorRole: 'TEACHER', action: 'INTERVENTION_ASSIGNED', entityType: 'Intervention', entityId: intervention.id, metadata: { studentId, batchId, topic, type, dueDate, testAssignmentId: intervention.testAssignmentId }, ...requestAuditContext(req) });
   return NextResponse.json({ intervention }, { status: 201 });
 }

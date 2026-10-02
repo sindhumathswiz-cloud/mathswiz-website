@@ -3,12 +3,17 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ responseId: string }> }) {
   const session = await getServerSession(authOptions);
   const teacherId = session?.user?.id;
   if (!teacherId || session.user.role !== 'TEACHER') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const caller = await prisma.user.findUnique({ where: { id: teacherId }, select: { subscription: true } });
+  if (!isPremiumSubscription(caller?.subscription)) {
+    return NextResponse.json({ error: 'This feature requires a premium subscription.' }, { status: 403 });
   }
 
   const { responseId } = await params;

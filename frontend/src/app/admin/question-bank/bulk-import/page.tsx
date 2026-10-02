@@ -1663,7 +1663,7 @@ function AutoPopulatePanel() {
     const [progress, setProgress] = useState<string[]>([]);
     const [results, setResults] = useState<{ totalCreated: number; totalErrors: number; details: any[] } | null>(null);
 
-    const BOARDS = ['CBSE', 'NDA', 'CUET', 'JEE_MAIN'] as const;
+    const BOARDS = ['CBSE', 'NDA', 'CUET', 'NEET'] as const;
 
     const toggleBoard = (b: string) => {
         setSelBoards(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
@@ -2666,7 +2666,7 @@ const ReviewCard = React.memo(function ReviewCard({ q, idx, isDraft, onUpdate, o
                                 placeholder="+ tag"
                                 className="bg-transparent border border-dashed border-slate-600 rounded px-1.5 py-0.5 text-[10px] text-slate.400 w-16 outline-none focus:border-indigo-500 focus:text-white" />
                             <div className="flex gap-1 ml-2">
-                                {['Board', 'NDA', 'JEE', 'MCQ'].map(t => (
+                                {['Board', 'NDA', 'NEET', 'MCQ'].map(t => (
                                     <button key={t} onClick={() => !q.tags.includes(t) && onUpdate(q.id, 'tags', [...q.tags, t])}
                                         className="bg-slate-800 hover:bg-slate-700 text-slate-500 hover:text-indigo-300 px-1.5 py-0.5 rounded text-[8px] font-black transition-all border border-slate-700 dark:text-slate-400">
                                         +{t}
@@ -2799,7 +2799,6 @@ function FolderIcon(props: any) {
         </svg>
     )
 }
-
 
 
 

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 
 // Re-use the LLM load balancer logic
 const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) => {
@@ -74,12 +75,9 @@ const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) =>
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
-        const role = (session?.user as any)?.role;
-
-        if (!userId || (role !== "TEACHER" && role !== "ADMIN")) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        const guard = await requirePremiumTeacher(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
 
         const { folderId } = await req.json();
         if (!folderId) return NextResponse.json({ error: "Folder ID required" }, { status: 400 });

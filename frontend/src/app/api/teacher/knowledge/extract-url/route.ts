@@ -2,14 +2,13 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 import * as cheerio from "cheerio";
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
-    const role = (session?.user as any)?.role;
-    if (!session?.user || (role !== "TEACHER" && role !== "ADMIN")) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await requirePremiumTeacher(session);
+    if (!guard.ok) return guard.response;
 
     try {
         const { url, type, folderId } = await req.json();

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +12,11 @@ export async function POST(req: Request) {
         if (!session || (session.user as any).role !== 'TEACHER') {
             return NextResponse.json({ error: 'Unauthorized - Teacher only' }, { status: 401 });
         }
-
         const userId = (session.user as any).id;
+        const caller = await prisma.user.findUnique({ where: { id: userId }, select: { subscription: true } });
+        if (!isPremiumSubscription(caller?.subscription)) {
+            return NextResponse.json({ error: 'This feature requires a premium subscription.' }, { status: 403 });
+        }
         const body = await req.json();
         const { questionIds } = body;
 

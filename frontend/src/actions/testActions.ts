@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit-log";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 export async function assignTestToBatchAction(formData: FormData) {
     const testId = formData.get("testId") as string;
@@ -21,6 +22,8 @@ export async function assignTestToBatchAction(formData: FormData) {
     const teacherId = session?.user?.id;
     const role = session?.user?.role;
     if (!teacherId || role !== "TEACHER") throw new Error("Unauthorized");
+    const caller = await (prisma as any).user.findUnique({ where: { id: teacherId }, select: { subscription: true } });
+    if (!isPremiumSubscription(caller?.subscription)) throw new Error("Test & Exam Engine requires a premium subscription.");
 
     const scheduledDate = scheduledFor ? new Date(scheduledFor) : null;
     const deadlineDate = deadline ? new Date(deadline) : null;

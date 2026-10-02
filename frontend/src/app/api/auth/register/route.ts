@@ -16,6 +16,8 @@ const registrationSchema = z.object({
     subjectExpertise: z.string().trim().max(200).optional(),
     childName: z.string().trim().max(160).optional(),
     childMobile: z.string().trim().regex(/^\+?[0-9]{10,15}$/).optional(),
+    selectedPlan: z.enum(["FREE", "MONTHLY", "YEARLY"]).optional().default("FREE"),
+    paymentMethod: z.enum(["UPI", "CARD", "BANK_TRANSFER"]).optional(),
 });
 
 export async function POST(req: Request) {
@@ -24,7 +26,10 @@ export async function POST(req: Request) {
         if (!parsed.success) {
             return NextResponse.json({ message: "Please provide valid registration details." }, { status: 400 });
         }
-        const { firstName, lastName, mobileNumber, phone, password, role, class: studentClass, subjectExpertise, childName, childMobile } = parsed.data;
+        const { firstName, lastName, mobileNumber, phone, password, role, class: studentClass, subjectExpertise, childName, childMobile, selectedPlan, paymentMethod } = parsed.data;
+        if (role === "STUDENT" && selectedPlan !== "FREE" && !["Class 11", "Class 12"].includes(studentClass || "")) {
+            return NextResponse.json({ message: "Paid Maths plans are available for Class 11 or Class 12 students." }, { status: 400 });
+        }
 
         const existingUser = await prisma.user.findUnique({ where: { mobileNumber } });
         if (existingUser) {
@@ -50,6 +55,20 @@ export async function POST(req: Request) {
             }
         });
 
+        // A plan choice is an enquiry, not proof of payment. Keep it visible to staff
+        // without granting paid access until the payment workflow confirms it.
+        if (role === "STUDENT" && selectedPlan !== "FREE") {
+            await prisma.lead.create({
+                data: {
+                    name: `${firstName} ${lastName}`.trim(),
+                    phone: mobileNumber,
+                    source: "Website plan registration",
+                    courseInterest: `${studentClass} Maths · ${selectedPlan === "MONTHLY" ? "Monthly ₹999" : "Yearly ₹9,999"}`,
+                    notes: `Preferred payment method: ${paymentMethod || "not selected"}. Account ID: ${user.id}. Payment confirmation required before activating full access.`,
+                }
+            }).catch((leadError) => console.error("Could not record plan enquiry", leadError));
+        }
+
         return NextResponse.json({
             message: "User created successfully",
             user: { id: user.id, mobileNumber: user.mobileNumber, role: user.role, accountStatus: user.accountStatus },
@@ -59,4 +78,3 @@ export async function POST(req: Request) {
         return NextResponse.json({ message: "Error creating user" }, { status: 500 });
     }
 }
-

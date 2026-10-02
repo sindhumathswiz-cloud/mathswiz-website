@@ -1,279 +1,70 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useTheme } from 'next-themes';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  ArrowRight,
-  Star,
-  Zap,
-  Sparkles,
-  CheckCircle,
-  BarChart3,
-  Users,
-  Video,
-  Monitor,
-  Layout as LayoutIcon,
-  BookOpen
-} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowRight, BarChart3, BookOpenCheck, BrainCircuit, Check, ChevronRight, Clock3, GraduationCap, Layers3, PlayCircle, ShieldCheck, Sparkles, Target } from 'lucide-react';
 
-interface HomePageClientProps {
-  content: any;
-  globalSettings?: any;
-  isPreview?: boolean;
-}
+interface HomePageClientProps { content?: any; globalSettings?: any; isPreview?: boolean; }
 
-export default function HomePageClient({ content, globalSettings }: HomePageClientProps) {
-  const {
-    hero = {},
-    features = { items: [], title: "Why Choose Us?", style: {} },
-    stats = { items: [], style: {} },
-    testimonials = { items: [], style: {} },
-    faq = { items: [], style: {} },
-    footer = { style: {}, contact: {} }
-  } = content;
+const defaultFeatures = [
+  { Icon: BrainCircuit, title: 'Learn the idea first', description: 'Clear concepts, worked examples, and guided practice build confidence before the clock starts.' },
+  { Icon: Target, title: 'Practise with purpose', description: 'Targeted quizzes and a personal mistake notebook turn every wrong answer into a next step.' },
+  { Icon: BarChart3, title: 'See meaningful progress', description: 'Mastery trends help students, teachers, and parents focus on the skills that matter most.' },
+];
 
-  // Extract from new structure
-  const heroStyle = hero.style || {};
-  const statsStyle = stats.style || {};
-  const featuresStyle = features.style || {};
-  const testimonialsStyle = testimonials.style || {};
-  const faqStyle = faq.style || {};
-  const footerStyle = footer.style || {};
+export default function HomePageClient({ content = {}, globalSettings = {} }: HomePageClientProps) {
+  const hero = content.hero ?? {};
+  const customFeatures = Array.isArray(content.features?.items) && content.features.items.length ? content.features.items : null;
+  const stats = Array.isArray(content.stats?.items) && content.stats.items.length ? content.stats.items : [
+    { value: 'Study → practise → improve', label: 'A complete learning loop' },
+    { value: 'Teacher-guided', label: 'Support when it matters' },
+    { value: 'Built for maths', label: 'Concepts made visual' },
+  ];
+  const primary = globalSettings.mainColor || '#4f46e5';
+  const institute = globalSettings.instituteName || "Sindhu's Mathswiz Classes";
+  const title = hero.title || 'Maths confidence, built one smart step at a time.';
+  const subtitle = hero.subtitle || 'Mathswiz brings together clear teaching, purposeful practice, and meaningful feedback—so every student knows what to learn next.';
+  const ctaText = hero.ctaText || hero.primaryButton?.text || 'Start learning free';
+  const requestedCtaLink = hero.ctaLink || hero.primaryButton?.link || '/register';
+  // Older homepage records used /signup; registration lives at /register.
+  const ctaLink = requestedCtaLink === '/signup' ? '/register' : requestedCtaLink;
 
-  const [currentTestimonial, setCurrentTestimonial] = useState(0);
-  const { theme: currentSystemTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  return <div className="overflow-hidden bg-[#fbfcff] text-slate-950 dark:bg-[#0c0c16] dark:text-white">
+    <section className="relative isolate overflow-hidden border-b border-indigo-100/70 bg-[radial-gradient(circle_at_75%_15%,#ddd6fe_0%,transparent_28%),radial-gradient(circle_at_10%_75%,#c7d2fe_0%,transparent_25%),linear-gradient(135deg,#f8fbff_0%,#f6f3ff_52%,#eef4ff_100%)] px-5 pb-20 pt-28 dark:border-white/10 dark:bg-[radial-gradient(circle_at_75%_15%,#312e81_0%,transparent_28%),radial-gradient(circle_at_10%_75%,#172554_0%,transparent_25%),linear-gradient(135deg,#10101d_0%,#17122b_52%,#0e1831_100%)] sm:px-8 lg:pb-28 lg:pt-36">
+      <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[560px] w-[960px] -translate-x-1/2 rounded-full bg-white/60 blur-3xl dark:bg-indigo-400/5" />
+      <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[1.05fr_.95fr]">
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white/80 px-4 py-2 text-xs font-black uppercase tracking-[.16em] text-indigo-700 shadow-sm dark:border-indigo-400/20 dark:bg-white/5 dark:text-indigo-200"><Sparkles className="h-3.5 w-3.5" /> {hero.badgeText || hero.badge || 'Learning that makes sense'}</div>
+          <h1 className="max-w-3xl font-display text-5xl font-black leading-[.98] tracking-[-.055em] text-slate-950 dark:text-white sm:text-6xl lg:text-7xl">{title}</h1>
+          <p className="mt-7 max-w-2xl text-lg font-medium leading-8 text-slate-600 dark:text-slate-300 sm:text-xl">{subtitle}</p>
+          <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+            <Link href={ctaLink} className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-indigo-600/25 transition hover:-translate-y-0.5 hover:bg-indigo-700" style={{ backgroundColor: primary }}>{ctaText}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
+            <Link href="/free-preview" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-6 py-4 text-sm font-black text-slate-700 transition hover:border-indigo-200 hover:bg-white dark:border-white/15 dark:bg-white/5 dark:text-slate-100"><PlayCircle className="h-4 w-4 text-indigo-600 dark:text-indigo-300" />Try free preview</Link>
+          </div>
+          <div className="mt-9 flex flex-wrap gap-x-5 gap-y-3 text-sm font-bold text-slate-600 dark:text-slate-300">{['Clear concepts', 'Smart practice', 'Visible progress'].map(item => <span className="flex items-center gap-2" key={item}><Check className="h-4 w-4 text-emerald-500" />{item}</span>)}</div>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .65, delay: .1 }} className="relative mx-auto w-full max-w-xl">
+          <div className="absolute -left-8 top-16 h-28 w-28 rounded-3xl bg-amber-300/50 blur-2xl dark:bg-amber-400/15" />
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 p-5 shadow-2xl shadow-indigo-950/15 backdrop-blur dark:border-white/10 dark:bg-[#17172a]/90 sm:p-7">
+            <div className="flex items-center justify-between"><div><p className="text-xs font-black uppercase tracking-[.16em] text-indigo-600 dark:text-indigo-300">Today’s focus</p><h2 className="mt-1 text-xl font-black">Quadratic equations</h2></div><div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-200"><BookOpenCheck className="h-6 w-6" /></div></div>
+            <div className="mt-7 rounded-2xl bg-slate-950 p-6 text-white shadow-inner"><p className="text-xs font-bold uppercase tracking-widest text-indigo-200">Quick concept check</p><p className="mt-4 font-display text-3xl font-bold tracking-tight">x² − 5x + 6 = 0</p><div className="mt-6 grid grid-cols-2 gap-3 text-sm font-bold"><span className="rounded-xl bg-white/10 p-3">x = 2, 3</span><span className="rounded-xl bg-white/5 p-3 text-slate-300">Try another</span></div></div>
+            <div className="mt-6 grid grid-cols-2 gap-4"><div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 dark:border-indigo-400/15 dark:bg-indigo-400/10"><p className="text-xs font-bold text-indigo-700 dark:text-indigo-200">Mastery</p><p className="mt-2 text-2xl font-black text-indigo-950 dark:text-white">78%</p><div className="mt-3 h-2 rounded-full bg-indigo-100 dark:bg-white/10"><div className="h-2 w-[78%] rounded-full bg-indigo-600" /></div></div><div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-400/15 dark:bg-emerald-400/10"><p className="text-xs font-bold text-emerald-700 dark:text-emerald-200">Next up</p><p className="mt-2 text-sm font-black leading-5 text-emerald-950 dark:text-white">Recovery practice</p><div className="mt-4 flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-200"><Clock3 className="h-3.5 w-3.5" />8 minutes</div></div></div>
+          </div>
+          <div className="absolute -bottom-6 -right-3 flex items-center gap-3 rounded-2xl border border-white bg-white px-4 py-3 shadow-xl dark:border-white/10 dark:bg-[#20203a]"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-400/15"><ShieldCheck className="h-5 w-5" /></span><span className="text-xs font-black leading-4">Every answer<br />leads to a next step</span></div>
+        </motion.div>
+      </div>
+    </section>
 
-  useEffect(() => {
-    setMounted(true);
-    if (!testimonials?.items || testimonials.items.length === 0) return;
-    const timer = setInterval(() => {
-      setCurrentTestimonial((prev) => (prev + 1) % testimonials.items.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [testimonials?.items?.length]);
+    <section className="border-b border-slate-200 bg-white px-5 py-8 dark:border-white/10 dark:bg-[#11111f] sm:px-8"><div className="mx-auto grid max-w-6xl gap-7 text-center md:grid-cols-3 md:divide-x md:divide-slate-200 dark:md:divide-white/10">{stats.slice(0, 3).map((stat: any, i: number) => <div key={i} className="px-4"><p className="font-display text-xl font-black text-indigo-700 dark:text-indigo-300">{stat.value}</p><p className="mt-1 text-xs font-bold uppercase tracking-[.13em] text-slate-500 dark:text-slate-400">{stat.label}</p></div>)}</div></section>
 
-  const isDarkMode = mounted && currentSystemTheme === 'dark';
+    <section className="px-5 py-20 sm:px-8 lg:py-28"><div className="mx-auto max-w-7xl"><div className="max-w-2xl"><p className="text-xs font-black uppercase tracking-[.18em] text-indigo-600 dark:text-indigo-300">Built for better learning</p><h2 className="mt-4 font-display text-4xl font-black tracking-[-.04em] sm:text-5xl">A study routine students can actually stick with.</h2><p className="mt-5 text-lg leading-8 text-slate-600 dark:text-slate-300">Less guesswork. More momentum. Mathswiz connects each study session to the next best action.</p></div><div className="mt-12 grid gap-5 md:grid-cols-3">{defaultFeatures.map(({ Icon, title, description }, i) => { const feat = customFeatures?.[i] ?? {}; return <article key={title} className="group rounded-[1.7rem] border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-950/5 dark:border-white/10 dark:bg-white/[.03] dark:hover:border-indigo-300/30"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-100 text-indigo-700 transition group-hover:scale-110 dark:bg-indigo-400/15 dark:text-indigo-200"><Icon className="h-6 w-6" /></div><h3 className="mt-7 text-xl font-black">{feat.title || title}</h3><p className="mt-3 leading-7 text-slate-600 dark:text-slate-300">{feat.description || description}</p><span className="mt-6 inline-flex items-center gap-1 text-sm font-black text-indigo-600 dark:text-indigo-300">Learn more<ChevronRight className="h-4 w-4" /></span></article>; })}</div></div></section>
 
-  const primaryColor = globalSettings?.mainColor || '#4f46e5';
-  const instituteName = globalSettings?.instituteName || "Sindhu's Mathswiz Classes";
+    <section className="bg-slate-950 px-5 py-20 text-white dark:bg-[#08080e] sm:px-8 lg:py-28"><div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[.85fr_1.15fr] lg:items-center"><div><p className="text-xs font-black uppercase tracking-[.18em] text-indigo-300">The MathsWiz method</p><h2 className="mt-4 font-display text-4xl font-black tracking-[-.04em] sm:text-5xl">Every practice session has a purpose.</h2><p className="mt-6 max-w-lg text-lg leading-8 text-slate-300">A repeatable loop gives students confidence to keep going—and teachers context to help at the right time.</p><Link href="/register" className="mt-8 inline-flex items-center gap-2 text-sm font-black text-indigo-200 hover:text-white">Create your learning plan<ArrowRight className="h-4 w-4" /></Link></div><div className="grid gap-4 sm:grid-cols-3">{[['01','Understand','Short, focused lessons make the “why” click.'],['02','Practise','Build fluency with guided and independent questions.'],['03','Improve','Use feedback and revision plans to close gaps.']].map(([number, title, description]) => <div key={number} className="rounded-3xl border border-white/10 bg-white/[.05] p-6"><span className="text-xs font-black tracking-[.18em] text-indigo-300">{number}</span><h3 className="mt-9 text-xl font-black">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-300">{description}</p></div>)}</div></div></section>
 
-  const getIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'Target': return <CheckCircle className="w-6 h-6" />;
-      case 'Video': return <Video className="w-6 h-6" />;
-      case 'BookOpen': return <BookOpen className="w-6 h-6" />;
-      case 'Sparkles': return <Sparkles className="w-6 h-6" />;
-      case 'Users': return <Users className="w-6 h-6" />;
-      default: return <LayoutIcon className="w-6 h-6" />;
-    }
-  };
+    <section className="px-5 py-20 sm:px-8 lg:py-28"><div className="mx-auto max-w-7xl"><div className="max-w-2xl"><p className="text-xs font-black uppercase tracking-[.18em] text-indigo-600 dark:text-indigo-300">Student stories</p><h2 className="mt-4 font-display text-4xl font-black tracking-[-.04em] sm:text-5xl">Small wins turn into real confidence.</h2></div><div className="mt-12 grid gap-5 md:grid-cols-3">{(Array.isArray(content.testimonials?.items) && content.testimonials.items.length ? content.testimonials.items : [{name:'Aarav Sharma',role:'Class 12 · CBSE',comment:'The practice feedback showed me exactly what to revise. Maths stopped feeling like guesswork.'},{name:'Priya Patel',role:'Class 11 · Foundation',comment:'The lessons are simple, the questions build up properly, and I can finally see my progress.'},{name:'Rohan Verma',role:'NDA aspirant',comment:'Timed practice helped me stay calm under pressure. I now know where my marks are coming from.'}]).slice(0,3).map((student: any, i: number) => <article key={i} className="rounded-[1.7rem] border border-slate-200 bg-white p-7 shadow-sm dark:border-white/10 dark:bg-white/[.03]"><div className="flex items-center justify-between"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-200"><GraduationCap className="h-5 w-5" /></span><span className="text-4xl font-black text-indigo-100 dark:text-indigo-400/20">“</span></div><p className="mt-7 text-base font-medium leading-7 text-slate-700 dark:text-slate-200">{student.comment || student.quote}</p><div className="mt-7 border-t border-slate-100 pt-5 dark:border-white/10"><p className="font-black">{student.name}</p><p className="mt-1 text-sm font-bold text-slate-500 dark:text-slate-400">{student.role || 'Mathswiz student'}</p></div></article>)}</div></div></section>
 
-  return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-500 overflow-x-hidden text-gray-900 dark:text-gray-100">
-        {/* Hero Section */}
-        <section 
-            id="section-hero"
-            className="relative pt-32 pb-24 md:pt-48 md:pb-40 overflow-hidden"
-            style={{ backgroundColor: heroStyle.backgroundColor || '#f7f7fc' }}
-        >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col lg:flex-row items-center gap-16">
-                <motion.div 
-                    initial={{ opacity: 0, x: -30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex-1 text-center lg:text-left"
-                >
-                    {hero.badgeText && (
-                        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white dark:bg-gray-900 border border-indigo-100 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-8 shadow-sm">
-                            <Sparkles className="w-3 h-3" /> {hero.badgeText}
-                        </span>
-                    )}
-                    <h1
-                        className="font-display text-5xl md:text-7xl font-black leading-[0.95] mb-8 tracking-tighter"
-                        style={{ color: heroStyle.titleColor || '#1e1b3a', fontSize: heroStyle.titleFontSize || undefined }}
-                    >
-                        {hero.title}
-                    </h1>
-                    <p
-                        className="font-body text-lg md:text-xl font-medium mb-10 max-w-2xl mx-auto lg:mx-0"
-                        style={{ color: heroStyle.subtitleColor || '#635e85' }}
-                    >
-                        {hero.subtitle}
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                        <Link 
-                            href={hero.ctaLink || "/register"}
-                            className="text-white px-10 py-5 rounded-3xl font-black text-lg shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
-                            style={{ backgroundColor: primaryColor }}
-                        >
-                            {hero.ctaText} <ArrowRight className="w-5 h-5" />
-                        </Link>
-                    </div>
-                </motion.div>
+    <section className="px-5 py-20 sm:px-8 lg:py-28"><div className="mx-auto grid max-w-7xl gap-10 rounded-[2rem] bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 px-7 py-10 text-white shadow-2xl shadow-indigo-900/20 md:grid-cols-[1fr_auto] md:items-center md:px-12 md:py-14"><div><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-indigo-100"><GraduationCap className="h-4 w-4" />For students, teachers and parents</div><h2 className="mt-5 max-w-2xl font-display text-4xl font-black tracking-[-.04em] sm:text-5xl">Make maths feel possible again.</h2><p className="mt-4 max-w-2xl text-lg leading-8 text-indigo-100">Start with a clearer plan and keep the progress visible.</p></div><Link href={ctaLink} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5">{ctaText}<ArrowRight className="h-4 w-4" /></Link></div></section>
 
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="flex-1 relative"
-                >
-                    <div className="relative z-10 rounded-[3rem] overflow-hidden shadow-2xl border-[12px] border-white dark:border-gray-900 aspect-[4/3]">
-                        <img 
-                            src={hero.imageUrl || "https://images.unsplash.com/photo-1632516643720-e7f5d7d6eca8?q=80&w=800&auto=format&fit=crop"} 
-                            alt="Institute" 
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
-                    {/* Decorative blobs */}
-                    <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-20" style={{ backgroundColor: primaryColor }} />
-                    <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl" />
-                </motion.div>
-            </div>
-        </section>
-
-        {/* Stats Section */}
-        {stats?.items?.length > 0 && (
-            <section id="section-stats" className="py-20 border-y border-gray-100 dark:border-gray-900" style={{ backgroundColor: statsStyle.backgroundColor || '#ffffff' }}>
-                <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-3 gap-8">
-                    {stats.items.map((stat: any, i: number) => (
-                        <div key={i} className="text-center">
-                            <h3 className="font-display text-4xl md:text-5xl font-black mb-2" style={{ color: statsStyle.valueColor || primaryColor }}>{stat.value}</h3>
-                            <p className="font-body text-xs font-black uppercase tracking-widest" style={{ color: statsStyle.textColor || '#635e85' }}>{stat.label}</p>
-                        </div>
-                    ))}
-                </div>
-            </section>
-        )}
-
-        {/* Features Section */}
-        {features?.items?.length > 0 && (
-            <section id="section-features" className="py-24 md:py-32" style={{ backgroundColor: featuresStyle.backgroundColor || '#f7f7fc' }}>
-                <div className="max-w-7xl mx-auto px-4">
-                    <h2 className="font-display text-3xl md:text-5xl font-black text-center mb-20 tracking-tighter uppercase" style={{ color: featuresStyle.titleColor || '#1e1b3a' }}>
-                        {features.title}
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {features.items.map((feat: any, i: number) => (
-                            <div
-                                key={i}
-                                className="p-10 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-xl transition-all group"
-                                style={{ backgroundColor: featuresStyle.cardBg || '#ffffff' }}
-                            >
-                                <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition">
-                                    {getIcon(feat.icon)}
-                                </div>
-                                <h3 className="font-display text-xl font-bold mb-4" style={{ color: featuresStyle.titleColor || '#1e1b3a' }}>{feat.title}</h3>
-                                <p className="font-body font-medium leading-relaxed" style={{ color: featuresStyle.descriptionColor || '#635e85' }}>{feat.description}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-        )}
-
-        {/* Testimonials */}
-        {testimonials?.items?.length > 0 && (
-            <section id="section-testimonials" className="py-32 overflow-hidden relative" style={{ backgroundColor: testimonialsStyle.backgroundColor || '#1e1b3a' }}>
-                <div className="absolute top-0 left-0 w-full h-full opacity-10">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white rounded-full blur-[120px]" />
-                </div>
-
-                <div className="max-w-4xl mx-auto px-4 relative z-10 text-center">
-                    <h2 className="font-display text-3xl font-black mb-20 uppercase tracking-widest text-indigo-300">Student Success Stories</h2>
-                    
-                    <div className="relative min-h-[400px]">
-                        <AnimatePresence mode="wait">
-                            <motion.div 
-                                key={currentTestimonial}
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                className="bg-white/10 dark:bg-gray-900/50 backdrop-blur-md p-10 md:p-16 rounded-[3rem] border border-white/20 dark:border-gray-800"
-                            >
-                                <img 
-                                    src={testimonials.items[currentTestimonial].avatar} 
-                                    className="w-20 h-20 rounded-full mx-auto mb-8 border-4 border-indigo-400 shadow-xl"
-                                    alt="Student"
-                                />
-                                <p className="text-2xl md:text-3xl font-medium italic leading-relaxed mb-10 text-white">
-                                    "{testimonials.items[currentTestimonial].comment}"
-                                </p>
-                                <div className="space-y-1">
-                                    <p className="text-xl font-black uppercase tracking-tighter text-white">{testimonials.items[currentTestimonial].name}</p>
-                                    <p className="text-indigo-400 font-bold text-sm">{testimonials.items[currentTestimonial].role}</p>
-                                </div>
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
-                </div>
-            </section>
-        )}
-
-        {/* FAQ Section */}
-        {faq?.items?.length > 0 && (
-            <section id="section-faq" className="py-24 bg-white dark:bg-gray-950" style={{ backgroundColor: faqStyle.backgroundColor || '#ffffff' }}>
-                <div className="max-w-3xl mx-auto px-4">
-                    <h2 className="font-display text-3xl font-black text-center text-gray-900 dark:text-white mb-16 uppercase">Frequently Asked Questions</h2>
-                    <div className="space-y-6">
-                        {faq.items.map((item: any, i: number) => (
-                            <div key={i} className="border-b dark:border-gray-800 pb-6">
-                                <h4 className="font-display text-lg font-bold text-gray-900 dark:text-white mb-2">{item.question}</h4>
-                                <p className="font-body text-gray-500 dark:text-gray-400 font-medium">{item.answer}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-        )}
-
-        {/* Global Footer CTA */}
-        <section className="py-20" style={{ backgroundColor: primaryColor }}>
-            <div className="max-w-7xl mx-auto px-4 text-center">
-                <h2 className="font-display text-3xl md:text-5xl font-black text-white mb-10 tracking-tight">Ready to Master Mathematic Concepts?</h2>
-                <Link href="/register" className="inline-block bg-white px-12 py-5 rounded-3xl font-black text-xl hover:scale-105 active:scale-95 transition shadow-2xl" style={{ color: primaryColor }}>
-                    Join Today
-                </Link>
-            </div>
-        </section>
-
-        {/* Final Branding Footer */}
-        <footer id="section-footer" className="py-12 px-6 border-t border-gray-100 dark:border-gray-900" style={{ backgroundColor: footerStyle.backgroundColor || '#1e1b3a', color: footerStyle.textColor || '#ffffff' }}>
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
-                <div className="max-w-md">
-                    <h2 className="font-display text-2xl font-black mb-4 tracking-tighter">{instituteName}</h2>
-                    <p className="text-sm opacity-60 leading-relaxed mb-6">{footer.about}</p>
-                    <div className="flex gap-4">
-                        {/* Icons could go here */}
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-12">
-                    <div className="space-y-4">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40">Contact Us</h4>
-                        <ul className="text-sm font-medium space-y-2 opacity-80">
-                            <li>{footer.contact?.address}</li>
-                            <li>{footer.contact?.phone}</li>
-                            <li>{footer.contact?.email}</li>
-                        </ul>
-                    </div>
-                    <div className="space-y-4">
-                         <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40">Quick Links</h4>
-                         <ul className="text-sm font-medium space-y-2 opacity-80">
-                            <li><Link href="/exams">Exams</Link></li>
-                            <li><Link href="/courses">Courses</Link></li>
-                            <li><Link href="/about">About Us</Link></li>
-                         </ul>
-                    </div>
-                </div>
-            </div>
-            <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 opacity-40 text-[10px] font-black uppercase tracking-widest">
-                <p>&copy; {new Date().getFullYear()} {instituteName}. All rights reserved.</p>
-                <div className="flex gap-6">
-                    <Link href="/privacy">Privacy Policy</Link>
-                    <Link href="/terms">Terms of Service</Link>
-                </div>
-            </div>
-        </footer>
-    </div>
-  );
+    <section className="border-t border-slate-200 px-5 py-10 dark:border-white/10 sm:px-8"><div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 text-sm text-slate-500 dark:text-slate-400 md:flex-row"><p className="font-bold">{institute} · Trusted maths learning, one step at a time.</p><div className="flex gap-5 font-bold"><Link href="/courses" className="hover:text-indigo-600">Courses</Link><Link href="/resources" className="hover:text-indigo-600">Resources</Link><Link href="/login" className="hover:text-indigo-600">Sign in</Link></div></div></section>
+  </div>;
 }

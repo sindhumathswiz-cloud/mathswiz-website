@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacherStrict } from "@/lib/teacher-api-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const teacherId = session?.user?.id;
-        if (!teacherId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = await requirePremiumTeacherStrict(session);
+        if (!guard.ok) return guard.response;
+        const teacherId = guard.userId;
 
         const { paymentId } = await req.json();
         if (!paymentId) return NextResponse.json({ error: "Missing paymentId" }, { status: 400 });

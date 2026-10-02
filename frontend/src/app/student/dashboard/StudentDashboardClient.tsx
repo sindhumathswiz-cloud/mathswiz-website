@@ -14,6 +14,7 @@ import BadgeCollection from "@/components/BadgeCollection";
 import LeaderboardRankSummary from "@/components/LeaderboardRankSummary";
 import PointsSummaryCard from "@/components/PointsSummaryCard";
 import { TodayDashboard } from "@/components/dashboard/TodayDashboard";
+import { PremiumBanner, PremiumFeatureNotice } from '@/components/PremiumAccess';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Legend } from 'recharts';
 interface Props {
     initialEnrollments: any[];
@@ -26,6 +27,7 @@ interface Props {
     initialNotices?: any[];
     initialProgress?: any[];
     defaultTab?: 'batches' | 'tests' | 'materials' | 'performance' | 'profile' | 'payments' | 'achieve' | 'live-classes';
+    isPremium?: boolean;
 }
 
 const EMPTY_ARRAY: any[] = [];
@@ -40,7 +42,8 @@ export default function StudentDashboardClient({
     initialGoal,
     initialNotices: notices = EMPTY_ARRAY,
     initialProgress: progress = EMPTY_ARRAY,
-    defaultTab
+    defaultTab,
+    isPremium = false
 }: Props) {
     const { data: session } = useSession();
     type StudentTab = 'batches' | 'tests' | 'materials' | 'performance' | 'profile' | 'payments' | 'achieve' | 'live-classes';
@@ -163,6 +166,8 @@ export default function StudentDashboardClient({
         <div className="min-h-screen bg-gray-50 dark:bg-background p-4 md:p-8">
             <div className="max-w-7xl mx-auto text-gray-900 dark:text-foreground">
 
+                {!isPremium && <PremiumBanner audience="student" />}
+
                 <TodayDashboard
                     role="Student"
                     title={`Welcome back, ${(session?.user as any)?.firstName || 'Student'}`}
@@ -178,10 +183,10 @@ export default function StudentDashboardClient({
                         { title: notices.length ? `${notices.length} class notices` : 'No new notices', detail: notices.length ? 'Read the latest updates from your teachers.' : 'You are caught up with classroom updates.', tone: notices.length ? 'neutral' : 'success' },
                     ]}
                     actions={[
-                        { label: 'Start practice', href: '/student/practice', icon: Target },
-                        { label: 'Smart Practice', href: '/student/practice?mode=smart', icon: Sparkles },
-                        { label: 'Ask Doubt Buddy', href: '/student/doubt-buddy', icon: Bot },
-                        { label: 'View assigned tests', icon: ClipboardList, onClick: () => setActiveTab('tests') },
+                        { label: isPremium ? 'Start practice' : 'Try free chapter', href: isPremium ? '/student/practice' : '/free-preview', icon: Target },
+                        { label: isPremium ? 'Smart Practice' : 'Smart Practice (Premium)', href: isPremium ? '/student/practice?mode=smart' : '/pricing', icon: isPremium ? Sparkles : Lock },
+                        { label: isPremium ? 'Ask Doubt Buddy' : 'Doubt Buddy (Premium)', href: isPremium ? '/student/doubt-buddy' : '/pricing', icon: isPremium ? Bot : Lock },
+                        { label: isPremium ? 'View assigned tests' : 'Full test library (Premium)', icon: isPremium ? ClipboardList : Lock, onClick: () => isPremium ? setActiveTab('tests') : window.location.assign('/pricing') },
                     ]}
                 />
 
@@ -229,7 +234,9 @@ export default function StudentDashboardClient({
                 {/* Tab Content */}
                 <div className="bg-white dark:bg-surface rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-6 md:p-8 min-h-[500px]">
 
-                    {activeTab === 'live-classes' && (
+                    {activeTab === 'live-classes' && (!isPremium ? (
+                        <PremiumFeatureNotice title="Live classes are a premium feature" description="Your free account keeps this classroom view visible. Subscribe to join live lessons and access recordings." />
+                    ) : (
                         <div className="animate-in fade-in duration-300">
                              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2"><Video className="w-5 h-5 text-indigo-600" /> Upcoming Live Classes</h2>
                              {enrolledBatches.some((enr: any) => enr.batch?.liveClasses?.length > 0) ? (
@@ -271,7 +278,7 @@ export default function StudentDashboardClient({
                                 </div>
                              )}
                         </div>
-                    )}
+                    ))}
 
                     {activeTab === 'batches' && (
                         <div className="animate-in fade-in duration-300">
@@ -397,7 +404,9 @@ export default function StudentDashboardClient({
                         </div>
                     )}
 
-                    {activeTab === 'tests' && (
+                    {activeTab === 'tests' && (!isPremium ? (
+                        <PremiumFeatureNotice title="Full tests and homework are locked" description="Premium students receive assigned tests, detailed reports, timed mocks, and homework from their teacher." freeAlternative={<Link href="/free-preview" className="font-bold text-violet-700 underline">Try the free first-chapter mock instead</Link>} />
+                    ) : (
                         <div className="animate-in fade-in duration-300">
                             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2"><ClipboardList className="w-5 h-5 text-indigo-600" /> Tests &amp; Homework</h2>
                             {assignedTests.length === 0 ? (
@@ -455,9 +464,11 @@ export default function StudentDashboardClient({
                                 </div>
                             )}
                         </div>
-                    )}
+                    ))}
 
-                    {activeTab === 'materials' && (
+                    {activeTab === 'materials' && (!isPremium ? (
+                        <PremiumFeatureNotice title="Full study material library is locked" description="Premium access unlocks teacher materials, downloads, revision packs, and the complete chapter library." freeAlternative={<Link href="/free-preview" className="font-bold text-violet-700 underline">Preview first-chapter practice and flashcards</Link>} />
+                    ) : (
                         <div className="animate-in fade-in duration-300">
                             <h2 className="text-xl font-bold text-gray-900 mb-6">Study Materials</h2>
                             
@@ -516,9 +527,11 @@ export default function StudentDashboardClient({
                                 </div>
                             )}
                         </div>
-                    )}
+                    ))}
 
-                    {activeTab === 'performance' && (
+                    {activeTab === 'performance' && (!isPremium ? (
+                        <PremiumFeatureNotice title="Performance analytics are a premium feature" description="Unlock mastery trends, topic-level feedback, and test analysis after subscribing." />
+                    ) : (
                         <div className="animate-in fade-in duration-300 space-y-8">
                             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-indigo-600" /> Performance & Analytics</h2>
                             
@@ -568,9 +581,11 @@ export default function StudentDashboardClient({
                                 </>
                             )}
                         </div>
-                    )}
+                    ))}
 
-                    {activeTab === 'achieve' && (() => {
+                    {activeTab === 'achieve' && (!isPremium ? (
+                        <PremiumFeatureNotice title="Achievements and leaderboards are a premium feature" description="Unlock teacher-moderated challenges, badges, and improvement-based leaderboards." />
+                    ) : (() => {
                         const last5 = attempts.slice(0, 5).reverse().map((a: any) => ({
                             name: a.isPracticeArena ? 'Practice' : (a.test?.title?.substring(0, 15) || 'Test'),
                             score: a.totalScore,
@@ -603,8 +618,6 @@ export default function StudentDashboardClient({
                                                 required
                                             >
                                                 <option value="">Select exam...</option>
-                                                <option value="JEE Main">JEE Main</option>
-                                                <option value="JEE Advanced">JEE Advanced</option>
                                                 <option value="NEET">NEET</option>
                                                 <option value="Boards (Class 12)">Boards (Class 12)</option>
                                                 <option value="Boards (Class 10)">Boards (Class 10)</option>
@@ -641,7 +654,7 @@ export default function StudentDashboardClient({
                             )}
                         </div>
                         );
-                    })()}
+                    })())}
 
                     {activeTab === 'payments' && (
                         <div className="animate-in fade-in duration-300">

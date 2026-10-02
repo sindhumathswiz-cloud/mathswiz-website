@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getServerSession = vi.fn();
 const selectQuestionsByFilters = vi.fn();
+const user = { findUnique: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
+vi.mock('@/lib/prisma', () => ({ default: { user } }));
 vi.mock('@/lib/question-selection', () => ({ selectQuestionsByFilters }));
 
 function post(body: unknown) {
@@ -18,6 +20,7 @@ describe('POST /api/teacher/tests/generate-blueprint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
     process.env.GROQ_API_KEY = 'test-key';
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,16 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
         if (query.teacherId !== session.user.id && query.studentId !== session.user.id) {
             return NextResponse.json({ error: "Access denied" }, { status: 403 });
+        }
+
+        // Student Queries is a Premium-gated teacher feature -- only the
+        // teacher side of this check needs it, the student side replies
+        // for free.
+        if (query.teacherId === session.user.id) {
+            const teacherUser = await (prisma as any).user.findUnique({ where: { id: session.user.id }, select: { subscription: true } });
+            if (!isPremiumSubscription(teacherUser?.subscription)) {
+                return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+            }
         }
 
         const reply = await (prisma as any).queryReply.create({

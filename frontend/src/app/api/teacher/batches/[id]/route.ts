@@ -4,6 +4,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
+import { requireTeacherOrAdmin } from "@/lib/teacher-api-guard";
 
 export async function GET(
     req: Request,
@@ -13,10 +14,10 @@ export async function GET(
     try {
         const { id: batchId } = await params;
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
-        const role = session?.user?.role;
-        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        
+        const guard = requireTeacherOrAdmin(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
+
         const batch = await prisma.batch.findFirst({
             where: { id: batchId, ...(role === "ADMIN" ? {} : { teacherId: userId }) },
             include: { teacher: true }
@@ -49,9 +50,9 @@ export async function PATCH(
     try {
         const { id: batchId } = await params;
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
-        const role = session?.user?.role;
-        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = requireTeacherOrAdmin(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
 
         const body = await req.json().catch(() => ({}));
         const { leaderboardEnabled } = body as { leaderboardEnabled?: unknown };

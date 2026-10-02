@@ -2,23 +2,24 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireTeacherOrAdmin } from "@/lib/teacher-api-guard";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = requireTeacherOrAdmin(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
 
         const body = await req.json();
-        const { batchId, studentId, feeStructureId } = body; 
+        const { batchId, studentId, feeStructureId } = body;
 
         if (!batchId || !studentId) {
             return NextResponse.json({ error: "Missing batchId or studentId" }, { status: 400 });
         }
 
-        const role = session?.user?.role;
         const batch = await prisma.batch.findFirst({
             where: { id: batchId, ...(role === "ADMIN" ? {} : { teacherId: userId }) },
             select: { id: true, teacherId: true },

@@ -5,10 +5,11 @@ const batchEnrollment = { findMany: vi.fn() };
 const testAttempt = { findMany: vi.fn() };
 const testResponse = { groupBy: vi.fn() };
 const question = { findMany: vi.fn() };
+const user = { findUnique: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { batchEnrollment, testAttempt, testResponse, question } }));
+vi.mock('@/lib/prisma', () => ({ default: { batchEnrollment, testAttempt, testResponse, question, user } }));
 
 function get(url: string) {
   return import('./route').then(({ GET }) => GET(new Request(url)));
@@ -18,6 +19,7 @@ describe('GET /api/teacher/heatmap/wrong-answers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
     batchEnrollment.findMany.mockResolvedValue([{ studentId: 's-1' }]);
     testAttempt.findMany.mockResolvedValue([{ id: 'attempt-1' }]);
   });

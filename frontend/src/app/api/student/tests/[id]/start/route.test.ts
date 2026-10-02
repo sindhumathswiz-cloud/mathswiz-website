@@ -4,10 +4,11 @@ const getServerSession = vi.fn();
 const testAssignment = { findFirst: vi.fn() };
 const testAttempt = { count: vi.fn(), findFirst: vi.fn(), create: vi.fn() };
 const test = { findUnique: vi.fn() };
+const user = { findUnique: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { testAssignment, testAttempt, test } }));
+vi.mock('@/lib/prisma', () => ({ default: { testAssignment, testAttempt, test, user } }));
 
 describe('student assignment start', () => {
   beforeEach(() => {
@@ -18,6 +19,10 @@ describe('student assignment start', () => {
     test.findUnique.mockResolvedValue({ id: 'test-1', sections: [] });
     testAttempt.findFirst.mockResolvedValue(null);
     testAttempt.create.mockResolvedValue({ id: 'attempt-1' });
+    // Premium by default so the pre-existing tests below (written before the
+    // free-preview gate existed) keep exercising unrestricted access; the
+    // gate itself gets its own dedicated tests below.
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
   });
 
   async function start() {
@@ -40,5 +45,42 @@ describe('student assignment start', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'Maximum attempts reached' });
     expect(test.findUnique).not.toHaveBeenCalled();
+  });
+
+  describe('free-preview gating for non-premium students', () => {
+    beforeEach(() => {
+      user.findUnique.mockResolvedValue({ subscription: 'FREE' });
+    });
+
+    it('blocks a test with no questions at all', async () => {
+      test.findUnique.mockResolvedValue({ id: 'test-1', sections: [] });
+      const response = await start();
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual(expect.objectContaining({ error: expect.stringContaining('premium subscription') }));
+      expect(testAttempt.create).not.toHaveBeenCalled();
+    });
+
+    it('blocks a test containing even one non-free-preview question', async () => {
+      test.findUnique.mockResolvedValue({
+        id: 'test-1',
+        sections: [{ questions: [
+          { question: { topic: 'Sets', class: 'Class 11', bookChapter: null } },
+          { question: { topic: 'Integrals', class: 'Class 12', bookChapter: { orderIndex: 3 } } },
+        ] }],
+      });
+      const response = await start();
+      expect(response.status).toBe(403);
+      expect(testAttempt.create).not.toHaveBeenCalled();
+    });
+
+    it('allows a test made entirely of free-preview-eligible questions', async () => {
+      test.findUnique.mockResolvedValue({
+        id: 'test-1',
+        sections: [{ questions: [{ question: { topic: 'Sets', class: 'Class 11', bookChapter: null } }] }],
+      });
+      const response = await start();
+      expect(response.status).toBe(200);
+      expect(testAttempt.create).toHaveBeenCalled();
+    });
   });
 });

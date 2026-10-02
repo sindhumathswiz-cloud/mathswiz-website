@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { User, Phone, Loader2, ArrowRight, BookOpen, Users, GraduationCap, ChevronLeft, Lock } from 'lucide-react';
+import { User, Phone, Loader2, ArrowRight, BookOpen, Users, GraduationCap, ChevronLeft, Lock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
 
 const montserrat = Montserrat({ subsets: ['latin'], weight: '800' });
@@ -25,6 +25,8 @@ export default function RegisterPage() {
     const [childName, setChildName] = useState('');
     const [childMobile, setChildMobile] = useState('');
     const [subjectExpertise, setSubjectExpertise] = useState('');
+    const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'MONTHLY' | 'YEARLY'>('FREE');
+    const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CARD' | 'BANK_TRANSFER'>('UPI');
 
     const [isLoading, setIsLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -52,6 +54,8 @@ export default function RegisterPage() {
             childName, 
             childMobile, 
             subjectExpertise 
+            , selectedPlan,
+            paymentMethod: selectedPlan === 'FREE' ? undefined : paymentMethod,
         };
 
         try {
@@ -102,7 +106,7 @@ export default function RegisterPage() {
                                 <CheckIcon className="h-6 w-6 text-green-600" />
                             </div>
                             <h3 className="text-lg font-medium text-gray-900">Registration Successful!</h3>
-                            <p className="mt-2 text-sm text-gray-500">Redirecting to login...</p>
+                            <p className="mt-2 text-sm text-gray-500">{selectedPlan === 'FREE' ? 'Redirecting to login...' : 'Your plan request is recorded. Payment is confirmed before full access is activated.'}</p>
                         </div>
                     ) : step === 1 ? (
                         <div className="space-y-4">
@@ -240,6 +244,7 @@ export default function RegisterPage() {
 
                             {/* Conditional Fields based on Role */}
                             {selectedRole === 'STUDENT' && (
+                                <>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Class/Grade</label>
                                     <select required value={studentClass} onChange={(e) => setStudentClass(e.target.value)}
@@ -253,6 +258,14 @@ export default function RegisterPage() {
                                         <option value="Foundation">Foundation</option>
                                     </select>
                                 </div>
+                                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+                                    <div className="flex items-start gap-3"><CreditCard className="mt-0.5 h-5 w-5 text-indigo-600"/><div><h3 className="font-bold text-gray-900">Choose your access</h3><p className="mt-1 text-xs leading-5 text-gray-600">Free preview access is available to everyone. Full plans are for Class 11 or Class 12 Maths.</p></div></div>
+                                    <div className="mt-4 grid gap-2">
+                                        {([['FREE', 'Free preview', 'Explore sample lessons and features'], ['MONTHLY', 'Monthly · ₹999', 'Full access for one month'], ['YEARLY', 'Yearly · ₹9,999', 'Full access for one year'] ] as const).map(([value, title, detail]) => <label key={value} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${selectedPlan === value ? 'border-indigo-500 bg-white shadow-sm' : 'border-transparent bg-white/60'}`}><input type="radio" name="plan" value={value} checked={selectedPlan === value} onChange={() => setSelectedPlan(value)} /><span><span className="block text-sm font-bold text-gray-900">{title}</span><span className="block text-xs text-gray-500">{detail}</span></span></label>)}
+                                    </div>
+                                    {selectedPlan !== 'FREE' && <div className="mt-4"><label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Preferred payment method</label><div className="mt-2 grid grid-cols-3 gap-2">{([['UPI','UPI'], ['CARD','Card'], ['BANK_TRANSFER','Bank transfer']] as const).map(([value, label]) => <button type="button" key={value} onClick={() => setPaymentMethod(value)} className={`rounded-xl border px-2 py-2 text-xs font-bold transition ${paymentMethod === value ? 'border-indigo-600 bg-white text-indigo-700' : 'border-transparent bg-white/60 text-gray-500'}`}>{label}</button>)}</div><p className="mt-3 flex gap-2 text-xs leading-5 text-gray-500"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600"/>You will receive the payment instructions after registration. Full access activates after payment confirmation.</p></div>}
+                                </div>
+                                </>
                             )}
 
                             {selectedRole === 'PARENT' && (
@@ -287,7 +300,7 @@ export default function RegisterPage() {
                                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition items-center mt-6"
                             >
                                 {isLoading ? <Loader2 className="animate-spin w-5 h-5" /> : (
-                                    <>Create {selectedRole?.toLowerCase()} account <ArrowRight className="ml-2 w-4 h-4" /></>
+                                    <>{selectedRole === 'STUDENT' && selectedPlan !== 'FREE' ? 'Create account & continue to payment' : `Create ${selectedRole?.toLowerCase()} account`} <ArrowRight className="ml-2 w-4 h-4" /></>
                                 )}
                             </button>
                         </form>

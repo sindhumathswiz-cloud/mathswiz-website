@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
         const requestedTeacherId = searchParams.get("teacherId");
         const session = await getServerSession(authOptions);
+        const guard = await requirePremiumTeacher(session);
+        if (!guard.ok) return guard.response;
 
-        const sessionUserId = (session?.user as any)?.id;
-        const activeTeacherId = session?.user?.role === "ADMIN"
+        const sessionUserId = guard.userId;
+        const activeTeacherId = guard.role === "ADMIN"
             ? (requestedTeacherId || sessionUserId)
             : sessionUserId;
 

@@ -6,16 +6,18 @@ const test = { findFirst: vi.fn() };
 const batch = { findFirst: vi.fn() };
 const batchEnrollment = { findFirst: vi.fn() };
 const testAssignment = { create: vi.fn(), findMany: vi.fn() };
+const user = { findUnique: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { test, batch, batchEnrollment, testAssignment } }));
+vi.mock('@/lib/prisma', () => ({ default: { test, batch, batchEnrollment, testAssignment, user } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 
 describe('teacher homework assignment', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
     test.findFirst.mockResolvedValue({ id: 'test-1', isPublished: true });
     batch.findFirst.mockResolvedValue({ id: 'batch-1' });
     testAssignment.create.mockResolvedValue({ id: 'assignment-1', kind: 'HOMEWORK' });
@@ -74,6 +76,7 @@ describe('GET /api/teacher/tests/assign', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
     test.findFirst.mockResolvedValue({ id: 'test-1' });
     testAssignment.findMany.mockResolvedValue([]);
   });

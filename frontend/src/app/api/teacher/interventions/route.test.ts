@@ -11,11 +11,12 @@ const testAssignment = { create: vi.fn() };
 const selectQuestionsByFilters = vi.fn();
 const masteryToDifficultyBand = vi.fn();
 const transaction = vi.fn(async (callback) => callback({ intervention, notification, test, testAssignment }));
+const user = { findUnique: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/prisma', () => ({
-  default: { batchEnrollment, intervention, notification, studentProgress, $transaction: transaction },
+  default: { batchEnrollment, intervention, notification, studentProgress, user, $transaction: transaction },
 }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 vi.mock('@/lib/question-selection', () => ({ selectQuestionsByFilters, masteryToDifficultyBand }));
@@ -31,6 +32,7 @@ describe('teacher interventions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
     batchEnrollment.findFirst.mockResolvedValue({ id: 'enrollment-1' });
     intervention.create.mockImplementation(({ data }: any) => Promise.resolve({ id: 'intervention-1', studentId: 'student-1', ...data }));
     studentProgress.findFirst.mockResolvedValue(null);

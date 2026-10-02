@@ -3,15 +3,14 @@ import prisma from "@/lib/prisma";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const userId = (session.user as any).id;
+    const guard = await requirePremiumTeacher(session);
+    if (!guard.ok) return guard.response;
+    const userId = guard.userId;
     const body = await request.json();
     const { title, description, mode, duration, totalMarks, isPublished, sections, templateType } = body;
     const allowedTemplateTypes = ['WORKSHEET', 'REVISION_PACK', 'MOCK_EXAM', 'HOMEWORK_TEMPLATE'];

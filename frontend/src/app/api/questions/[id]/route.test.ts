@@ -12,6 +12,7 @@ const mockPrisma = {
   tagTaxonomy: { findMany: vi.fn() },
   pageFigure: { findMany: vi.fn() },
   questionVersion: { create: vi.fn() },
+  user: { findUnique: vi.fn() },
   $transaction: vi.fn(),
 };
 vi.mock('@/lib/prisma', () => ({ default: mockPrisma }));
@@ -253,6 +254,7 @@ describe('PATCH /api/questions/[id] -- version history snapshot', () => {
   it('labels the change reason "Teacher correction" for a teacher-authored edit', async () => {
     const { getServerSession } = await import('next-auth');
     vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } } as any);
+    mockPrisma.user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
     mockPrisma.question.findUnique.mockResolvedValue({
       ...bookSourced, scope: 'TEACHER_PRIVATE', createdById: 'teacher-1',
       difficulty: 'MEDIUM', topic: 'Algebra', subTopic: null, tags: ['math'], currentVersion: 1,

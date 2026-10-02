@@ -8,16 +8,18 @@ const tx = {
   testAttempt: { update: vi.fn() },
 };
 const $transaction = vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx));
+const user = { findUnique: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { testResponse, $transaction } }));
+vi.mock('@/lib/prisma', () => ({ default: { testResponse, $transaction, user } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 
 describe('teacher homework review', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
     testResponse.findFirst.mockResolvedValue({ id: 'response-1', attemptId: 'attempt-1' });
     tx.testResponse.update.mockResolvedValue({ id: 'response-1', reviewStatus: 'REVIEWED' });
     tx.testResponse.aggregate.mockResolvedValue({ _sum: { marksAwarded: 7 } });

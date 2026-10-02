@@ -1,13 +1,24 @@
 "use server";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { recordAuditLog } from "@/lib/audit-log";
+import { requirePremiumTeacherOrThrow } from "@/lib/teacher-api-guard";
+
+// Fee Management is a Premium-gated teacher feature. These server actions
+// are invoked directly by the client (not behind the dashboard's own
+// `!isPremium` UI check), so each one must re-verify role + subscription
+// itself -- a server action has no middleware to fall back on.
+const requireFeeManagementAccess = requirePremiumTeacherOrThrow;
 
 // Delete a Fee Structure by ID
 export async function deleteFeeStructureAction(id: string) {
     if (!id) throw new Error("Fee Structure ID is required.");
+    const { userId, role } = await requireFeeManagementAccess();
+    const feeStructure = await (prisma as any).feeStructure.findFirst({
+        where: { id, ...(role === "ADMIN" ? {} : { teacherId: userId }) },
+        select: { id: true },
+    });
+    if (!feeStructure) throw new Error("Fee structure not found or not owned by you.");
     await (prisma as any).feeStructure.delete({ where: { id } });
     revalidatePath('/teacher/dashboard');
 }
@@ -19,8 +30,18 @@ export async function assignFeeToStudentAction(formData: FormData) {
 
     if (!enrollmentId || !feeStructureId) throw new Error("Missing Enrollment ID or Fee Structure ID.");
 
-    const feeStructure = await (prisma as any).feeStructure.findUnique({ where: { id: feeStructureId } });
-    if (!feeStructure) throw new Error("Fee structure not found.");
+    const { userId, role } = await requireFeeManagementAccess();
+
+    const feeStructure = await (prisma as any).feeStructure.findFirst({
+        where: { id: feeStructureId, ...(role === "ADMIN" ? {} : { teacherId: userId }) },
+    });
+    if (!feeStructure) throw new Error("Fee structure not found or not owned by you.");
+
+    const enrollment = await (prisma as any).batchEnrollment.findFirst({
+        where: { id: enrollmentId, ...(role === "ADMIN" ? {} : { batch: { teacherId: userId } }) },
+        select: { id: true },
+    });
+    if (!enrollment) throw new Error("Enrollment not found or not owned by you.");
 
     // 1. Assign the structure to the batch enrollment
     await (prisma as any).batchEnrollment.update({
@@ -62,6 +83,13 @@ export async function assignCustomFeeToStudentAction(data: { enrollmentId: strin
 
     if (!enrollmentId) throw new Error("Missing Enrollment ID.");
 
+    const { userId, role } = await requireFeeManagementAccess();
+    const enrollment = await (prisma as any).batchEnrollment.findFirst({
+        where: { id: enrollmentId, ...(role === "ADMIN" ? {} : { batch: { teacherId: userId } }) },
+        select: { id: true },
+    });
+    if (!enrollment) throw new Error("Enrollment not found or not owned by you.");
+
     await (prisma as any).batchEnrollment.update({
         where: { id: enrollmentId },
         data: { feeStructureId: feeStructureId || null }
@@ -101,12 +129,11 @@ export async function markPaymentPaidAction(formData: FormData) {
     const mode = formData.get("paymentMode") as string;
     const paidDate = formData.get("paidAt") as string;
 
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !session.user.role) throw new Error("Unauthorized");
+    const { userId, role } = await requireFeeManagementAccess();
     const ownedPayment = await (prisma as any).paymentRecord.findFirst({
         where: {
             id: paymentId,
-            ...(session.user.role === "ADMIN" ? {} : { enrollment: { batch: { teacherId: session.user.id } } }),
+            ...(role === "ADMIN" ? {} : { enrollment: { batch: { teacherId: userId } } }),
         },
         select: { id: true },
     });
@@ -139,8 +166,8 @@ export async function markPaymentPaidAction(formData: FormData) {
         },
     });
     await recordAuditLog({
-        actorId: session.user.id,
-        actorRole: session.user.role,
+        actorId: userId,
+        actorRole: role,
         action: "PAYMENT_MARKED_PAID",
         entityType: "PaymentRecord",
         entityId: payment.id,
@@ -152,12 +179,11 @@ export async function markPaymentPaidAction(formData: FormData) {
 // 3. Grant an extension on a due date
 export async function updatePaymentDueDateAction(paymentId: string, newDate: string) {
     if (!paymentId || !newDate) throw new Error("Payment ID and new date are required.");
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !session.user.role) throw new Error("Unauthorized");
+    const { userId, role } = await requireFeeManagementAccess();
     const payment = await (prisma as any).paymentRecord.findFirst({
         where: {
             id: paymentId,
-            ...(session.user.role === "ADMIN" ? {} : { enrollment: { batch: { teacherId: session.user.id } } }),
+            ...(role === "ADMIN" ? {} : { enrollment: { batch: { teacherId: userId } } }),
         },
         select: { id: true },
     });
@@ -167,7 +193,7 @@ export async function updatePaymentDueDateAction(paymentId: string, newDate: str
         data: { dueDate: new Date(newDate), status: "UPCOMING" } // Resets to UPCOMING if it was UNPAID
     });
     await recordAuditLog({
-        actorId: session.user.id, actorRole: session.user.role,
+        actorId: userId, actorRole: role,
         action: "PAYMENT_DUE_DATE_CHANGED", entityType: "PaymentRecord", entityId: payment.id,
         metadata: { dueDate: newDate },
     });
@@ -177,12 +203,11 @@ export async function updatePaymentDueDateAction(paymentId: string, newDate: str
 // 4. Suspend a student's access to the batch for non-payment
 export async function suspendStudentAccessAction(enrollmentId: string, reason: string = "Overdue Fees") {
     if (!enrollmentId) throw new Error("Enrollment ID is required.");
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !session.user.role) throw new Error("Unauthorized");
+    const { userId, role } = await requireFeeManagementAccess();
     const enrollment = await (prisma as any).batchEnrollment.findFirst({
         where: {
             id: enrollmentId,
-            ...(session.user.role === "ADMIN" ? {} : { batch: { teacherId: session.user.id } }),
+            ...(role === "ADMIN" ? {} : { batch: { teacherId: userId } }),
         },
         select: { id: true, studentId: true },
     });
@@ -200,7 +225,7 @@ export async function suspendStudentAccessAction(enrollmentId: string, reason: s
         },
     });
     await recordAuditLog({
-        actorId: session.user.id, actorRole: session.user.role,
+        actorId: userId, actorRole: role,
         action: "ENROLLMENT_SUSPENDED", entityType: "BatchEnrollment", entityId: enrollment.id,
         metadata: { reason },
     });
@@ -211,12 +236,11 @@ export async function suspendStudentAccessAction(enrollmentId: string, reason: s
 // 5. Reinstate student access upon payment
 export async function reinstateStudentAccessAction(enrollmentId: string) {
     if (!enrollmentId) throw new Error("Enrollment ID is required.");
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !session.user.role) throw new Error("Unauthorized");
+    const { userId, role } = await requireFeeManagementAccess();
     const enrollment = await (prisma as any).batchEnrollment.findFirst({
         where: {
             id: enrollmentId,
-            ...(session.user.role === "ADMIN" ? {} : { batch: { teacherId: session.user.id } }),
+            ...(role === "ADMIN" ? {} : { batch: { teacherId: userId } }),
         },
         select: { id: true },
     });
@@ -226,7 +250,7 @@ export async function reinstateStudentAccessAction(enrollmentId: string) {
         data: { status: "APPROVED" }
     });
     await recordAuditLog({
-        actorId: session.user.id, actorRole: session.user.role,
+        actorId: userId, actorRole: role,
         action: "ENROLLMENT_REINSTATED", entityType: "BatchEnrollment", entityId: enrollment.id,
     });
     revalidatePath('/teacher/batch-management');
@@ -236,7 +260,14 @@ export async function reinstateStudentAccessAction(enrollmentId: string) {
 // 6. UPDATE: Modify an existing Fee Structure
 export async function updateFeeStructureAction(id: string, data: { name: string, totalAmount: number, installments: any[] }) {
     if (!id) throw new Error("Fee Structure ID is required.");
-    
+
+    const { userId, role } = await requireFeeManagementAccess();
+    const feeStructure = await (prisma as any).feeStructure.findFirst({
+        where: { id, ...(role === "ADMIN" ? {} : { teacherId: userId }) },
+        select: { id: true },
+    });
+    if (!feeStructure) throw new Error("Fee structure not found or not owned by you.");
+
     await (prisma as any).feeStructure.update({
         where: { id },
         data: {

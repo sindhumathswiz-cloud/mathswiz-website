@@ -616,7 +616,6 @@ export default function AdminDashboardClient({
                                             <option>Class 11</option>
                                             <option>Repeaters</option>
                                             <option>NDA Entrance</option>
-                                            <option>JEE Main</option>
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
@@ -696,5 +695,4 @@ export default function AdminDashboardClient({
         </div>
     );
 }
-
 

@@ -3,16 +3,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getServerSession = vi.fn();
 const question = { findMany: vi.fn() };
 const studentProgress = { findMany: vi.fn() };
+const user = { findUnique: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { question, studentProgress } }));
+vi.mock('@/lib/prisma', () => ({ default: { question, studentProgress, user } }));
 
 describe('adaptive Arena next question', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'student-1', role: 'STUDENT' } });
     studentProgress.findMany.mockResolvedValue([]);
+    // Premium by default so every pre-existing test below (written before
+    // the free-preview gate existed) keeps exercising unrestricted access;
+    // the gate itself gets its own dedicated tests below.
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
   });
 
   it('filters malformed candidates and returns normalized usable options', async () => {
@@ -87,5 +92,38 @@ describe('adaptive Arena next question', () => {
     expect(question.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ topic: 'Trigonometry' }),
     }));
+  });
+
+  describe('free-preview gating for non-premium students', () => {
+    beforeEach(() => {
+      user.findUnique.mockResolvedValue({ subscription: 'FREE' });
+    });
+
+    it('scopes the question query to PUBLIC and raises the candidate pool size', async () => {
+      question.findMany.mockResolvedValue([]);
+      const { GET } = await import('./route');
+      await GET(new Request('http://localhost/api/student/practice/next'));
+      expect(question.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ scope: 'PUBLIC' }), take: 1000 }));
+    });
+
+    it('excludes a candidate that is not a free-preview-eligible question', async () => {
+      question.findMany.mockResolvedValue([
+        { id: 'gated', topic: 'Integrals', class: 'Class 12', bookChapter: { orderIndex: 3 }, options: ['1', '2'], correctAnswer: 'A' },
+      ]);
+      const { GET } = await import('./route');
+      const response = await GET(new Request('http://localhost/api/student/practice/next'));
+      expect(response.status).toBe(404);
+    });
+
+    it('still returns a free-preview-eligible candidate', async () => {
+      question.findMany.mockResolvedValue([
+        { id: 'free', topic: 'Sets', class: 'Class 11', bookChapter: null, options: ['1', '2'], correctAnswer: 'A' },
+      ]);
+      const { GET } = await import('./route');
+      const response = await GET(new Request('http://localhost/api/student/practice/next'));
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.question.id).toBe('free');
+    });
   });
 });

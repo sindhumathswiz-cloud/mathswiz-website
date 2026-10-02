@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
+import { requireTeacherOrAdmin } from "@/lib/teacher-api-guard";
 
 const VALID_STATUSES = ["ENDED", "CANCELLED"];
 
@@ -16,9 +17,9 @@ export async function PATCH(
     try {
         const { id: batchId, challengeId } = await params;
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
-        const role = session?.user?.role;
-        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = requireTeacherOrAdmin(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
 
         const batch = await (prisma as any).batch.findFirst({
             where: { id: batchId, ...(role === "ADMIN" ? {} : { teacherId: userId }) },

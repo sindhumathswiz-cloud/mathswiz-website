@@ -55,7 +55,7 @@ const boardColors: Record<string, string> = {
     JEE_MAIN: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',
 };
 
-const BOARDS = ['CBSE', 'NDA', 'CUET', 'JEE_MAIN'] as const;
+const BOARDS = ['CBSE', 'NDA', 'CUET'] as const;
 
 export default function CurriculumManagerClient({ initialClasses, pendingCount }: CurriculumManagerClientProps) {
     const [classes, setClasses] = useState<TaxonomyItem[]>(initialClasses);
@@ -456,7 +456,6 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                         <option value="CBSE">CBSE</option>
                         <option value="NDA">NDA</option>
                         <option value="CUET">CUET</option>
-                        <option value="JEE_MAIN">JEE Main</option>
                     </select>
                 </div>
 
@@ -582,7 +581,6 @@ export default function CurriculumManagerClient({ initialClasses, pendingCount }
                                             <option value="CBSE">CBSE</option>
                                             <option value="NDA">NDA</option>
                                             <option value="CUET">CUET</option>
-                                            <option value="JEE_MAIN">JEE Main</option>
                                         </select>
                                     </div>
                                 )}

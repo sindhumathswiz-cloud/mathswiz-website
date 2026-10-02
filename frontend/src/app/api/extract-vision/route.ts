@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 import { normalizeExtractedQuestions } from "@/lib/extract-normalizer";
 
 // ─── Stage 1: Image → LaTeX via Mathpix OCR (free tier, best-in-class math OCR) ─
@@ -112,6 +115,10 @@ RAW TEXT TO PROCESS:\n${rawText}`;
 // ─── POST handler ─────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        const guard = await requirePremiumTeacher(session);
+        if (!guard.ok) return guard.response;
+
         const body = await req.json();
 
         // ── ROUTE A: Word doc / raw text (from /api/extract-word) ────────────

@@ -12,8 +12,12 @@ export async function PATCH(req: Request) {
         const { targetId, action, type } = body;
         const session = await getServerSession(authOptions);
         const userId = (session?.user as any)?.id;
+        const role = (session?.user as any)?.role;
 
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (role !== 'TEACHER' && role !== 'ADMIN') {
+            return NextResponse.json({ error: "Access Denied" }, { status: 403 });
+        }
 
         if (type === 'ENROLLMENT') {
             // Verify the batch belongs to this teacher
@@ -21,7 +25,7 @@ export async function PATCH(req: Request) {
                 where: { id: targetId },
                 include: { batch: { select: { teacherId: true } } }
             });
-            if (!enrollment || enrollment.batch.teacherId !== userId) {
+            if (!enrollment || (role !== 'ADMIN' && enrollment.batch.teacherId !== userId)) {
                 return NextResponse.json({ error: "Access Denied" }, { status: 403 });
             }
             await prisma.batchEnrollment.update({
@@ -30,8 +34,20 @@ export async function PATCH(req: Request) {
             });
         }
         else if (type === 'PARENT') {
-            // Parents are global for now, but we can check if they have children in teacher's batches
-            // Simplified: allow admins or teacher to approve (though admins usually handle global)
+            // Parents are global, but a teacher may only approve a parent who
+            // has a child enrolled in one of THIS teacher's batches -- admins
+            // can approve any parent.
+            if (role !== 'ADMIN') {
+                const parent = await prisma.user.findFirst({
+                    where: {
+                        id: targetId,
+                        role: 'PARENT',
+                        parentLinks: { some: { student: { enrollments: { some: { batch: { teacherId: userId } } } } } },
+                    },
+                    select: { id: true },
+                });
+                if (!parent) return NextResponse.json({ error: "Access Denied" }, { status: 403 });
+            }
             await prisma.user.update({
                 where: { id: targetId },
                 data: { accountStatus: action } as any

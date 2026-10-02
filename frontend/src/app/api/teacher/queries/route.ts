@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,9 @@ export async function GET(req: Request) {
     try {
         const teacherUser = await (prisma as any).user.findUnique({ where: { id: (session.user as any).id } });
         if (!teacherUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+        if (!isPremiumSubscription(teacherUser.subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
 
         const queries = await (prisma as any).teacherQuery.findMany({
             where: { teacherId: teacherUser.id },
@@ -47,6 +51,9 @@ export async function PATCH(req: Request) {
 
         const teacherUser = await (prisma as any).user.findUnique({ where: { id: (session.user as any).id } });
         if (!teacherUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+        if (!isPremiumSubscription(teacherUser.subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
 
         const query = await (prisma as any).teacherQuery.updateMany({
             where: { id: queryId, teacherId: teacherUser.id },

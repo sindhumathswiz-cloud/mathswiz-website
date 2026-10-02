@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import StudentDashboardClient from "../dashboard/StudentDashboardClient";
 import { unstable_noStore as noStore } from "next/cache";
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export default async function StudentAchievePage() {
     noStore();
@@ -11,21 +12,26 @@ export default async function StudentAchievePage() {
     const userId = (session?.user as any)?.id;
 
     if (!userId) return <div>Please log in</div>;
+    const user = await (prisma as any).user.findUnique({ where: { id: userId }, select: { subscription: true } });
+    const isPremium = isPremiumSubscription(user?.subscription);
 
-    const goal = await (prisma as any).studentGoal.findUnique({
+    // This page only ever renders the Premium-gated Achieve tab -- skip the
+    // full fetch for free students instead of shipping it into page props
+    // behind a UI-only lock.
+    const goal = isPremium ? await (prisma as any).studentGoal.findUnique({
         where: { userId }
-    }).catch(() => null);
+    }).catch(() => null) : null;
 
-    const progress = await (prisma as any).studentProgress.findMany({
+    const progress = isPremium ? await (prisma as any).studentProgress.findMany({
         where: { userId },
         orderBy: { masteryScore: 'desc' }
-    }).catch(() => []);
+    }).catch(() => []) : [];
 
-    const pastAttempts = await (prisma as any).testAttempt.findMany({
+    const pastAttempts = isPremium ? await (prisma as any).testAttempt.findMany({
         where: { userId: userId, status: 'SUBMITTED' },
         include: { test: true },
         orderBy: { endTime: 'desc' }
-    }).catch(() => []);
+    }).catch(() => []) : [];
 
     return (
         <Suspense>
@@ -39,6 +45,7 @@ export default async function StudentAchievePage() {
                 initialGoal={goal}
                 initialProgress={progress}
                 defaultTab="achieve"
+                isPremium={isPremium}
             />
         </Suspense>
     );

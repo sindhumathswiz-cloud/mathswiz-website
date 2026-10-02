@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 import { selectQuestionsByFilters } from "@/lib/question-selection";
 
 const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) => {
@@ -59,12 +60,8 @@ const fetchFromBalancedLLM = async (systemPrompt: string, userPrompt: string) =>
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
-        const role = session?.user?.role;
-        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        if (role !== "TEACHER" && role !== "ADMIN") {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
+        const guard = await requirePremiumTeacher(session);
+        if (!guard.ok) return guard.response;
 
         const { prompt } = await req.json();
         if (!prompt) return NextResponse.json({ error: "Prompt is required" }, { status: 400 });

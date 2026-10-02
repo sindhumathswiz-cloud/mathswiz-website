@@ -2,15 +2,26 @@ import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export const dynamic = 'force-dynamic';
+
+async function requirePremiumTeacherStrict(session: any) {
+  if (!session || (session.user as any).role !== 'TEACHER') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const user = await prisma.user.findUnique({ where: { id: (session.user as any).id }, select: { subscription: true } });
+  if (!isPremiumSubscription(user?.subscription)) {
+    return NextResponse.json({ error: 'This feature requires a premium subscription.' }, { status: 403 });
+  }
+  return null;
+}
 
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'TEACHER') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = await requirePremiumTeacherStrict(session);
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const subject = searchParams.get('subject');
@@ -19,7 +30,7 @@ export async function GET(request: Request) {
     const type = searchParams.get('type');
     const scope = searchParams.get('scope'); // 'all', 'private', 'submitted'
 
-    const userId = (session.user as any).id;
+    const userId = (session!.user as any).id;
 
     const where: any = {};
 
@@ -64,11 +75,10 @@ export async function GET(request: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'TEACHER') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = await requirePremiumTeacherStrict(session);
+    if (denied) return denied;
 
-    const userId = (session.user as any).id;
+    const userId = (session!.user as any).id;
     const body = await req.json();
     const questions = Array.isArray(body) ? body : [body];
 

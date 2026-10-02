@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 import { searchSimilar, searchSimilarQuestions } from "@/lib/vector-store";
 import { generateEmbedding } from "@/lib/embeddings";
 import prisma from "@/lib/prisma";
@@ -9,11 +10,10 @@ import { fetchFromLLM } from "@/lib/llm";
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    }
-    const userId = (session.user as { id: string }).id;
-    const userRole = (session.user as any).role;
+    const guard = await requirePremiumTeacher(session);
+    if (!guard.ok) return guard.response;
+    const userId = guard.userId;
+    const userRole = guard.role;
 
     const body = await request.json();
     const { topic, topicId, folderId, count = 5, difficulties = ['MEDIUM'], taxonomyIds } = body;
@@ -72,11 +72,14 @@ export async function POST(request: NextRequest) {
         const taxonomyTerms = taxonomies.map(t => t.name);
         const matchingFolders = await prisma.knowledgeFolder.findMany({
           where: {
-            OR: taxonomyTerms.flatMap(term => [
-              { topicName: { contains: term, mode: 'insensitive' } },
-              { className: { contains: term, mode: 'insensitive' } },
-              { subject: { contains: term, mode: 'insensitive' } },
-            ])
+            AND: [
+              { OR: taxonomyTerms.flatMap(term => [
+                { topicName: { contains: term, mode: 'insensitive' } },
+                { className: { contains: term, mode: 'insensitive' } },
+                { subject: { contains: term, mode: 'insensitive' } },
+              ]) },
+              ...(userRole === "ADMIN" ? [] : [{ OR: [{ userId }, { user: { role: 'ADMIN' as const } }] }]),
+            ],
           },
           select: { id: true }
         });
@@ -94,11 +97,14 @@ export async function POST(request: NextRequest) {
       tagFilters = topicNode ? [topicNode.name.toUpperCase()] : undefined;
       const matchingFolders = await prisma.knowledgeFolder.findMany({
         where: {
-          OR: [
-            { topicName: { contains: searchQuery || topicNode?.name || '', mode: 'insensitive' } },
-            { className: { contains: searchQuery || '', mode: 'insensitive' } },
-            { subject: { contains: searchQuery || '', mode: 'insensitive' } },
-          ]
+          AND: [
+            { OR: [
+              { topicName: { contains: searchQuery || topicNode?.name || '', mode: 'insensitive' } },
+              { className: { contains: searchQuery || '', mode: 'insensitive' } },
+              { subject: { contains: searchQuery || '', mode: 'insensitive' } },
+            ] },
+            ...(userRole === "ADMIN" ? [] : [{ OR: [{ userId }, { user: { role: 'ADMIN' as const } }] }]),
+          ],
         },
         select: { id: true }
       });

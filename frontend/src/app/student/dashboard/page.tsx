@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import StudentDashboardClient from "./StudentDashboardClient";
 import { unstable_noStore as noStore } from "next/cache";
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export default async function StudentDashboard() {
     noStore(); // CRITICAL: Disables all static caching for this route.
@@ -25,31 +26,34 @@ export default async function StudentDashboard() {
     }
 
     if (!userId) {
-        return <Suspense><StudentDashboardClient initialEnrollments={[]} initialPayments={[]} initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} initialMaterials={[]} initialTests={[]} initialAttempts={[]} initialGoal={null} /></Suspense>;
+        return <Suspense><StudentDashboardClient isPremium={false} initialEnrollments={[]} initialPayments={[]} initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} initialMaterials={[]} initialTests={[]} initialAttempts={[]} initialGoal={null} /></Suspense>;
     }
 
     try {
         // 1. Get Student Class
         const user = await (prisma as any).user.findUnique({
             where: { id: userId },
-            select: { class: true }
+            select: { class: true, subscription: true }
         });
         const studentClass = user?.class;
+        const isPremium = isPremiumSubscription(user?.subscription);
 
-        // 2. Fetch Enrollments
+        // 2. Fetch Enrollments. liveClasses (with meeting URLs) is only ever
+        // rendered behind the Premium-gated Live Classes tab -- omit it for
+        // free students instead of shipping join links they can't use.
         const enrollments = await (prisma as any).batchEnrollment.findMany({
             where: { studentId: userId },
-            include: { 
-                batch: { 
-                    include: { 
+            include: {
+                batch: {
+                    include: {
                         teacher: true,
-                        liveClasses: {
+                        ...(isPremium ? { liveClasses: {
                             where: { startTime: { gte: new Date() } },
                             orderBy: { startTime: 'asc' },
                             take: 5
-                        }
+                        } } : {})
                     }
-                } 
+                }
             },
             orderBy: { createdAt: 'desc' }
         }).catch(() => []);
@@ -61,19 +65,25 @@ export default async function StudentDashboard() {
             orderBy: { dueDate: 'asc' }
         }).catch(() => []);
 
-        // 4. Fetch Materials (Filtered by Class)
-        const materials = await (prisma as any).material.findMany({
-            where: { 
+        // 4. Fetch Materials (Filtered by Class). Only ever rendered behind
+        // the Premium-gated Materials tab -- skip the fetch for free
+        // students rather than shipping the full library in page props.
+        const materials = isPremium ? await (prisma as any).material.findMany({
+            where: {
                 OR: [
                     { class: studentClass },
                     { isFree: true } // Allow free materials to potentially bypass class if needed, or stick strictly to class
                 ]
             },
             orderBy: { createdAt: 'desc' }
-        }).catch(() => []);
+        }).catch(() => []) : [];
 
-        // 5. Fetch Test Assignments (Filtered by Class)
-        const tests = await (prisma as any).testAssignment.findMany({
+        // 5. Fetch Test Assignments (Filtered by Class). The overview tiles
+        // need an accurate count regardless of tier, but the full test/
+        // question content only ever renders behind the Premium-gated Tests
+        // tab -- fetch IDs only for free students so the count stays right
+        // without shipping question content they can't access.
+        const tests = isPremium ? await (prisma as any).testAssignment.findMany({
             where: {
                 AND: [
                     {
@@ -87,23 +97,39 @@ export default async function StudentDashboard() {
                     }
                 ]
             },
-            include: { 
+            include: {
                 test: {
                     include: { attempts: { where: { userId: userId, status: 'SUBMITTED' } } }
-                } 
+                }
             },
             orderBy: { createdAt: 'desc' }
+        }).catch(() => []) : await (prisma as any).testAssignment.findMany({
+            where: {
+                AND: [
+                    {
+                        OR: [
+                            { studentId: userId },
+                            { batch: { enrollments: { some: { studentId: userId, status: 'APPROVED' } } } }
+                        ]
+                    },
+                    { test: { class: studentClass } }
+                ]
+            },
+            select: { id: true },
         }).catch(() => []);
 
-        const pastAttempts = await (prisma as any).testAttempt.findMany({
+        const pastAttempts = isPremium ? await (prisma as any).testAttempt.findMany({
             where: { userId: userId, status: 'SUBMITTED' },
             include: { test: true },
             orderBy: { endTime: 'desc' }
+        }).catch(() => []) : await (prisma as any).testAttempt.findMany({
+            where: { userId: userId, status: 'SUBMITTED' },
+            select: { id: true },
         }).catch(() => []);
 
-        const goal = await (prisma as any).studentGoal.findUnique({
+        const goal = isPremium ? await (prisma as any).studentGoal.findUnique({
             where: { userId }
-        }).catch(() => null);
+        }).catch(() => null) : null;
 
         // Fetch Notices for enrolled batches
         const batchIds = enrollments.map((e: any) => e.batchId);
@@ -138,11 +164,12 @@ export default async function StudentDashboard() {
                     initialAttempts={pastAttempts}
                     initialGoal={goal}
                     initialNotices={notices}
+                    isPremium={isPremium}
                 />
             </Suspense>
         );
     } catch (error) {
         console.error("Student Dashboard Server Fetch Error:", error);
-        return <Suspense><StudentDashboardClient initialEnrollments={[]} initialPayments={[]} initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} initialMaterials={[]} initialTests={[]} initialAttempts={[]} initialGoal={null} initialNotices={[]} /></Suspense>;
+        return <Suspense><StudentDashboardClient isPremium={false} initialEnrollments={[]} initialPayments={[]} initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }} initialMaterials={[]} initialTests={[]} initialAttempts={[]} initialGoal={null} initialNotices={[]} /></Suspense>;
     }
 }

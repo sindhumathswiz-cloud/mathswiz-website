@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getServerSession = vi.fn();
 const recordAuditLog = vi.fn();
 const test = { findFirst: vi.fn(), create: vi.fn() };
+const user = { findUnique: vi.fn() };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { test } }));
+vi.mock('@/lib/prisma', () => ({ default: { test, user } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 
 const params = (testId: string) => Promise.resolve({ testId });
@@ -18,6 +19,7 @@ describe('POST /api/teacher/tests/[testId]/duplicate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+    user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
   });
 
   it('rejects non-teacher roles', async () => {

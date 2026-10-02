@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 import prisma from "@/lib/prisma";
 
@@ -16,6 +17,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         const folderId = (await params).id;
         const dbUser = await prisma.user.findUnique({ where: { id: (session.user as any).id } });
         if (!dbUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+        if (!isPremiumSubscription((dbUser as any).subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
 
         const folder = await prisma.knowledgeFolder.findFirst({
             where: { id: folderId, userId: dbUser.id },
@@ -40,6 +44,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     try {
         const dbUser = await prisma.user.findUnique({ where: { id: (session.user as any).id } });
         if (!dbUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+        if (!isPremiumSubscription((dbUser as any).subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
 
         await prisma.knowledgeFolder.deleteMany({
             where: { id: (await params).id, userId: dbUser.id }

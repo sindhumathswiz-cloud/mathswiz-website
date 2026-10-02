@@ -10,7 +10,8 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         let userId = (session?.user as any)?.id;
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const role = (session?.user as any)?.role;
+        if (!userId || role !== 'TEACHER') return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         // IDENTITY HEALING: Ensure we use the real Database ID for all queries
         const dbUser = await prisma.user.findUnique({

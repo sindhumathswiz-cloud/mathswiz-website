@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 import prisma from "@/lib/prisma";
 
@@ -13,6 +14,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     try {
+        const dbUser = await prisma.user.findUnique({ where: { id: (session.user as any).id }, select: { subscription: true } });
+        if (!isPremiumSubscription(dbUser?.subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
         const docId = (await params).id;
         
         // Ensure the person deleting this owns the folder it belongs to

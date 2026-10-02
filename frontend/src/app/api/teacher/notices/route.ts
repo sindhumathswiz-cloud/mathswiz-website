@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from '@/lib/prisma';
+import { requirePremiumTeacherStrict } from '@/lib/teacher-api-guard';
 
 // GET: fetch all notices for batches belonging to this teacher
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const teacherId = (session?.user as any)?.id;
-        if (!teacherId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const guard = await requirePremiumTeacherStrict(session);
+        if (!guard.ok) return guard.response;
+        const teacherId = guard.userId;
 
         const notices = await (prisma as any).notice.findMany({
             where: { teacherId },
@@ -27,8 +29,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const teacherId = (session?.user as any)?.id;
-        if (!teacherId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const guard = await requirePremiumTeacherStrict(session);
+        if (!guard.ok) return guard.response;
+        const teacherId = guard.userId;
 
         const body = await req.json();
         const { title, content, batchId } = body;
@@ -58,8 +61,9 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const teacherId = (session?.user as any)?.id;
-        if (!teacherId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const guard = await requirePremiumTeacherStrict(session);
+        if (!guard.ok) return guard.response;
+        const teacherId = guard.userId;
 
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');

@@ -4,6 +4,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
 import { extractClaimedAnswerIndex, parseQuestionOptions, resolveCorrectOptionIndex } from '@/lib/arena-answer';
 import { masteryBand } from '@/lib/mastery-view';
+import { isFreePreviewQuestion } from '@/lib/free-preview-content';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,12 +27,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const studentId = session.user.id;
+    const student = await prisma.user.findUnique({ where: { id: studentId }, select: { subscription: true } });
+    const isPremium = isPremiumSubscription(student?.subscription);
 
     const { searchParams } = new URL(req.url);
     const topic = searchParams.get('topic');
     const difficulty = searchParams.get('difficulty');
 
     const where: any = { status: 'APPROVED', correctAnswer: { not: '' } };
+    if (!isPremium) where.scope = 'PUBLIC';
     if (topic) where.topic = topic;
     if (difficulty) where.difficulty = difficulty;
 
@@ -39,12 +44,22 @@ export async function GET(req: Request) {
     // record never reaches the interactive Arena.
     const candidates = await prisma.question.findMany({
       where,
-      take: 250,
+      take: isPremium ? 250 : 1000,
       orderBy: { updatedAt: 'desc' },
-      include: { createdBy: { select: { firstName: true, lastName: true } } },
+      include: { createdBy: { select: { firstName: true, lastName: true } }, bookChapter: { select: { orderIndex: true } } },
     });
 
-    const usable = candidates.flatMap(candidate => {
+    // isFreePreviewQuestion is async (it's also used from a route that
+    // awaits a DB-backed check), so eligibility is resolved up front rather
+    // than inside this synchronous flatMap -- calling it without awaiting
+    // negates a Promise object, which is always falsy, silently letting
+    // every question through the gate regardless of the actual result.
+    const freePreviewEligible = isPremium
+      ? null
+      : await Promise.all(candidates.map(candidate => isFreePreviewQuestion(candidate)));
+
+    const usable = candidates.flatMap((candidate, index) => {
+      if (freePreviewEligible && !freePreviewEligible[index]) return [];
       const options = parseQuestionOptions(candidate.options);
       const correctIndex = resolveCorrectOptionIndex(candidate.correctAnswer, options);
       const claimedIndex = extractClaimedAnswerIndex(candidate.explanation);

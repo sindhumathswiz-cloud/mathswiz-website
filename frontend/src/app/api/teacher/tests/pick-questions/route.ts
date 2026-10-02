@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 import { selectQuestionsByFilters, type QuestionFilterSpec } from "@/lib/question-selection";
 
 export const dynamic = 'force-dynamic';
@@ -15,12 +16,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
-        const role = session?.user?.role;
-        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        if (role !== "TEACHER" && role !== "ADMIN") {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
+        const guard = await requirePremiumTeacher(session);
+        if (!guard.ok) return guard.response;
 
         const body = await req.json().catch(() => null);
         const filters: QuestionFilterSpec[] = Array.isArray(body?.filters) ? body.filters : [];

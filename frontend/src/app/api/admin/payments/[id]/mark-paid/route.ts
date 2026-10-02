@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
 import { recordAuditLog, requestAuditContext } from "@/lib/audit-log";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -15,6 +16,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         const { paidAt } = await req.json();
 
         if ((session.user as any).role === 'TEACHER') {
+            const caller = await prisma.user.findUnique({ where: { id: (session.user as any).id }, select: { subscription: true } });
+            if (!isPremiumSubscription(caller?.subscription)) {
+                return NextResponse.json({ error: 'This feature requires a premium subscription.' }, { status: 403 });
+            }
             const payment = await (prisma as any).paymentRecord.findUnique({
                 where: { id },
                 select: { enrollment: { select: { batch: { select: { teacherId: true } } } } }

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 // List All Folders
 export async function GET() {
@@ -13,6 +14,9 @@ export async function GET() {
     try {
         const dbUser = await prisma.user.findUnique({ where: { id: (session.user as any).id } });
         if (!dbUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+        if (!isPremiumSubscription((dbUser as any).subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
 
         // Teachers browse their own folders plus every admin-created folder
         // (the shared training corpus), matching the sharing rule used across
@@ -51,6 +55,9 @@ export async function PATCH(req: Request) {
 
         const dbUser = await prisma.user.findUnique({ where: { id: (session.user as any).id } });
         if (!dbUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+        if (!isPremiumSubscription((dbUser as any).subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
 
         await prisma.knowledgeFolder.updateMany({
             where: { id: folderId, userId: dbUser.id },

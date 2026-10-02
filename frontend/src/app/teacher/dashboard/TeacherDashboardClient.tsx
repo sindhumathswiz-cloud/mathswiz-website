@@ -11,14 +11,16 @@ import { FeeManagement } from "@/components/admin/FeeManagement";
 import { FeeStructureGenerator } from "@/components/admin/FeeStructureGenerator";
 import { LeadCRM } from "@/components/admin/LeadCRM";
 import { ReportsExport } from "@/components/admin/ReportsExport";
-import KnowledgeBasePage from "../knowledge-base/page";
+import KnowledgeBasePage from "../knowledge-base/KnowledgeBaseClient";
 import { createBatchAction, deleteBatchAction } from "@/actions/batchActions";
 import { createMaterialAction, updateMaterialAction, deleteMaterialAction } from "@/actions/materialActions";
 // @ts-ignore
 import { MaterialType } from "@prisma/client";
 import { toast } from "react-hot-toast";
 import { signOut, useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { PremiumBanner, PremiumFeatureNotice } from '@/components/PremiumAccess';
 
 interface Batch {
     id: string;
@@ -39,11 +41,20 @@ export default function TeacherDashboardClient({
     initialEngagementData = [],
     initialDoubtsCount = 0,
     teacherId = '',
+    isPremium = false,
     initialStats = { totalStudents: 0, pendingAssignments: 0, liveTests: 0, activeNow: 0 }
 }: any) {
     const [isSigningOut, setIsSigningOut] = useState(false);
     const { data: session } = useSession();
+    const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<'Platform Overview' | 'Live Classes' | 'User Directory' | 'Lead CRM' | 'Question Bank' | 'Test & Exam Engine' | 'Study Materials' | 'Fee Management' | 'Reports & Export' | 'System Features' | 'AI Training Content'>('Platform Overview');
+    const lockedTabs = new Set(['Live Classes', 'Lead CRM', 'Question Bank', 'Test & Exam Engine', 'AI Training Content', 'Study Materials', 'Fee Management', 'Reports & Export', 'System Features']);
+    const dashboardTabs = ['Platform Overview', 'Live Classes', 'User Directory', 'Lead CRM', 'Question Bank', 'Test & Exam Engine', 'AI Training Content', 'Study Materials', 'Fee Management', 'Reports & Export', 'System Features'] as const;
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && dashboardTabs.includes(tab as typeof dashboardTabs[number])) setActiveTab(tab as typeof activeTab);
+    }, [searchParams]);
 
     // State initialized with Server-fetched data
     const [batches, setBatches] = useState<Batch[]>(initialBatches);
@@ -82,6 +93,7 @@ export default function TeacherDashboardClient({
 
     // Re-fetch periodically or on demand if needed, but primary load is from props
     const fetchDashboardData = async () => {
+        if (!isPremium) return;
         try {
             const timestamp = new Date().getTime();
             const res = await fetch(`/api/teacher/dashboard-data?t=${timestamp}`, { cache: 'no-store' });
@@ -109,11 +121,11 @@ export default function TeacherDashboardClient({
     // 🚀 INSTANT PERSISTENCE & AUTO-SYNC (Task Implementation)
     useEffect(() => {
         // 1. Immediate Load: Show last known data from DB instantly
-        fetchDashboardData();
+        if (isPremium) fetchDashboardData();
 
         // 2. Silent Background Sync: Refresh in background if MS token exists
         const token = (session as any)?.accessToken;
-        if (token && !hasAutoSynced.current) {
+        if (isPremium && token && !hasAutoSynced.current) {
             hasAutoSynced.current = true;
             // Trigger sync silently after a short delay
             const timeoutId = setTimeout(() => {
@@ -121,7 +133,7 @@ export default function TeacherDashboardClient({
             }, 1000);
             return () => clearTimeout(timeoutId);
         }
-    }, [(session as any)?.accessToken]);
+    }, [(session as any)?.accessToken, isPremium]);
 
     const handleApproval = async (targetId: string, action: 'APPROVED' | 'REJECTED', type: 'ENROLLMENT' | 'PARENT') => {
         try {
@@ -288,48 +300,12 @@ export default function TeacherDashboardClient({
                         ]}
                         actions={[
                             { label: 'Review students', icon: Users, onClick: () => setActiveTab('User Directory') },
-                            { label: 'Plan a live class', icon: Video, onClick: () => setActiveTab('Live Classes') },
-                            { label: 'Create or assign a test', icon: ClipboardList, onClick: () => setActiveTab('Test & Exam Engine') },
+                            { label: isPremium ? 'Plan a live class' : 'Live classes (Premium)', icon: isPremium ? Video : Lock, onClick: () => setActiveTab('Live Classes') },
+                            { label: isPremium ? 'Create or assign a test' : 'Test engine (Premium)', icon: isPremium ? ClipboardList : Lock, onClick: () => setActiveTab('Test & Exam Engine') },
                         ]}
                     />
-                    <div className="grid items-start gap-6 md:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)]">
-                        <aside className="sticky top-4 z-20 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-3 shadow-sm md:top-6" aria-label="Teacher workspace navigation">
-                            <div className="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
-                                {['Platform Overview', 'Live Classes', 'User Directory', 'Lead CRM', 'Question Bank', 'Test & Exam Engine', 'AI Training Content', 'Study Materials', 'Fee Management', 'Reports & Export', 'System Features'].map((tab) => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setActiveTab(tab as any)}
-                                        aria-current={activeTab === tab ? 'page' : undefined}
-                                        className={`dashboard-tab flex shrink-0 items-center text-left md:w-full ${activeTab === tab ? 'dashboard-tab-active' : ''}`}
-                                    >
-                                        {tab}
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="mt-3 border-t border-slate-200 dark:border-white/10 pt-3">
-                                <Link href="/teacher/mastery" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 dark:text-brand transition hover:bg-indigo-50 dark:hover:bg-brand/10 md:justify-start">
-                                    <TrendingUp className="h-4 w-4" /> Student mastery
-                                </Link>
-                                <Link href="/teacher/interventions" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 dark:text-brand transition hover:bg-indigo-50 dark:hover:bg-brand/10 md:justify-start">
-                                    <Users className="h-4 w-4" /> Interventions
-                                </Link>
-                                <Link href="/teacher/homework" className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 dark:text-brand transition hover:bg-indigo-50 dark:hover:bg-brand/10 md:justify-start">
-                                    <ClipboardList className="h-4 w-4" /> Homework review
-                                </Link>
-                                <button
-                                    type="button"
-                                    onClick={handleSignOut}
-                                    disabled={isSigningOut}
-                                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-rose-700 dark:text-rose-400 transition hover:bg-rose-50 dark:hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-wait disabled:opacity-60 md:justify-start"
-                                >
-                                    {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-                                    {isSigningOut ? 'Signing out…' : 'Sign out'}
-                                </button>
-                            </div>
-                        </aside>
-
-                        {/* Tab Content */}
-                        <div className="min-h-[500px] min-w-0 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-5 shadow-sm sm:p-8">
+                    {!isPremium && <PremiumBanner audience="teacher" />}
+                    <div className="min-h-[500px] min-w-0 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-5 shadow-sm sm:p-8">
                         {activeTab === 'Platform Overview' && (
                             <PlatformOverview 
                                 totalPending={totalPending} 
@@ -339,11 +315,11 @@ export default function TeacherDashboardClient({
                             />
                         )}
 
-                        {activeTab === 'Live Classes' && (
+                        {activeTab === 'Live Classes' && (!isPremium ? <PremiumFeatureNotice title="Live class tools are locked" description="Premium teachers can schedule lessons, share meeting links, and manage their live classroom here." /> : (
                             <div className="animate-in fade-in duration-300">
                                 <LiveClassCalendar teacherId={teacherId} batches={batches} />
                             </div>
-                        )}
+                        ))}
 
                         {activeTab === 'User Directory' && (
                             <div className="animate-in fade-in duration-300">
@@ -515,11 +491,11 @@ export default function TeacherDashboardClient({
                             </div>
                         )}
 
-                        {activeTab === 'Test & Exam Engine' && <TestEngineCreator stats={{ liveTests, pendingAssignments }} />}
+                        {activeTab === 'Test & Exam Engine' && (!isPremium ? <PremiumFeatureNotice title="Test & Exam Engine is locked" description="Premium teachers can build, assign, and analyse class assessments from this workspace." /> : <TestEngineCreator stats={{ liveTests, pendingAssignments }} />)}
 
-                        {activeTab === 'Question Bank' && <QuestionBankStudio />}
+                        {activeTab === 'Question Bank' && (!isPremium ? <PremiumFeatureNotice title="Question Bank is locked" description="Premium teachers can curate questions, build collections, and use verified items in assessments." /> : <QuestionBankStudio />)}
 
-                        {activeTab === 'Study Materials' && (
+                        {activeTab === 'Study Materials' && (!isPremium ? <PremiumFeatureNotice title="Study materials are locked" description="Premium teachers can upload revision packs, videos, worksheets, and free samples for their learners." /> : (
                             <div className="animate-in fade-in duration-300">
                                 <div className="flex justify-between items-center mb-8">
                                     <div>
@@ -581,22 +557,22 @@ export default function TeacherDashboardClient({
                                     </div>
                                 )}
                             </div>
-                        )}
+                        ))}
 
-                        {activeTab === 'Fee Management' && (
+                        {activeTab === 'Fee Management' && (!isPremium ? <PremiumFeatureNotice title="Fee management is locked" description="Premium teachers can manage fee structures, payment records, and outstanding balances here." /> : (
                             <div className="space-y-12">
                                 <FeeStructureGenerator />
                                 <FeeManagement payments={payments} />
                             </div>
-                        )}
+                        ))}
 
-                        {activeTab === 'Lead CRM' && (
+                        {activeTab === 'Lead CRM' && (!isPremium ? <PremiumFeatureNotice title="Lead CRM is locked" description="Premium teachers can manage enquiries and follow up with prospective learners here." /> : (
                             <div className="animate-in fade-in duration-300">
                                 <LeadCRM leads={leads} teacherId={teacherId} />
                             </div>
-                        )}
+                        ))}
 
-                        {activeTab === 'Reports & Export' && (
+                        {activeTab === 'Reports & Export' && (!isPremium ? <PremiumFeatureNotice title="Reports and exports are locked" description="Premium teachers can review class trends and export their teaching reports here." /> : (
                             <div className="animate-in fade-in duration-300">
                                 {/* Reports Summary Tiles */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -624,9 +600,9 @@ export default function TeacherDashboardClient({
                                     payments={payments}
                                 />
                             </div>
-                        )}
+                        ))}
 
-                        {activeTab === 'System Features' && (
+                        {activeTab === 'System Features' && (!isPremium ? <PremiumFeatureNotice title="Class announcements are locked" description="Premium teachers can create classroom notices and manage their teaching tools here." /> : (
                             <div className="animate-in fade-in duration-300 space-y-8">
                                 {/* Notice / Announcement Creator */}
                                 <div>
@@ -759,15 +735,14 @@ export default function TeacherDashboardClient({
                                     )}
                                 </div>
                             </div>
-                        )}
+                        ))}
 
-                        {activeTab === 'AI Training Content' && (
+                        {activeTab === 'AI Training Content' && (!isPremium ? <PremiumFeatureNotice title="AI training content is locked" description="Premium teachers can manage the AI-assisted content workspace here." /> : (
                             <div className="animate-in fade-in duration-300">
                                 <KnowledgeBasePage />
                             </div>
-                        )}
+                        ))}
                         </div>
-                    </div>
                 </div>
             </div>
 

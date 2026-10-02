@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireTeacherOrAdmin } from "@/lib/teacher-api-guard";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
-        const role = session?.user?.role;
-        if (!userId || !role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const guard = requireTeacherOrAdmin(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
 
         const batches = await (prisma as any).batch.findMany({
             where: role === "ADMIN" ? {} : { teacherId: userId },
@@ -27,12 +28,13 @@ export async function GET() {
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
-        
+        const guard = requireTeacherOrAdmin(session);
+        if (!guard.ok) return guard.response;
+        const { userId, role } = guard;
+
         const body = await req.json();
         const { name, code, startDate, teacherId } = body;
-        const role = session?.user?.role;
-        
+
         const resolvedTeacherId = role === "ADMIN" ? teacherId : userId;
 
         if (!name || !code) return NextResponse.json({ error: "Name and code are required" }, { status: 400 });

@@ -6,6 +6,7 @@ import TeacherDashboardClient from "./TeacherDashboardClient";
 import { Lock } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { buildWeeklyEngagement } from '@/lib/teacher-dashboard-metrics';
+import { isPremiumSubscription } from '@/lib/subscription';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -43,6 +44,8 @@ export default async function TeacherDashboard() {
 
     // DATA ISOLATION: ALL queries are scoped to this teacher's batches/data
     try {
+        const teacher = await (prisma as any).user.findUnique({ where: { id: userId }, select: { subscription: true } });
+        const isPremium = isPremiumSubscription(teacher?.subscription);
         // Teacher's own batches only
         const batches = await (prisma as any).batch.findMany({
             where: { teacherId: userId },
@@ -71,8 +74,13 @@ export default async function TeacherDashboard() {
             }
         }).catch(() => []);
 
-        // Payments only from teacher's batches
-        const payments = await (prisma as any).paymentRecord.findMany({
+        // Payments, materials, leads and notices only ever render behind this
+        // dashboard's Premium-gated tabs (Fee Management / Study Materials /
+        // Lead CRM / System Features) -- fetching them for a free teacher put
+        // the real data (student payment amounts, contact info, etc.) in the
+        // server-rendered page source regardless of the UI lock. Skip the
+        // fetch entirely when the teacher isn't premium.
+        const payments = isPremium ? await (prisma as any).paymentRecord.findMany({
             where: { enrollment: { batchId: { in: batchIds } } },
             include: {
                 enrollment: {
@@ -84,7 +92,7 @@ export default async function TeacherDashboard() {
             },
             orderBy: { dueDate: 'asc' },
             take: 200
-        }).catch(() => []);
+        }).catch(() => []) : [];
 
         // Students approved in teacher's batches
         const totalEnrollments = await (prisma as any).batchEnrollment.count({
@@ -92,14 +100,14 @@ export default async function TeacherDashboard() {
         }).catch(() => 0);
 
         // Materials created by this teacher
-        const materials = await (prisma as any).material.findMany({
+        const materials = isPremium ? await (prisma as any).material.findMany({
             where: { createdById: userId },
             orderBy: { createdAt: 'desc' },
             include: { createdBy: true }
-        }).catch(() => []);
+        }).catch(() => []) : [];
 
         // Leads — teacher-scoped (Task 6 Fix)
-        const leads = await (prisma as any).lead.findMany({
+        const leads = isPremium ? await (prisma as any).lead.findMany({
             where: {
                 OR: [
                     { teacherId: userId },
@@ -108,9 +116,10 @@ export default async function TeacherDashboard() {
             },
             orderBy: { createdAt: 'desc' },
             take: 100
-        }).catch(() => []);
+        }).catch(() => []) : [];
 
-        // Users within teacher's batches (for Reports)
+        // Users within teacher's batches -- needed unconditionally for the
+        // free User Directory tab, and reused by the Premium Reports tab.
         const users = await (prisma as any).user.findMany({
             where: { enrollments: { some: { batchId: { in: batchIds } } } },
             select: { id: true, firstName: true, lastName: true, email: true, role: true, accountStatus: true, createdAt: true },
@@ -119,12 +128,12 @@ export default async function TeacherDashboard() {
         }).catch(() => []);
 
         // Notices created by this teacher
-        const notices = await (prisma as any).notice.findMany({
+        const notices = isPremium ? await (prisma as any).notice.findMany({
             where: { teacherId: userId },
             include: { batch: { select: { name: true } } },
             orderBy: { createdAt: 'desc' },
             take: 50
-        }).catch(() => []);
+        }).catch(() => []) : [];
 
         const formattedBatches = batches.map((b: any) => ({
             id: b.id,
@@ -188,6 +197,7 @@ export default async function TeacherDashboard() {
                 liveTests,
                 activeNow
             }}
+            isPremium={isPremium}
         />;
     } catch (error) {
         console.error("🔥 CRITICAL Dashboard Fetch Error:", error);
@@ -198,6 +208,7 @@ export default async function TeacherDashboard() {
             initialNotices={[]}
             teacherId={userId || ''}
             initialStats={{ totalStudents: 0, pendingAssignments: 0, liveTests: 0, activeNow: 0 }}
+            isPremium={false}
         />;
     }
 }

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import {
     LayoutDashboard,
@@ -18,6 +18,12 @@ import {
     ChevronRight,
     LogOut,
     Zap,
+    Video,
+    FileStack,
+    CircleDollarSign,
+    BarChart3,
+    Bot,
+    Lock,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -26,9 +32,18 @@ interface SidebarItemProps {
     icon: React.ReactNode;
     label: string;
     isActive: boolean;
+    locked?: boolean;
 }
 
-const SidebarItem = ({ href, icon, label, isActive }: SidebarItemProps) => (
+interface TeacherNavItem {
+    href: string;
+    icon: React.ReactNode;
+    label: string;
+    tab?: string;
+    premium?: boolean;
+}
+
+const SidebarItem = ({ href, icon, label, isActive, locked = false }: SidebarItemProps) => (
     <Link
         href={href}
         className={`flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-200 group ${
@@ -43,33 +58,50 @@ const SidebarItem = ({ href, icon, label, isActive }: SidebarItemProps) => (
             </div>
             <span className="font-body font-bold text-sm tracking-tight">{label}</span>
         </div>
-        {isActive && <ChevronRight size={14} className="opacity-50" />}
+        {locked ? <Lock size={14} className="text-violet-500" aria-label="Premium feature" /> : isActive && <ChevronRight size={14} className="opacity-50" />}
     </Link>
 );
 
 export default function TeacherSidebar() {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => setMounted(true), []);
+    const [isPremium, setIsPremium] = React.useState<boolean | null>(null);
 
-    const menuItems = [
-        { href: '/teacher/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-        { href: '/teacher/batch-management', icon: <Users size={18} />, label: 'Batch Management' },
-        { href: '/teacher/question-bank', icon: <BookOpen size={18} />, label: 'Question Bank' },
-        { href: '/teacher/tests', icon: <ClipboardList size={18} />, label: 'Test Ledger' },
-        { href: '/teacher/homework', icon: <ClipboardCheck size={18} />, label: 'Homework Review' },
+    React.useEffect(() => {
+        fetch('/api/user/status')
+            .then((response) => response.ok ? response.json() : null)
+            .then((data) => setIsPremium(data?.user?.subscription === 'PREMIUM'))
+            .catch(() => setIsPremium(false));
+    }, []);
+
+    const dashboardHref = (tab: string) => `/teacher/dashboard?tab=${encodeURIComponent(tab)}`;
+    const isDashboardTabActive = (tab: string) => pathname === '/teacher/dashboard' && (searchParams.get('tab') || 'Platform Overview') === tab;
+
+    const menuItems: TeacherNavItem[] = [
+        { href: dashboardHref('Platform Overview'), icon: <LayoutDashboard size={18} />, label: 'Dashboard', tab: 'Platform Overview' },
+        { href: dashboardHref('User Directory'), icon: <Users size={18} />, label: 'Batch Management', tab: 'User Directory' },
+        { href: dashboardHref('Live Classes'), icon: <Video size={18} />, label: 'Live Classes', tab: 'Live Classes', premium: true },
+        { href: dashboardHref('Question Bank'), icon: <BookOpen size={18} />, label: 'Question Bank', tab: 'Question Bank', premium: true },
+        { href: dashboardHref('Test & Exam Engine'), icon: <ClipboardList size={18} />, label: 'Test & Exams', tab: 'Test & Exam Engine', premium: true },
+        { href: '/teacher/homework', icon: <ClipboardCheck size={18} />, label: 'Homework Review', premium: true },
     ];
 
-    const insightItems = [
-        { href: '/teacher/mastery', icon: <Target size={18} />, label: 'Student Mastery' },
-        { href: '/teacher/heatmap', icon: <Flame size={18} />, label: 'Class Heatmap' },
-        { href: '/teacher/interventions', icon: <HeartHandshake size={18} />, label: 'Interventions' },
+    const insightItems: TeacherNavItem[] = [
+        { href: '/teacher/mastery', icon: <Target size={18} />, label: 'Student Mastery', premium: true },
+        { href: '/teacher/heatmap', icon: <Flame size={18} />, label: 'Class Heatmap', premium: true },
+        { href: '/teacher/interventions', icon: <HeartHandshake size={18} />, label: 'Interventions', premium: true },
     ];
 
-    const toolItems = [
-        { href: '/teacher/knowledge-base', icon: <Library size={18} />, label: 'Knowledge Base' },
-        { href: '/teacher/queries', icon: <MessageSquareQuote size={18} />, label: 'Student Queries' },
+    const toolItems: TeacherNavItem[] = [
+        { href: dashboardHref('Study Materials'), icon: <FileStack size={18} />, label: 'Study Materials', tab: 'Study Materials', premium: true },
+        { href: dashboardHref('Lead CRM'), icon: <Users size={18} />, label: 'Lead CRM', tab: 'Lead CRM', premium: true },
+        { href: dashboardHref('Fee Management'), icon: <CircleDollarSign size={18} />, label: 'Fee Management', tab: 'Fee Management', premium: true },
+        { href: dashboardHref('Reports & Export'), icon: <BarChart3 size={18} />, label: 'Reports & Export', tab: 'Reports & Export', premium: true },
+        { href: dashboardHref('AI Training Content'), icon: <Bot size={18} />, label: 'AI Content', tab: 'AI Training Content', premium: true },
+        { href: '/teacher/queries', icon: <MessageSquareQuote size={18} />, label: 'Student Queries', premium: true },
     ];
 
     const handleLogout = async () => {
@@ -100,21 +132,21 @@ export default function TeacherSidebar() {
                 <div className="space-y-2">
                     <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Command Center</p>
                     {menuItems.map((item) => (
-                        <SidebarItem key={item.href} {...item} isActive={pathname === item.href} />
+                        <SidebarItem key={item.href} {...item} locked={isPremium === false && Boolean(item.premium)} isActive={item.tab ? isDashboardTabActive(item.tab) : pathname === item.href} />
                     ))}
                 </div>
 
                 <div className="mt-10 space-y-2">
                     <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Class Insights</p>
                     {insightItems.map((item) => (
-                        <SidebarItem key={item.href} {...item} isActive={pathname === item.href} />
+                        <SidebarItem key={item.href} {...item} locked={isPremium === false && Boolean(item.premium)} isActive={item.tab ? isDashboardTabActive(item.tab) : pathname === item.href} />
                     ))}
                 </div>
 
                 <div className="mt-10 space-y-2">
                     <p className="font-body text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-4">Tools</p>
                     {toolItems.map((item) => (
-                        <SidebarItem key={item.href} {...item} isActive={pathname === item.href} />
+                        <SidebarItem key={item.href} {...item} locked={isPremium === false && Boolean(item.premium)} isActive={item.tab ? isDashboardTabActive(item.tab) : pathname === item.href} />
                     ))}
                 </div>
             </div>

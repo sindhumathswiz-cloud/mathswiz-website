@@ -10,7 +10,7 @@ type ApiRule = {
   methods?: readonly string[];
 };
 
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/site-page/", "/api/health/"] as const;
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/site-page/", "/api/health/", "/api/free-preview"] as const;
 const PUBLIC_API_EXACT_PATHS = ["/api/register", "/api/auth/register", "/api/health"] as const;
 
 // Rules are evaluated in order. Narrow exceptions must precede namespace defaults.

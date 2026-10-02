@@ -2,11 +2,19 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role === "STUDENT") {
+    const callerRole = (session?.user as any)?.role;
+    if (!session || (callerRole !== "TEACHER" && callerRole !== "ADMIN")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (callerRole === "TEACHER") {
+        const caller = await prisma.user.findUnique({ where: { id: (session.user as any).id }, select: { subscription: true } });
+        if (!isPremiumSubscription(caller?.subscription)) {
+            return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+        }
     }
 
     try {

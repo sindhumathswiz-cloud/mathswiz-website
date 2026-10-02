@@ -23,6 +23,9 @@ const mockPrisma = {
   pageFigure: {
     findMany: vi.fn()
   },
+  user: {
+    findUnique: vi.fn()
+  },
   $transaction: vi.fn()
 };
 
@@ -93,6 +96,7 @@ describe('API Route - Questions', () => {
         user: { id: 'teacher-1', role: 'TEACHER', email: 'teacher@test.com' }
       });
 
+      mockPrisma.user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
       mockPrisma.$transaction.mockResolvedValue([{ id: 'q1' }]);
 
       const { POST } = await import('@/app/api/questions/route');

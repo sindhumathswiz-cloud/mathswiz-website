@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { deriveProvenance, provenanceApprovalError } from "@/lib/question-provenance";
 import { structuralApprovalError } from "@/lib/question-qa";
 import { figureApprovalError } from "@/lib/question-figures";
+import { isPremiumSubscription } from "@/lib/subscription";
 
 export const dynamic = 'force-dynamic';
 
@@ -164,6 +165,13 @@ export async function POST(req: Request) {
         // Teachers can add questions but they go to TEACHER_PRIVATE scope
         if (role !== 'ADMIN' && role !== 'TEACHER') {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+        // Question Bank is a Premium-gated teacher feature (ADMIN is exempt).
+        if (role === 'TEACHER') {
+            const caller = await prisma.user.findUnique({ where: { id: userId }, select: { subscription: true } });
+            if (!isPremiumSubscription(caller?.subscription)) {
+                return NextResponse.json({ error: "This feature requires a premium subscription." }, { status: 403 });
+            }
         }
 
         const body = await req.json();
