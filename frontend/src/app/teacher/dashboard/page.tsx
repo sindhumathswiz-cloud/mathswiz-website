@@ -70,7 +70,7 @@ export default async function TeacherDashboard() {
             where: {
                 role: 'PARENT',
                 accountStatus: 'PENDING',
-                children: { some: { enrollments: { some: { batchId: { in: batchIds } } } } },
+                parentLinks: { some: { student: { enrollments: { some: { batchId: { in: batchIds } } } } } },
             }
         }).catch(() => []);
 
