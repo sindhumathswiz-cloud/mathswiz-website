@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
-import { activeBookStorageBackend, hasPdfSignature, pdfHash, removePrivateBookPdf, storePrivateBookPdf, validateBookPdf } from '@/lib/book-storage';
+import { validateBookPdf } from '@/lib/book-storage';
+import { DuplicateBookPdfError, registerBookPdf } from '@/lib/book-ingestion-intake';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -36,27 +37,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  if (!hasPdfSignature(buffer)) return NextResponse.json({ error: 'The file does not contain a valid PDF signature' }, { status: 400 });
-  const hash = pdfHash(buffer);
-  const duplicate = await prisma.bookIngestionRun.findUnique({ where: { bookId_fileHash: { bookId: id, fileHash: hash } }, select: { id: true, status: true, stage: true } });
-  if (duplicate) return NextResponse.json({ error: 'This exact PDF is already registered for the book', ingestionRun: duplicate }, { status: 409 });
-
-  let storedPath: string | null = null;
   try {
-    storedPath = await storePrivateBookPdf(id, hash, buffer);
-    const result = await prisma.$transaction(async tx => {
-      const sourceDocument = await tx.sourceDocument.create({
-        data: { title: `${book.title} - ${file.name}`, sourceType: 'PDF', documentCategory: 'QUESTION_PAPER', filePath: storedPath, bookId: id, fileHash: hash, className: book.className, subject: book.subject, ingestedBy: auth.user.id },
-      });
-      const ingestionRun = await tx.bookIngestionRun.create({
-        data: { bookId: id, userId: auth.user.id, sourceDocumentId: sourceDocument.id, fileName: file.name.slice(0, 255), fileHash: hash, storagePath: storedPath, stage: 'STORED', providerConfig: { storage: activeBookStorageBackend(), bytes: file.size, mimeType: file.type || 'application/pdf' }, progress: 2 },
-      });
-      return { sourceDocument, ingestionRun };
-    });
-    await recordAuditLog({ actorId: auth.user.id, actorRole: 'ADMIN', action: 'BOOK_PDF_STORED', entityType: 'BookIngestionRun', entityId: result.ingestionRun.id, metadata: { bookId: id, fileName: file.name, fileHash: hash, bytes: file.size }, ...requestAuditContext(request) });
+    const result = await registerBookPdf({ bookId: id, book, adminId: auth.user.id, fileName: file.name, fileSize: file.size, mimeType: file.type, buffer });
+    await recordAuditLog({ actorId: auth.user.id, actorRole: 'ADMIN', action: 'BOOK_PDF_STORED', entityType: 'BookIngestionRun', entityId: result.ingestionRun.id, metadata: { bookId: id, fileName: file.name, fileHash: result.fileHash, bytes: file.size }, ...requestAuditContext(request) });
     return NextResponse.json({ ingestionRun: result.ingestionRun }, { status: 201 });
   } catch (error) {
-    if (storedPath) await removePrivateBookPdf(storedPath).catch(() => undefined);
+    if (error instanceof DuplicateBookPdfError) {
+      return NextResponse.json({ error: error.message, ingestionRun: error.duplicate }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === 'The file does not contain a valid PDF signature') {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error('Book PDF intake failed:', error);
     return NextResponse.json({ error: 'The PDF could not be stored safely' }, { status: 500 });
   }

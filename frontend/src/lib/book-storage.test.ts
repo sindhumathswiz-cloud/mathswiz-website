@@ -3,7 +3,9 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   activeBookStorageBackend,
+  assembleUploadSession,
   assertPrivateImageReference,
+  deleteUploadSessionChunks,
   discardPrivateImageOutputDirectory,
   hasPdfSignature,
   pdfHash,
@@ -19,6 +21,7 @@ import {
   validateBookPdf,
   withLocalBookPdfPath,
   withLocalPageImagePath,
+  writeUploadChunk,
 } from './book-storage';
 
 // A minimal Blob-like stand-in for what supabase-js's storage.download()
@@ -154,6 +157,85 @@ describe('private book storage', () => {
       const fresh = await import('./book-storage');
       const bytes = Buffer.from('%PDF-1.7\n%%EOF');
       await expect(fresh.storePrivateBookPdf('book-1', fresh.pdfHash(bytes), bytes)).rejects.toThrow('SUPABASE_PROJECT_REF and SUPABASE_SERVICE_ROLE_KEY');
+    });
+  });
+
+  describe('Chunked upload sessions', () => {
+    describe('on LOCAL_DISK', () => {
+      beforeEach(() => {
+        process.env.QB_PRIVATE_STORAGE_ROOT = testRoot;
+      });
+
+      it('reassembles chunks in order into the exact original bytes', async () => {
+        const chunks = [Buffer.from('%PDF-1.7\n'), Buffer.from('some content here '), Buffer.from('%%EOF')];
+        for (let i = 0; i < chunks.length; i++) await writeUploadChunk('book-1', 'session-1', i, chunks[i]);
+        const assembled = await assembleUploadSession('book-1', 'session-1', chunks.length);
+        expect(assembled).toEqual(Buffer.concat(chunks));
+      });
+
+      it('overwrites a chunk written twice at the same index rather than duplicating it', async () => {
+        await writeUploadChunk('book-1', 'session-1', 0, Buffer.from('first-attempt'));
+        await writeUploadChunk('book-1', 'session-1', 0, Buffer.from('retry'));
+        const assembled = await assembleUploadSession('book-1', 'session-1', 1);
+        expect(assembled.toString()).toBe('retry');
+      });
+
+      it('removes every chunk file on cleanup', async () => {
+        await writeUploadChunk('book-1', 'session-1', 0, Buffer.from('a'));
+        await writeUploadChunk('book-1', 'session-1', 1, Buffer.from('b'));
+        await deleteUploadSessionChunks('book-1', 'session-1', 2);
+        await expect(assembleUploadSession('book-1', 'session-1', 2)).rejects.toThrow();
+      });
+
+      it('rejects ids that could escape the storage root', async () => {
+        await expect(writeUploadChunk('../../etc', 'session-1', 0, Buffer.from('x'))).rejects.toThrow('Invalid upload session key');
+      });
+
+      it('cleanup never throws, even for a session with no chunks on disk', async () => {
+        await expect(deleteUploadSessionChunks('book-1', 'never-started', 3)).resolves.toBeUndefined();
+      });
+    });
+
+    describe('on SUPABASE', () => {
+      beforeEach(() => {
+        process.env.QB_STORAGE_BACKEND = 'SUPABASE';
+        process.env.SUPABASE_PROJECT_REF = 'test-ref';
+        process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
+      });
+
+      it('uploads each chunk to its own content-addressed-by-index key', async () => {
+        upload.mockResolvedValue({ data: {}, error: null });
+        await writeUploadChunk('book-1', 'session-1', 2, Buffer.from('chunk-bytes'));
+        expect(upload).toHaveBeenCalledWith('book-1/_uploads/session-1/2.part', Buffer.from('chunk-bytes'), { upsert: true, contentType: 'application/octet-stream' });
+      });
+
+      it('downloads every chunk in order and concatenates them', async () => {
+        const parts = [Buffer.from('one-'), Buffer.from('two-'), Buffer.from('three')];
+        download.mockImplementation((key: string) => {
+          const index = Number(key.split('/').pop()?.replace('.part', ''));
+          return Promise.resolve({ data: fakeBlob(parts[index]), error: null });
+        });
+        const assembled = await assembleUploadSession('book-1', 'session-1', parts.length);
+        expect(assembled).toEqual(Buffer.concat(parts));
+        expect(download).toHaveBeenNthCalledWith(1, 'book-1/_uploads/session-1/0.part');
+        expect(download).toHaveBeenNthCalledWith(3, 'book-1/_uploads/session-1/2.part');
+      });
+
+      it('surfaces a chunk download failure instead of silently skipping it', async () => {
+        download.mockResolvedValue({ data: null, error: { message: 'object not found' } });
+        await expect(assembleUploadSession('book-1', 'session-1', 1)).rejects.toThrow('object not found');
+      });
+
+      it('removes every chunk key on cleanup in one batched call', async () => {
+        remove.mockResolvedValue({ data: [], error: null });
+        await deleteUploadSessionChunks('book-1', 'session-1', 3);
+        expect(remove).toHaveBeenCalledWith(['book-1/_uploads/session-1/0.part', 'book-1/_uploads/session-1/1.part', 'book-1/_uploads/session-1/2.part']);
+      });
+
+      it('cleanup never throws even if the Supabase delete call fails', async () => {
+        remove.mockResolvedValue({ data: null, error: { message: 'network error' } });
+        await expect(deleteUploadSessionChunks('book-1', 'session-1', 1)).resolves.toBeUndefined();
+      });
     });
   });
 

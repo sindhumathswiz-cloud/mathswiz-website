@@ -30,6 +30,7 @@ export default function BookCatalogClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingBookId, setUploadingBookId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ percent: number; bytesUploaded: number; totalBytes: number; resumed: boolean } | null>(null);
   const [renderingBookId, setRenderingBookId] = useState<string | null>(null);
   const [extractingBookId, setExtractingBookId] = useState<string | null>(null);
   const [benchmarkingKey, setBenchmarkingKey] = useState<string | null>(null);
@@ -73,23 +74,76 @@ export default function BookCatalogClient() {
     }
   }
 
+  // Large books (up to 250MB) over an unstable connection shouldn't have to
+  // restart from byte zero on every dropped request -- the PDF is sent as a
+  // sequence of small chunks instead of one giant POST. A chunk that fails
+  // is retried on its own (a few seconds of lost work, not the whole file),
+  // and if the admin gives up and reselects the exact same file later, the
+  // server recognizes the still-in-progress session (keyed on book + admin
+  // + file name + size) and resumes from wherever it left off rather than
+  // starting over. See /api/admin/books/[id]/upload-sessions* and
+  // lib/book-storage.ts's chunk helpers for the server side of this.
+  const MAX_CHUNK_RETRIES = 5;
+
+  async function uploadChunkWithRetry(bookId: string, sessionId: string, index: number, chunk: Blob, totalBytes: number) {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < MAX_CHUNK_RETRIES; attempt++) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * 2 ** attempt, 10_000)));
+      try {
+        const response = await fetch(`/api/admin/books/${bookId}/upload-sessions/${sessionId}/chunks/${index}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: chunk,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Chunk ${index + 1} failed`);
+        setUploadProgress({ percent: Math.round((data.bytesReceived / totalBytes) * 100), bytesUploaded: data.bytesReceived, totalBytes, resumed: false });
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Chunk upload failed');
+      }
+    }
+    throw lastError || new Error(`Chunk ${index + 1} failed after ${MAX_CHUNK_RETRIES} attempts`);
+  }
+
   async function uploadBookPdf(bookId: string, file: File | null) {
     if (!file) return;
     setUploadingBookId(bookId);
     setMessage(null);
+    setUploadProgress({ percent: 0, bytesUploaded: 0, totalBytes: file.size, resumed: false });
     try {
-      const body = new FormData();
-      body.set('file', file);
-      const response = await fetch(`/api/admin/books/${bookId}/ingestions`, { method: 'POST', body });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not upload PDF');
+      const sessionResponse = await fetch(`/api/admin/books/${bookId}/upload-sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, fileSize: file.size }),
+      });
+      const sessionData = await sessionResponse.json();
+      if (!sessionResponse.ok) throw new Error(sessionData.error || 'Could not start upload');
+      const session = sessionData.session as { id: string; chunkSize: number; totalChunks: number; receivedChunkCount: number };
+
+      if (sessionData.resumed && session.receivedChunkCount > 0) {
+        setMessage({ kind: 'success', text: `Resuming a previous upload of this file from ${Math.round((session.receivedChunkCount / session.totalChunks) * 100)}%…` });
+        setUploadProgress({ percent: Math.round((session.receivedChunkCount * session.chunkSize / file.size) * 100), bytesUploaded: session.receivedChunkCount * session.chunkSize, totalBytes: file.size, resumed: true });
+      }
+
+      for (let index = session.receivedChunkCount; index < session.totalChunks; index++) {
+        const start = index * session.chunkSize;
+        const end = Math.min(start + session.chunkSize, file.size);
+        await uploadChunkWithRetry(bookId, session.id, index, file.slice(start, end), file.size);
+      }
+
+      setMessage({ kind: 'success', text: 'Upload complete — storing and verifying the PDF…' });
+      const finalizeResponse = await fetch(`/api/admin/books/${bookId}/upload-sessions/${session.id}/finalize`, { method: 'POST' });
+      const finalizeData = await finalizeResponse.json();
+      if (!finalizeResponse.ok) throw new Error(finalizeData.error || 'Could not finalize the upload');
+
       setMessage({ kind: 'success', text: 'The original PDF is stored privately. Building its page inventory…' });
-      const inventoryResponse = await fetch(`/api/admin/books/${bookId}/ingestions/${data.ingestionRun.id}/inventory`, { method: 'POST' });
+      const inventoryResponse = await fetch(`/api/admin/books/${bookId}/ingestions/${finalizeData.ingestionRun.id}/inventory`, { method: 'POST' });
       const inventoryData = await inventoryResponse.json();
       if (!inventoryResponse.ok) throw new Error(inventoryData.error || 'PDF stored, but page inventory failed');
       setMessage({ kind: 'success', text: `PDF ready: ${inventoryData.inventory.totalPages} pages · ${inventoryData.inventory.sourceProfile.replaceAll('_', ' ').toLowerCase()} profile.` });
     } catch (error) {
-      setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Could not upload PDF' });
+      setMessage({ kind: 'error', text: `${error instanceof Error ? error.message : 'Could not upload PDF'} — reselect the same file to resume where it left off.` });
     } finally {
       // Refresh on BOTH outcomes -- the PDF upload itself can succeed and
       // create a real ingestion run even when the very next step (page
@@ -100,6 +154,7 @@ export default function BookCatalogClient() {
       // instead of surfacing the real, retriable failure.
       await loadBooks();
       setUploadingBookId(null);
+      setUploadProgress(null);
     }
   }
 
@@ -340,13 +395,26 @@ export default function BookCatalogClient() {
                       </button>
                     </div>
                   )}
-                  <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-4 dark:border-white/10">
-                    <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white ${uploadingBookId ? 'pointer-events-none opacity-60' : ''}`}>
-                      {uploadingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      {uploadingBookId === book.id ? 'Storing PDF…' : 'Upload whole PDF'}
-                      <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={event => { void uploadBookPdf(book.id, event.target.files?.[0] || null); event.currentTarget.value = ''; }} />
-                    </label>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Private storage · PDF only · maximum 250 MB</span>
+                  <div className="mt-4 border-t border-slate-100 pt-4 dark:border-white/10">
+                    <div className="flex items-center gap-3">
+                      <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-black text-white ${uploadingBookId ? 'pointer-events-none opacity-60' : ''}`}>
+                        {uploadingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        {uploadingBookId === book.id ? (uploadProgress ? `Uploading ${uploadProgress.percent}%…` : 'Starting upload…') : 'Upload whole PDF'}
+                        <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={event => { void uploadBookPdf(book.id, event.target.files?.[0] || null); event.currentTarget.value = ''; }} />
+                      </label>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Private storage · PDF only · maximum 250 MB · resumes automatically if interrupted</span>
+                    </div>
+                    {uploadingBookId === book.id && uploadProgress && (
+                      <div className="mt-3">
+                        <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                          <div className="h-full rounded-full bg-indigo-600 dark:bg-brand transition-all duration-300" style={{ width: `${uploadProgress.percent}%` }} />
+                        </div>
+                        <p className="mt-1.5 text-xs font-bold text-slate-500 dark:text-slate-400">
+                          {(uploadProgress.bytesUploaded / 1024 / 1024).toFixed(1)} MB / {(uploadProgress.totalBytes / 1024 / 1024).toFixed(1)} MB
+                          {uploadProgress.resumed ? ' · resumed from a previous attempt' : ''}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   {book.ingestionRuns[0]?.totalPages && book.ingestionRuns[0].processedPages < book.ingestionRuns[0].totalPages && <button onClick={() => void renderBookPages(book)} disabled={anyBusy} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 disabled:opacity-60 dark:text-brand dark:bg-brand/10 dark:border-brand/20">{renderingBookId === book.id && <Loader2 className="h-4 w-4 animate-spin" />}{book.ingestionRuns[0].processedPages ? 'Resume page rendering' : 'Render and analyse pages'} · {book.ingestionRuns[0].processedPages}/{book.ingestionRuns[0].totalPages}</button>}
                   {book.ingestionRuns[0]?.processedPages > 0 && (

@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -167,6 +168,125 @@ export async function storePrivateBookPdf(bookId: string, hash: string, buffer: 
     if (error?.code !== 'EEXIST') throw error;
   }
   return finalPath;
+}
+
+// ---------------------------------------------------------------------------
+// Chunked/resumable book PDF upload (BookUploadSession)
+//
+// Each chunk is written straight to the real storage backend as its own
+// small object the moment it arrives, rather than appended to a local temp
+// file -- important on Vercel, where the function filesystem doesn't
+// persist between invocations, so two chunk requests for the same upload
+// can land on two different containers with no shared disk between them.
+// Writing each chunk directly to Supabase Storage (the production backend)
+// sidesteps that: whichever container a chunk request hits, it lands in the
+// one place every other request for that session can also see it. Finalize
+// (assembleUploadSession) reads every chunk back in order and concatenates
+// them into the same Buffer shape storePrivateBookPdf already expects, so
+// the rest of the book-intake pipeline is untouched.
+// ---------------------------------------------------------------------------
+
+const UPLOAD_CHUNK_KEY_PATTERN = /^[a-zA-Z0-9_-]+\/_uploads\/[a-zA-Z0-9_-]+\/\d+\.part$/;
+
+function uploadChunkKey(bookId: string, sessionId: string, index: number) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(bookId) || !/^[a-zA-Z0-9_-]+$/.test(sessionId)) throw new Error('Invalid upload session key');
+  const key = `${bookId}/_uploads/${sessionId}/${index}.part`;
+  if (!UPLOAD_CHUNK_KEY_PATTERN.test(key)) throw new Error('Invalid upload chunk key');
+  return key;
+}
+
+function uploadChunkDirectory(bookId: string, sessionId: string) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(bookId) || !/^[a-zA-Z0-9_-]+$/.test(sessionId)) throw new Error('Invalid upload session key');
+  const root = storageRoot();
+  const directory = path.resolve(root, bookId, '_uploads', sessionId);
+  if (!directory.startsWith(`${root}${path.sep}`)) throw new Error('Invalid upload chunk target');
+  return directory;
+}
+
+/** Persists one chunk of an in-progress BookUploadSession. Safe to call again
+ * with the same (bookId, sessionId, index) -- both backends overwrite. */
+export async function writeUploadChunk(bookId: string, sessionId: string, index: number, bytes: Buffer): Promise<void> {
+  if (activeBookStorageBackend() === 'SUPABASE') {
+    const key = uploadChunkKey(bookId, sessionId, index);
+    const { error } = await supabaseStorageClient().storage.from(storageBucket()).upload(key, bytes, {
+      upsert: true,
+      contentType: 'application/octet-stream',
+    });
+    if (error) throw new Error(`Supabase Storage chunk upload failed: ${error.message}`);
+    return;
+  }
+  const directory = uploadChunkDirectory(bookId, sessionId);
+  await mkdir(directory, { recursive: true });
+  await writeFile(path.join(directory, `${index}.part`), bytes);
+}
+
+/** Reassembles every chunk of a completed BookUploadSession, in order, into
+ * the same whole-file Buffer shape storePrivateBookPdf/pdfHash/hasPdfSignature
+ * already expect. On LOCAL_DISK this streams the concatenation to a scratch
+ * file rather than holding every chunk in memory at once, then does a single
+ * final read -- peak memory during assembly stays near one chunk's size, not
+ * the whole file; the one unavoidable full-buffer read at the end matches
+ * today's existing (pre-chunking) memory ceiling for this route, not a
+ * regression. On SUPABASE each chunk is downloaded and concatenated in
+ * memory, since Supabase Storage's simple upload API has no server-side
+ * "append" primitive -- a true zero-buffering path there would mean adopting
+ * Supabase's TUS resumable-upload protocol directly, a larger follow-up. */
+export async function assembleUploadSession(bookId: string, sessionId: string, totalChunks: number): Promise<Buffer> {
+  if (activeBookStorageBackend() === 'SUPABASE') {
+    const parts: Buffer[] = [];
+    for (let index = 0; index < totalChunks; index++) {
+      const key = uploadChunkKey(bookId, sessionId, index);
+      const { data, error } = await supabaseStorageClient().storage.from(storageBucket()).download(key);
+      if (error || !data) throw new Error(`Supabase Storage chunk download failed (part ${index}): ${error?.message || 'no data'}`);
+      parts.push(Buffer.from(await data.arrayBuffer()));
+    }
+    return Buffer.concat(parts);
+  }
+
+  const directory = uploadChunkDirectory(bookId, sessionId);
+  const assembledPath = path.join(directory, `.assembled.${randomUUID()}`);
+  await new Promise<void>((resolve, reject) => {
+    const out = createWriteStream(assembledPath);
+    out.on('error', reject);
+    out.on('finish', resolve);
+    (async () => {
+      try {
+        for (let index = 0; index < totalChunks; index++) {
+          const bytes = await readFile(path.join(directory, `${index}.part`));
+          if (!out.write(bytes)) await new Promise<void>((drainResolve) => out.once('drain', () => drainResolve()));
+        }
+        out.end();
+      } catch (error) {
+        out.destroy();
+        reject(error);
+      }
+    })();
+  });
+  try {
+    return await readFile(assembledPath);
+  } finally {
+    await rm(assembledPath, { force: true });
+  }
+}
+
+/** Best-effort cleanup of a BookUploadSession's chunks -- called once they've
+ * been folded into the final stored PDF (success), or when a session is
+ * abandoned/aborted/expired (failure). Never throws: a leftover chunk is
+ * wasted storage, not a correctness problem, and shouldn't fail the caller's
+ * own success/failure path. */
+export async function deleteUploadSessionChunks(bookId: string, sessionId: string, totalChunks: number): Promise<void> {
+  try {
+    if (activeBookStorageBackend() === 'SUPABASE') {
+      const keys = Array.from({ length: totalChunks }, (_, index) => uploadChunkKey(bookId, sessionId, index));
+      if (keys.length === 0) return;
+      const { error } = await supabaseStorageClient().storage.from(storageBucket()).remove(keys);
+      if (error) console.error(`Supabase Storage chunk cleanup failed for session ${sessionId}: ${error.message}`);
+      return;
+    }
+    await rm(uploadChunkDirectory(bookId, sessionId), { recursive: true, force: true });
+  } catch (error) {
+    console.error(`Upload chunk cleanup failed for session ${sessionId}:`, error);
+  }
 }
 
 export async function removePrivateBookPdf(filePath: string) {

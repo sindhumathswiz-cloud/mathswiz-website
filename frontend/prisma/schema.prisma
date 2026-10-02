@@ -116,6 +116,7 @@ model User {
   spacedRepetitionCards     SpacedRepetitionCard[]
   questionFlagsRaised       QuestionFlag[]          @relation("QuestionFlagsRaised")
   questionFlagsResolved     QuestionFlag[]          @relation("QuestionFlagsResolved")
+  bookUploadSessions        BookUploadSession[]
 }
 
 model AuditLog {
@@ -1347,10 +1348,53 @@ model Book {
   questions       Question[]
   ingestionRuns   BookIngestionRun[]
   pageFigures     PageFigure[]
+  uploadSessions  BookUploadSession[]
 
   @@index([className, subject, isActive])
   @@index([title, edition])
   @@index([publisher])
+}
+
+// A chunked/resumable book PDF upload in progress. Chunks are persisted one
+// at a time (see writeUploadChunk in lib/book-storage.ts, backend-aware same
+// as everything else there) rather than buffered in the Next.js route
+// handler's memory, so one dropped request only costs a single chunk retry,
+// not the whole multi-hundred-MB file -- and each individual request stays
+// comfortably under any platform request-body ceiling. Upload is strictly
+// sequential (receivedChunkCount is both "how many chunks stored" and "the
+// index the next chunk must use") rather than tracking an arbitrary set of
+// indexes, since the client always sends chunks in order and retries the
+// same index on failure -- this keeps resume logic to one integer instead of
+// a bitmap, at the cost of not supporting parallel/out-of-order chunk
+// uploads, which this feature doesn't need.
+model BookUploadSession {
+  id                 String                  @id @default(cuid())
+  bookId             String
+  createdById        String
+  fileName           String
+  fileSize           Int
+  chunkSize          Int
+  totalChunks        Int
+  receivedChunkCount Int                     @default(0)
+  bytesReceived      Int                     @default(0)
+  status             BookUploadSessionStatus @default(IN_PROGRESS)
+  ingestionRunId     String?
+  errorMessage       String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  book      Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([bookId, createdById, status])
+  @@index([status, updatedAt])
+}
+
+enum BookUploadSessionStatus {
+  IN_PROGRESS
+  FINALIZING
+  COMPLETED
+  FAILED
 }
 
 model BookChapter {
