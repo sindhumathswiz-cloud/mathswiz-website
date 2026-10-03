@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getAuthenticatedUser = vi.fn();
+const startDraftClock = vi.fn();
 const recordAuditLog = vi.fn();
 const getPageRawText = vi.fn();
 const structurePageQuestions = vi.fn();
@@ -17,6 +18,7 @@ const loadConfirmedChapters = vi.fn();
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
 vi.mock('@/lib/prisma', () => ({ default: { bookIngestionRun, book, documentPage, question, pageFigure, bookChapter } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
+vi.mock('@/lib/draft-retention', () => ({ startDraftClock }));
 vi.mock('@/lib/extract-book-page', () => ({ getPageRawText, structurePageQuestions }));
 vi.mock('@/lib/page-image-crop', () => ({ cropPageRegion }));
 vi.mock('@/lib/book-manifest', async (importOriginal) => ({
@@ -111,6 +113,30 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
     expect(data.batch.duplicates).toBe(1);
     expect(documentPage.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'page-1' }, data: expect.objectContaining({ status: 'COMPLETED', ocrProvider: 'NATIVE_TEXT' }) }));
     expect(documentPage.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'page-2' }, data: expect.objectContaining({ status: 'COMPLETED', ocrProvider: 'MATHPIX_OCR' }) }));
+  });
+
+  it('stores the OCR text layer for a Mathpix page, leaves native-text pages alone, and starts the 60-day draft clock', async () => {
+    documentPage.findMany.mockResolvedValue([
+      { id: 'page-1', pageNumber: 1, nativeText: 'text', pageImagePath: '/p1.png', processedImagePath: null, layoutData: null, width: 1000, height: 1400 },
+      { id: 'page-2', pageNumber: 2, nativeText: '', pageImagePath: '/p2.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true }, width: 1000, height: 1400 },
+    ]);
+    const ocrLayer = { version: 1, source: 'MATHPIX_OCR', lines: [{ x: 0.1, y: 0.1, w: 0.5, h: 0.02, text: '$x^2$', kind: 'math' }] };
+    getPageRawText
+      .mockResolvedValueOnce({ provider: 'NATIVE_TEXT', rawText: 'page one text', ocrConfidence: null, textLayer: null })
+      .mockResolvedValueOnce({ provider: 'MATHPIX_OCR', rawText: 'page two text', ocrConfidence: 0.9, textLayer: ocrLayer });
+    structurePageQuestions.mockResolvedValue([]);
+
+    const { POST } = await import('./route');
+    expect(((await POST(post({ startPage: 1, batchSize: 5 }), { params })) as Response).status).toBe(200);
+
+    // The page was OCR'd at the size it was rendered at, so line positions can be stored as page fractions.
+    expect(getPageRawText).toHaveBeenNthCalledWith(2, expect.objectContaining({ width: 1000, height: 1400 }));
+    const nativePageUpdate = documentPage.update.mock.calls.find(([arg]) => arg.where.id === 'page-1')![0];
+    const ocrPageUpdate = documentPage.update.mock.calls.find(([arg]) => arg.where.id === 'page-2')![0];
+    // A page with no OCR layer must not overwrite one built earlier.
+    expect(nativePageUpdate.data).not.toHaveProperty('textLayer');
+    expect(ocrPageUpdate.data.textLayer).toEqual(ocrLayer);
+    expect(startDraftClock).toHaveBeenCalledWith('run-1');
   });
 
   describe('explanationType-derived tags', () => {

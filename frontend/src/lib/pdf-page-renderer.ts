@@ -16,6 +16,8 @@ export type RenderedPage = {
   pageType: string;
   regions: Array<{ [key: string]: string | number | boolean | null }>;
   preprocessing: { operations: string[]; deskewAngle?: number; contrastScore?: number };
+  geometry?: { profile: string; detectors: string[]; error: string | null };
+  textLayer?: unknown | null;
   imageQualityScore: number;
 };
 
@@ -24,8 +26,12 @@ function localTool(relativePath: string, fallback: string) {
   return existsSync(candidate) ? candidate : fallback;
 }
 
+export function pythonExecutable() {
+  return process.env.QB_PYTHON_EXECUTABLE || localTool(path.join('python', 'python.exe'), 'python');
+}
+
 function runRenderScript(safeInput: string, outputDirectory: string, start: number, end: number, profile: PdfSourceProfile): Promise<RenderedPage[]> {
-  const python = process.env.QB_PYTHON_EXECUTABLE || localTool(path.join('python', 'python.exe'), 'python');
+  const python = pythonExecutable();
   const pdftoppm = process.env.QB_PDFTOPPM_EXECUTABLE || localTool(path.join('native', 'poppler', 'Library', 'bin', 'pdftoppm.exe'), 'pdftoppm');
   const script = path.join(process.cwd(), 'scripts', 'render-pdf-page-batch.py');
   return new Promise((resolve, reject) => {

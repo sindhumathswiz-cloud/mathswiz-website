@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, BookOpen, CheckCircle2, ClipboardCheck, Image as ImageIcon, ListTree, Loader2, Plus, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, GitCompareArrows, Image as ImageIcon, ListTree, Loader2, Plus, ScanText, Search, Sparkles } from 'lucide-react';
+import { describePageList } from '@/lib/page-parity';
 
 type CatalogBook = {
   id: string;
@@ -106,6 +107,38 @@ export default function BookCatalogClient() {
     throw lastError || new Error(`Chunk ${index + 1} failed after ${MAX_CHUNK_RETRIES} attempts`);
   }
 
+  // Renders every page of the stored PDF (images + selectable text), batch by
+  // batch, and reports whether the pages held now match the PDF's page count.
+  // Shared by the upload flow (so a book is page-for-page in the library as
+  // soon as it is uploaded) and the Resume button.
+  async function renderAllPages(bookId: string, title: string, runId: string, totalPages: number, firstPage: number | null) {
+    // null = let the server resume at the first page that has no image yet.
+    let startPage: number | null = firstPage;
+    let parity: { matches: boolean; pagesHeld: number; missingPages: number[]; missingImagePages: number[]; unexpectedPages: number[] } | null = null;
+    while (startPage === null || startPage <= totalPages) {
+      setMessage({ kind: 'success', text: `Rendering ${title}${startPage ? `: pages ${startPage}-${Math.min(totalPages, startPage + 19)}` : ''} of ${totalPages}…` });
+      const response = await fetch(`/api/admin/books/${bookId}/ingestions/${runId}/render-pages`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...(startPage ? { startPage } : {}), batchSize: 20 }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Page rendering failed');
+      if (data.parity) parity = data.parity;
+      if (data.complete || !data.nextStartPage) break;
+      startPage = data.nextStartPage;
+    }
+    return parity;
+  }
+
+  function parityMessage(title: string, totalPages: number, parity: Awaited<ReturnType<typeof renderAllPages>>) {
+    if (!parity || parity.matches) return { kind: 'success' as const, text: `${title}: all ${totalPages} pages match the PDF page for page. The extracted pages are kept as a draft for 60 days.` };
+    const gaps = [
+      parity.missingPages.length ? `missing pages ${describePageList(parity.missingPages)}` : '',
+      parity.missingImagePages.length ? `no image for pages ${describePageList(parity.missingImagePages)}` : '',
+      parity.unexpectedPages.length ? `unexpected pages ${describePageList(parity.unexpectedPages)}` : '',
+    ].filter(Boolean).join('; ');
+    return { kind: 'error' as const, text: `${title}: ${parity.pagesHeld} of ${totalPages} pages rendered — ${gaps}. Use Resume page rendering to fill the gaps.` };
+  }
+
   async function uploadBookPdf(bookId: string, file: File | null) {
     if (!file) return;
     setUploadingBookId(bookId);
@@ -141,7 +174,21 @@ export default function BookCatalogClient() {
       const inventoryResponse = await fetch(`/api/admin/books/${bookId}/ingestions/${finalizeData.ingestionRun.id}/inventory`, { method: 'POST' });
       const inventoryData = await inventoryResponse.json();
       if (!inventoryResponse.ok) throw new Error(inventoryData.error || 'PDF stored, but page inventory failed');
-      setMessage({ kind: 'success', text: `PDF ready: ${inventoryData.inventory.totalPages} pages · ${inventoryData.inventory.sourceProfile.replaceAll('_', ' ').toLowerCase()} profile.` });
+      const totalPages = inventoryData.inventory.totalPages as number;
+      setMessage({ kind: 'success', text: `PDF ready: ${totalPages} pages · ${inventoryData.inventory.sourceProfile.replaceAll('_', ' ').toLowerCase()} profile. Rendering every page…` });
+      // The book is rendered page for page as part of the upload, so it can be
+      // read and selected from straight away. A failure here leaves the stored
+      // PDF and the completed batches intact; Resume page rendering continues.
+      const title = books.find((b) => b.id === bookId)?.title ?? 'This book';
+      setRenderingBookId(bookId);
+      try {
+        const parity = await renderAllPages(bookId, title, finalizeData.ingestionRun.id, totalPages, 1);
+        setMessage(parityMessage(title, totalPages, parity));
+      } catch (renderError) {
+        setMessage({ kind: 'error', text: `PDF stored (${totalPages} pages), but rendering stopped: ${renderError instanceof Error ? renderError.message : 'page rendering failed'} Use Resume page rendering to continue.` });
+      } finally {
+        setRenderingBookId(null);
+      }
     } catch (error) {
       setMessage({ kind: 'error', text: `${error instanceof Error ? error.message : 'Could not upload PDF'} — reselect the same file to resume where it left off.` });
     } finally {
@@ -181,19 +228,11 @@ export default function BookCatalogClient() {
     if (!run?.totalPages) return;
     setRenderingBookId(book.id);
     setMessage(null);
-    let startPage = Math.max(1, run.processedPages + 1);
     try {
-      while (startPage <= run.totalPages) {
-        setMessage({ kind: 'success', text: `Rendering ${book.title}: pages ${startPage}-${Math.min(run.totalPages, startPage + 19)} of ${run.totalPages}…` });
-        const response = await fetch(`/api/admin/books/${book.id}/ingestions/${run.id}/render-pages`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startPage, batchSize: 20 }),
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Page rendering failed');
-        if (data.complete || !data.nextStartPage) break;
-        startPage = data.nextStartPage;
-      }
-      setMessage({ kind: 'success', text: `${book.title}: all ${run.totalPages} pages were archived and structurally analysed. Taking you to the chapter manifest…` });
+      const parity = await renderAllPages(book.id, book.title, run.id, run.totalPages, null);
+      const summary = parityMessage(book.title, run.totalPages, parity);
+      if (summary.kind === 'error') { setMessage(summary); await loadBooks(); return; }
+      setMessage({ kind: 'success', text: `${book.title}: all ${run.totalPages} pages match the PDF and were archived and structurally analysed. Taking you to the chapter manifest…` });
       // Confirming (or at least reviewing) the chapter manifest here -- not
       // straight to "Extract questions" -- is what makes distrustEmpty work
       // (see structure-questions.ts): extraction only knows a page is safe to
@@ -337,6 +376,9 @@ export default function BookCatalogClient() {
             <Link href="/admin/question-bank/review-queue" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
               <ClipboardCheck className="h-4 w-4 text-indigo-600 dark:text-brand" /> Review queue
             </Link>
+            <Link href="/admin/question-bank/drafts" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
+              <CalendarClock className="h-4 w-4 text-indigo-600 dark:text-brand" /> Extracted drafts
+            </Link>
           </div>
         </header>
 
@@ -436,6 +478,16 @@ export default function BookCatalogClient() {
                   {book.ingestionRuns[0]?.processedPages > 0 && (
                     <Link href={`/admin/question-bank/books/${book.id}/figures`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
                       <ImageIcon className="h-4 w-4" /> Figures
+                    </Link>
+                  )}
+                  {book.ingestionRuns[0]?.processedPages > 0 && (
+                    <Link href={`/admin/question-bank/books/${book.id}/source`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
+                      <ScanText className="h-4 w-4" /> Source book
+                    </Link>
+                  )}
+                  {book.ingestionRuns[0]?.processedPages > 0 && (
+                    <Link href={`/admin/question-bank/books/${book.id}/provider-agreement`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
+                      <GitCompareArrows className="h-4 w-4" /> Provider Agreement
                     </Link>
                   )}
                   {book.confirmedChapters > 0 && (

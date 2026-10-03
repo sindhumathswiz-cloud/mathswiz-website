@@ -1498,6 +1498,12 @@ model BookIngestionRun {
   errorMessage       String?            @db.Text
   startedAt          DateTime?
   completedAt        DateTime?
+  // The extracted page buffer (page images, OCR text, text layer, provider
+  // benchmarks) is a draft kept for DRAFT_RETENTION_DAYS, then purged -- see
+  // lib/draft-retention.ts. Questions, figures and the original PDF are never
+  // part of the purge.
+  draftExpiresAt     DateTime?
+  draftPurgedAt      DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -1509,6 +1515,7 @@ model BookIngestionRun {
   @@unique([bookId, fileHash])
   @@index([status, stage, updatedAt])
   @@index([userId, createdAt])
+  @@index([draftExpiresAt])
 }
 
 // Whole-book or chapter ingestion source
@@ -1579,6 +1586,10 @@ model DocumentPage {
   height             Int?
   nativeText         String?  @db.Text
   layoutData         Json?
+  // Positioned, selectable text for the page-faithful source viewer (see
+  // lib/page-text-layer.ts). Kept out of layoutData because layout summaries
+  // read layoutData for every page of a book at once.
+  textLayer          Json?
   ocrProvider        String?
   ocrConfidence      Float?
   imageQualityScore  Float?

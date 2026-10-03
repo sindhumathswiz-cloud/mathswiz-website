@@ -8,6 +8,7 @@ import { Montserrat } from 'next/font/google';
 import MathRenderer from '@/components/MathRenderer';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
 import PageSnipTool from './PageSnipTool';
+import SourcePageViewer from './SourcePageViewer';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 
@@ -83,7 +84,7 @@ export default function AdminQuestionBank() {
         examType: '',
     });
     const [showOriginal, setShowOriginal] = useState(false);
-    const [sourceTab, setSourceTab] = useState<'text' | 'image'>('text');
+    const [sourceTab, setSourceTab] = useState<'text' | 'pages' | 'image'>('text');
     const [selectedTaxonomyIds, setSelectedTaxonomyIds] = useState<string[]>([]);
 
     // Cursor position of content/explanation at the moment focus last left
@@ -92,9 +93,11 @@ export default function AdminQuestionBank() {
     // own selectionStart/selectionEnd would already read as collapsed at 0.
     const contentRef = useRef<HTMLTextAreaElement | null>(null);
     const explanationRef = useRef<HTMLTextAreaElement | null>(null);
-    const lastCursor = useRef<{ content: [number, number]; explanation: [number, number] }>({ content: [0, 0], explanation: [0, 0] });
+    const optionRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+    // Keyed by field: 'content' | 'explanation' | 'option:0'..'option:3'.
+    const lastCursor = useRef<Record<string, [number, number]>>({});
 
-    const trackCursor = (field: 'content' | 'explanation') => (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const trackCursor = (field: string) => (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
         const el = e.currentTarget;
         lastCursor.current[field] = [el.selectionStart, el.selectionEnd];
     };
@@ -102,20 +105,38 @@ export default function AdminQuestionBank() {
     // Standard paste semantics: replace the tracked selection (or insert at
     // the tracked cursor if nothing was selected), then restore focus/cursor
     // just past the inserted text.
-    const insertAtCursor = (text: string, target: 'content' | 'explanation') => {
-        const ref = target === 'content' ? contentRef : explanationRef;
-        const [start, end] = lastCursor.current[target];
+    const insertAtCursor = (text: string, target: string) => {
+        // The correct answer is a short value (an option letter or a number), not
+        // free text: a selection replaces it, collapsed to one trimmed line.
+        if (target === 'answer') {
+            const answer = text.replace(/\s+/g, ' ').trim();
+            const letter = answer.match(/^\(?([A-Da-d])\)?[.)]?$/);
+            setEditForm((prev: any) => ({ ...prev, correctAnswer: letter ? letter[1].toUpperCase() : answer }));
+            return;
+        }
+        const optionIndex = target.startsWith('option:') ? Number(target.slice(7)) : -1;
+        const focusField = () => (optionIndex >= 0 ? optionRefs.current[optionIndex] : target === 'content' ? contentRef.current : explanationRef.current) ?? null;
+        // No remembered cursor (the field was never clicked) means append.
+        const remembered = lastCursor.current[target];
+        const [start, end] = remembered ?? [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER];
         setEditForm((prev: any) => {
-            const value: string = prev[target] || '';
+            const value: string = (optionIndex >= 0 ? prev.options[optionIndex] : prev[target]) || '';
+            // Appending to existing text must not glue the new text onto its last word.
+            const piece = !remembered && value && !/\s$/.test(value) ? '\n' + text : text;
             const safeStart = Math.min(start, value.length);
             const safeEnd = Math.min(Math.max(end, safeStart), value.length);
-            const nextValue = value.slice(0, safeStart) + text + value.slice(safeEnd);
-            const nextCursor = safeStart + text.length;
+            const nextValue = value.slice(0, safeStart) + piece + value.slice(safeEnd);
+            const nextCursor = safeStart + piece.length;
             lastCursor.current[target] = [nextCursor, nextCursor];
             requestAnimationFrame(() => {
-                const el = ref.current;
+                const el = focusField();
                 if (el) { el.focus(); el.setSelectionRange(nextCursor, nextCursor); }
             });
+            if (optionIndex >= 0) {
+                const options = [...prev.options];
+                options[optionIndex] = nextValue;
+                return { ...prev, options };
+            }
             return { ...prev, [target]: nextValue };
         });
     };
@@ -467,6 +488,9 @@ export default function AdminQuestionBank() {
                                                                         {isCorrect && <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">âœ“ Correct</span>}
                                                                     </div>
                                                                     <textarea 
+                                                                        ref={el => { optionRefs.current[idx] = el; }}
+                                                                        onSelect={trackCursor(`option:${idx}`)}
+                                                                        onBlur={trackCursor(`option:${idx}`)}
                                                                         value={opt}
                                                                         onChange={e => {
                                                                             const newOpts = [...editForm.options];
@@ -638,11 +662,31 @@ export default function AdminQuestionBank() {
                                                         <button type="button" onClick={() => setSourceTab('text')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${sourceTab === 'text' ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-white/10'}`}>
                                                             Text
                                                         </button>
+                                                        <button type="button" onClick={() => setSourceTab('pages')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${sourceTab === 'pages' ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-white/10'}`}>
+                                                            Source pages (select &amp; paste)
+                                                        </button>
                                                         <button type="button" onClick={() => setSourceTab('image')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${sourceTab === 'image' ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-white/10'}`}>
                                                             <Crop className="w-3.5 h-3.5" /> Page image (snip)
                                                         </button>
                                                     </div>
-                                                    {sourceTab === 'text' ? (
+                                                    {sourceTab === 'pages' ? (
+                                                        selectedQuestion.bookId ? (
+                                                            <SourcePageViewer
+                                                                bookId={selectedQuestion.bookId}
+                                                                initialPage={selectedQuestion.sourcePageStart}
+                                                                height={460}
+                                                                insertTargets={[
+                                                                    { id: 'content', label: 'Question' },
+                                                                    ...[0, 1, 2, 3].map(i => ({ id: `option:${i}`, label: `Option ${String.fromCharCode(65 + i)}` })),
+                                                                    { id: 'answer', label: 'Answer' },
+                                                                    { id: 'explanation', label: 'Solution' },
+                                                                ]}
+                                                                onInsert={insertAtCursor}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-xs text-gray-400 dark:text-slate-500">This question has no source book to show pages from.</p>
+                                                        )
+                                                    ) : sourceTab === 'text' ? (
                                                         <div className="rounded-xl bg-slate-900 p-4 text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
                                                             {selectedQuestion.originalRawText || 'No raw source text available for this question.'}
                                                         </div>

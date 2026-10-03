@@ -11,16 +11,13 @@ import type { QuestionProvenance } from '@prisma/client';
  * can surface the riskiest rows first with a concrete reason, instead of an
  * arbitrary order a reviewer has to open each row to understand.
  *
- * Deliberately does NOT include the "provider-agreement" signal the
- * original roadmap doc named as Phase 3's other input
- * (book-semantic-assembler.ts running two OCR/vision providers and
- * comparing them) -- that half of Phase 2 was never wired to anything
- * (confirmed: nothing outside book-semantic-assembler.ts's own test file
- * references it), and wiring it means picking two providers and doubling
- * OCR/vision spend on every page, which isn't a call to make silently while
- * building a review queue. The three gates here are real, already-enforced
- * signals; this reuses them rather than blocking on that larger, separate
- * decision.
+ * Also folds in the provider-agreement signal: when an admin has reconciled
+ * a source page (POST .../ingestions/[runId]/reconcile, which compares the
+ * stored Gemini and Mathpix readings and costs no extra OCR spend), a
+ * question on that page whose formula the two providers disagree on is
+ * blocked here until a human confirms it. Pages nobody has reconciled
+ * contribute nothing -- absence of the check is not treated as agreement or
+ * disagreement.
  *
  * Also deliberately does NOT persist a value into Question.extractionConfidence
  * -- doing that properly needs a batch reconciliation pass over every
@@ -80,7 +77,12 @@ export async function assessQuestionsRisk(questions: RiskAssessableQuestion[]): 
   const ids = questions.map((q) => q.id);
   const bookIds = [...new Set(questions.map((q) => q.bookId).filter((b): b is string => b != null))];
 
-  const [linkedFigureRows, unresolvedFigureRows] = ids.length === 0 ? [[], []] : await Promise.all([
+  const pageBounds = questions.reduce<{ min: number; max: number } | null>((acc, q) => {
+    if (q.sourcePageStart == null || q.sourcePageEnd == null) return acc;
+    return acc ? { min: Math.min(acc.min, q.sourcePageStart), max: Math.max(acc.max, q.sourcePageEnd) } : { min: q.sourcePageStart, max: q.sourcePageEnd };
+  }, null);
+
+  const [linkedFigureRows, unresolvedFigureRows, heldReconciliationPages] = ids.length === 0 ? [[], [], []] : await Promise.all([
     prisma.pageFigure.findMany({
       where: { questionId: { in: ids } },
       select: { questionId: true, reviewedAt: true, matchedAutomatically: true },
@@ -89,7 +91,28 @@ export async function assessQuestionsRisk(questions: RiskAssessableQuestion[]): 
       where: { bookId: { in: bookIds }, questionId: null, reviewedAt: null },
       select: { bookId: true, pageNumber: true },
     }),
+    bookIds.length === 0 || !pageBounds ? Promise.resolve([]) : prisma.documentPage.findMany({
+      where: {
+        document: { bookId: { in: bookIds } },
+        pageNumber: { gte: pageBounds.min, lte: pageBounds.max },
+        layoutData: { path: ['reconciliation', 'status'], equals: 'HAS_HOLDS' },
+      },
+      select: { pageNumber: true, layoutData: true, document: { select: { bookId: true } } },
+    }),
   ]);
+
+  // bookId -> pageNumber -> printed numbers the providers disagree on.
+  const heldByBookPage = new Map<string, Map<number, string[]>>();
+  for (const row of heldReconciliationPages) {
+    const bookId = row.document.bookId;
+    if (!bookId) continue;
+    const layout = row.layoutData && typeof row.layoutData === 'object' && !Array.isArray(row.layoutData) ? row.layoutData as Record<string, unknown> : {};
+    const record = layout.reconciliation && typeof layout.reconciliation === 'object' ? layout.reconciliation as Record<string, unknown> : {};
+    const numbers = Array.isArray(record.heldPrintedNumbers) ? record.heldPrintedNumbers.map(String) : [];
+    const pages = heldByBookPage.get(bookId) ?? new Map<number, string[]>();
+    pages.set(row.pageNumber, numbers);
+    heldByBookPage.set(bookId, pages);
+  }
 
   const linkedByQuestion = new Map<string, Array<{ reviewedAt: Date | null; matchedAutomatically: boolean }>>();
   for (const row of linkedFigureRows) {
@@ -129,6 +152,15 @@ export async function assessQuestionsRisk(questions: RiskAssessableQuestion[]): 
         unresolvedOnPagePages,
       });
       if (figureReason) blockers.push(figureReason);
+
+      // A held page with no recorded printed numbers means the disputed
+      // block could not be attributed to one question, so every question on
+      // the page is held; otherwise only the question(s) that own it.
+      const heldPages = heldByBookPage.get(question.bookId);
+      const disputed = heldPages && [...heldPages.entries()].some(([page, numbers]) =>
+        page >= question.sourcePageStart! && page <= question.sourcePageEnd! &&
+        (numbers.length === 0 || (question.printedNumber != null && numbers.includes(question.printedNumber))));
+      if (disputed) blockers.push('Two OCR providers read a formula in this question differently -- confirm it against the source page');
     }
 
     result.set(question.id, { score: scoreFor(question.confidence, blockers), blockers });

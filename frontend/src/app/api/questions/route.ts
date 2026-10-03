@@ -27,6 +27,14 @@ export async function GET(req: Request) {
 
         const session = await getServerSession(authOptions);
 
+        // Question Bank is a Premium teacher feature; other roles keep their existing scoped read.
+        if ((session?.user as any)?.role === 'TEACHER') {
+            const caller = await prisma.user.findUnique({ where: { id: (session!.user as any).id }, select: { subscription: true } });
+            if (!isPremiumSubscription(caller?.subscription)) {
+                return NextResponse.json({ error: 'This feature requires a premium subscription.' }, { status: 403 });
+            }
+        }
+
         const filter: any = {};
         if (status) filter.status = status;
         if (subject) filter.subject = subject;

@@ -14,6 +14,9 @@ import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 from pypdf import PdfReader
 
+from page_geometry import detect_geometry
+from page_text_layer import build_text_layer
+
 # Windows' console defaults stdout to the system codepage (cp1252), which
 # can't encode every character extracted from a real PDF -- legacy
 # symbol-font glyphs (mapped into the Unicode Private Use Area,
@@ -32,6 +35,9 @@ ANSWER_RE = re.compile(r"\b(?:answers?|answer\s*key)\b", re.I)
 SOLUTION_RE = re.compile(r"\b(?:solutions?|sol\.)\b", re.I)
 FIGURE_RE = re.compile(r"\b(?:fig(?:ure)?\.?|graph|diagram|curve|plot)\b", re.I)
 TABLE_RE = re.compile(r"\b(?:table|marks?|q\.no|question\s*no)\b", re.I)
+# Only pdftoppm's own output (page-<n>). The enhanced derivative of an earlier page
+# (page-<n>-processed.jpg) sits in the same folder and must not be mistaken for a page.
+RENDERED_PAGE_STEM_RE = re.compile(r"^page-\d+$")
 CONVERTER_NOTICE_RE = re.compile(r"An evaluation version of novaPDF.*?without this notice\.", re.I | re.S)
 
 
@@ -221,7 +227,7 @@ def main() -> None:
     results = []
     with pdfplumber.open(input_pdf) as document:
         for page_number in range(args.start, args.end + 1):
-            candidates = [candidate for candidate in output_dir.glob("page-*.*") if int(candidate.stem.rsplit("-", 1)[-1]) == page_number]
+            candidates = [candidate for candidate in output_dir.glob("page-*.*") if RENDERED_PAGE_STEM_RE.match(candidate.stem) and int(candidate.stem.rsplit("-", 1)[-1]) == page_number]
             if not candidates:
                 raise RuntimeError(f"Rendered page {page_number} was not found")
             image_path = candidates[-1]
@@ -241,16 +247,51 @@ def main() -> None:
             page_type = classify_page(meaningful_text, image_count)
             columns = column_regions(image_path)
             regions = columns + horizontal_regions(image_path) + native_structure_regions(plumber_page, page_type, meaningful_text, columns)
-            if FIGURE_RE.search(meaningful_text):
-                regions.append({"kind": "FIGURE_OR_GRAPH_CANDIDATE", "confidence": 0.45, "evidence": "native keyword"})
-            if TABLE_RE.search(meaningful_text):
-                regions.append({"kind": "TABLE_CANDIDATE", "confidence": 0.45, "evidence": "native keyword"})
-            if args.profile in {"IMAGE_BOOK", "PHOTOGRAPHED_BOOK"} and not any(region["kind"] == "QUESTION_REGION_CANDIDATE" for region in regions):
-                regions.append({"kind": "VISION_SEGMENTATION_REQUIRED", "confidence": 1.0, "evidence": "image-based page without reliable native question geometry"})
             processed_path = None
             preprocessing = {"operations": []}
             if args.profile == "PHOTOGRAPHED_BOOK":
                 processed_path, preprocessing = enhance_photographed_page(image_path)
+
+            # Profile-specific geometry for option / answer / solution / figure /
+            # graph / table regions (see page_geometry.py). A failure here must
+            # not lose the rest of the batch, so it is recorded on the page.
+            geometry_detectors: list[str] = []
+            geometry_error = None
+            try:
+                try:
+                    words = plumber_page.extract_words() or []
+                except Exception:
+                    words = []
+                with Image.open(processed_path or image_path) as geometry_source:
+                    gray = np.asarray(geometry_source.convert("L"))
+                geometry_regions, geometry_detectors = detect_geometry(
+                    profile=args.profile, plumber_page=plumber_page, gray=gray, page_type=page_type,
+                    native_characters=len(meaningful_text),
+                    question_regions=[r for r in regions if r["kind"] == "QUESTION_REGION_CANDIDATE"],
+                    question_markers=[r for r in regions if r["kind"] == "QUESTION_NUMBER_CANDIDATE"],
+                    option_markers=[r for r in regions if r["kind"] == "OPTION_MARKER_CANDIDATE"],
+                    columns=columns, words=words,
+                )
+                regions += geometry_regions
+            except Exception as error:  # noqa: BLE001
+                geometry_error = f"{type(error).__name__}: {error}"[:300]
+
+            # Keyword-only candidates have no geometry; keep them as a fallback
+            # signal only where no real figure/graph/table region was found.
+            kinds = {region["kind"] for region in regions}
+            if FIGURE_RE.search(meaningful_text) and not (kinds & {"FIGURE_REGION_CANDIDATE", "GRAPH_REGION_CANDIDATE"}):
+                regions.append({"kind": "FIGURE_OR_GRAPH_CANDIDATE", "confidence": 0.45, "evidence": "native keyword"})
+            if TABLE_RE.search(meaningful_text) and "TABLE_REGION_CANDIDATE" not in kinds:
+                regions.append({"kind": "TABLE_CANDIDATE", "confidence": 0.45, "evidence": "native keyword"})
+            if args.profile in {"IMAGE_BOOK", "PHOTOGRAPHED_BOOK"} and not any(region["kind"] == "QUESTION_REGION_CANDIDATE" for region in regions):
+                regions.append({"kind": "VISION_SEGMENTATION_REQUIRED", "confidence": 1.0, "evidence": "image-based page without reliable native question geometry"})
+            # Selectable text at its printed position, for the page-faithful viewer.
+            # A page with no usable embedded text (scans) gets None here and is
+            # given an OCR text layer later instead.
+            try:
+                text_layer = build_text_layer(plumber_page)
+            except Exception:  # noqa: BLE001
+                text_layer = None
             results.append({
                 "pageNumber": page_number,
                 "imagePath": str(image_path),
@@ -263,6 +304,8 @@ def main() -> None:
                 "pageType": page_type,
                 "regions": regions,
                 "preprocessing": preprocessing,
+                "geometry": {"profile": args.profile, "detectors": geometry_detectors, "error": geometry_error},
+                "textLayer": text_layer,
                 "imageQualityScore": round(min(1.0, width / 1200) * min(1.0, height / 1600), 4),
             })
     print(json.dumps({"pages": results}, ensure_ascii=False))

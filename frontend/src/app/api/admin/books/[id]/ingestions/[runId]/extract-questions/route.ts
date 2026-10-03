@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { getPageRawText, structurePageQuestions } from '@/lib/extract-book-page';
+import { textLayerUpdate as ocrTextLayerUpdate } from '@/lib/page-text-layer';
+import { startDraftClock } from '@/lib/draft-retention';
 import { isLikelyCaseStudyFragment } from '@/lib/case-study-fragment';
 import { isLikelyIncompletePage } from '@/lib/incomplete-page-fragment';
 import { cropPageRegion } from '@/lib/page-image-crop';
@@ -289,7 +291,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
     orderBy: { pageNumber: 'asc' },
     take: batchSize,
-    select: { id: true, pageNumber: true, nativeText: true, pageImagePath: true, processedImagePath: true, layoutData: true },
+    select: { id: true, pageNumber: true, nativeText: true, pageImagePath: true, processedImagePath: true, layoutData: true, width: true, height: true },
   });
 
   if (pages.length === 0) {
@@ -409,6 +411,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         pageImagePath: page.pageImagePath,
         processedImagePath: page.processedImagePath,
         requiresVisionSegmentation: Boolean(layout.requiresVisionSegmentation),
+        width: page.width,
+        height: page.height,
       });
 
       const stitching = pendingFragment && pendingFragment.lastPage + 1 === page.pageNumber;
@@ -457,6 +461,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             detectedQuestions: 0,
             ocrProvider: pageRaw.provider,
             ocrConfidence: pageRaw.ocrConfidence,
+            ...ocrTextLayerUpdate(pageRaw.textLayer),
             errorMessage: null,
           },
         });
@@ -633,6 +638,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           detectedQuestions: structured.length,
           ocrProvider: pageRaw.provider,
           ocrConfidence: pageRaw.ocrConfidence,
+          ...ocrTextLayerUpdate(pageRaw.textLayer),
           errorMessage: null,
         },
       });
@@ -709,6 +715,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     metadata: { bookId: id, pages: pages.map((p) => p.pageNumber), savedCount, duplicateCount, reviewCount, detectedCount, manifestFiledCount, distrustEmptyPages, emptySectionPages, skippedListingPages: manifestListingPages, figuresMatchedToQuestion, failures },
     ...requestAuditContext(request),
   });
+
+  // Extracted content is a draft kept for DRAFT_RETENTION_DAYS from the latest activity.
+  await startDraftClock(run.id);
 
   const lastPage = pages[pages.length - 1]?.pageNumber ?? requestedStart;
   const reachedWindowEnd = endPage != null && lastPage >= endPage;

@@ -45,6 +45,7 @@ describe('API Route - Questions', () => {
         user: { id: 'teacher-1', role: 'TEACHER', email: 'teacher@test.com' }
       });
 
+      mockPrisma.user.findUnique.mockResolvedValue({ subscription: 'PREMIUM' });
       mockPrisma.question.findMany.mockResolvedValue([]);
 
       const { GET } = await import('@/app/api/questions/route');
@@ -54,6 +55,16 @@ describe('API Route - Questions', () => {
 
       expect(response.status).toBe(200);
       expect(mockPrisma.question.findMany).toHaveBeenCalled();
+    });
+
+    it('should reject a free TEACHER with 403', async () => {
+      const { getServerSession } = await import('next-auth');
+      vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'teacher-1', role: 'TEACHER' } });
+      mockPrisma.user.findUnique.mockResolvedValue({ subscription: 'FREE' });
+      const { GET } = await import('@/app/api/questions/route');
+      const response = await GET(new Request('http://localhost/api/questions'));
+      expect(response.status).toBe(403);
+      expect(mockPrisma.question.findMany).not.toHaveBeenCalled();
     });
 
     it('should return only APPROVED PUBLIC for STUDENT role', async () => {

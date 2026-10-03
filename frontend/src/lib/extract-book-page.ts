@@ -5,6 +5,7 @@ import { structureQuestions } from './structure-questions';
 import { analyzeQuestion, type QAIssue } from './question-qa';
 import { computeContentHash } from './question-classifier';
 import { parseDiagramRegions, parseOcrTextLines, type DiagramRegion, type OcrTextLine } from './diagram-regions';
+import { layerFromMathpixLines, type PageTextLayer } from './page-text-layer';
 import type { CanonicalQuestion } from './extract-normalizer';
 
 /**
@@ -40,6 +41,11 @@ export interface PageForExtraction {
   pageImagePath: string | null;
   processedImagePath: string | null;
   requiresVisionSegmentation: boolean;
+  // Pixel size of the rendered page image; lets OCR line positions be stored
+  // as page fractions (the selectable text layer). Optional: without it the
+  // text still extracts, it just gets no positioned layer.
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface PageRawText {
@@ -60,6 +66,10 @@ export interface PageRawText {
   // cropPageRegion to actually cut one out. null when provider is
   // NATIVE_TEXT (no image was OCR'd).
   ocrImagePath: string | null;
+  // Positioned text for the page-faithful viewer, from the same OCR call (no
+  // extra spend). null for NATIVE_TEXT pages -- their layer is built from the
+  // PDF while rendering -- or when OCR returned no usable positions.
+  textLayer: PageTextLayer | null;
 }
 
 export interface ExtractedPageQuestion {
@@ -88,7 +98,7 @@ function imageMime(filePath: string): string {
 // (PageSnipTool.tsx / .../pages/[pageNumber]/snip/route.ts) OCRs a small
 // cropped region the exact same way; this function doesn't care whether the
 // image it's given is a whole page or a crop of one.
-export async function ocrPageWithMathpix(imagePath: string): Promise<{ text: string; confidence: number | null; diagramRegions: DiagramRegion[]; textLines: OcrTextLine[]; safeImagePath: string }> {
+export async function ocrPageWithMathpix(imagePath: string, imageSize?: { width?: number | null; height?: number | null }): Promise<{ text: string; confidence: number | null; diagramRegions: DiagramRegion[]; textLines: OcrTextLine[]; textLayer: PageTextLayer | null; safeImagePath: string }> {
   const safePath = assertPrivateImageReference(imagePath);
   if (!process.env.MATHPIX_APP_ID || !process.env.MATHPIX_APP_KEY) {
     throw new Error('Mathpix credentials are not configured (MATHPIX_APP_ID / MATHPIX_APP_KEY)');
@@ -129,6 +139,13 @@ export async function ocrPageWithMathpix(imagePath: string): Promise<{ text: str
     confidence: typeof output.confidence === 'number' ? output.confidence : null,
     diagramRegions: parseDiagramRegions(output.line_data),
     textLines: parseOcrTextLines(output.line_data),
+    // Prefer the size we rendered the page at; fall back to what Mathpix
+    // reports for the image it read.
+    textLayer: layerFromMathpixLines(
+      output.line_data,
+      imageSize?.width || Number(output.image_width) || 0,
+      imageSize?.height || Number(output.image_height) || 0,
+    ),
     safeImagePath: safePath,
   };
 }
@@ -151,15 +168,15 @@ export async function getPageRawText(page: PageForExtraction): Promise<PageRawTe
     // trade-off for now: re-running OCR on every text-trustworthy page
     // just to catch this would multiply Mathpix cost across the whole
     // book for a comparatively rare page shape.
-    return { provider: 'NATIVE_TEXT', rawText: nativeText, ocrConfidence: null, diagramRegions: [], textLines: [], ocrImagePath: null };
+    return { provider: 'NATIVE_TEXT', rawText: nativeText, ocrConfidence: null, diagramRegions: [], textLines: [], ocrImagePath: null, textLayer: null };
   }
 
   const imagePath = page.processedImagePath || page.pageImagePath;
   if (!imagePath) {
     // Nothing usable on this page: no trustworthy text layer and no image to OCR.
-    return { provider: 'NATIVE_TEXT', rawText: '', ocrConfidence: null, diagramRegions: [], textLines: [], ocrImagePath: null };
+    return { provider: 'NATIVE_TEXT', rawText: '', ocrConfidence: null, diagramRegions: [], textLines: [], ocrImagePath: null, textLayer: null };
   }
-  const ocr = await ocrPageWithMathpix(imagePath);
+  const ocr = await ocrPageWithMathpix(imagePath, { width: page.width, height: page.height });
   return {
     provider: 'MATHPIX_OCR',
     rawText: ocr.text,
@@ -167,6 +184,7 @@ export async function getPageRawText(page: PageForExtraction): Promise<PageRawTe
     diagramRegions: ocr.diagramRegions,
     textLines: ocr.textLines,
     ocrImagePath: ocr.safeImagePath,
+    textLayer: ocr.textLayer,
   };
 }
 

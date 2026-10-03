@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pageFigure = { findMany: vi.fn() };
-vi.mock('./prisma', () => ({ default: { pageFigure } }));
+const documentPage = { findMany: vi.fn() };
+vi.mock('./prisma', () => ({ default: { pageFigure, documentPage } }));
 
 const cleanMcq = {
   id: 'q-1',
@@ -22,6 +23,7 @@ describe('assessQuestionsRisk', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pageFigure.findMany.mockResolvedValue([]);
+    documentPage.findMany.mockResolvedValue([]);
   });
 
   it('returns an empty map for an empty input without querying', async () => {
@@ -121,5 +123,19 @@ describe('assessQuestionsRisk', () => {
     const { assessQuestionsRisk } = await import('./question-risk');
     const result = await assessQuestionsRisk([{ ...cleanMcq, provenance: 'MANUALLY_AUTHORED', bookId: null, sourcePageStart: null, sourcePageEnd: null }]);
     expect(result.get('q-1')!.blockers).toEqual([]);
+  });
+  it('blocks the question that owns a formula the two OCR providers disagree on', async () => {
+    documentPage.findMany.mockResolvedValue([{ pageNumber: 10, document: { bookId: 'book-1' }, layoutData: { reconciliation: { status: 'HAS_HOLDS', heldPrintedNumbers: ['3'] } } }]);
+    const { assessQuestionsRisk } = await import('./question-risk');
+    const result = await assessQuestionsRisk([cleanMcq, { ...cleanMcq, id: 'q-2', printedNumber: '4' }]);
+    expect(result.get('q-1')!.blockers[0]).toContain('OCR providers');
+    expect(result.get('q-2')!.blockers).toEqual([]);
+  });
+
+  it('holds every question on a held page when the dispute could not be attributed to one question', async () => {
+    documentPage.findMany.mockResolvedValue([{ pageNumber: 10, document: { bookId: 'book-1' }, layoutData: { reconciliation: { status: 'HAS_HOLDS', heldPrintedNumbers: [] } } }]);
+    const { assessQuestionsRisk } = await import('./question-risk');
+    const result = await assessQuestionsRisk([{ ...cleanMcq, printedNumber: '9' }]);
+    expect(result.get('q-1')!.blockers[0]).toContain('OCR providers');
   });
 });

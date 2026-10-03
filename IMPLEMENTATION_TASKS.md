@@ -191,13 +191,17 @@ Mathswiz's core experience is a continuous **study → practice → mock test �
   - [x] Convert reliable native markers into bounded question regions and option markers
   - [x] Route unresolved image-only pages explicitly to mathematical vision without guessed question boxes
   - [x] Add per-run layout summaries for question regions, page types, enhancements, and vision-required pages
-  - [ ] Add profile-specific geometry detection for question, option, answer, solution, graph, figure, and table regions
+  - [x] Add profile-specific geometry detection for question, option, answer, solution, graph, figure, and table regions (`scripts/page_geometry.py`: native PDF objects for digital pages, raster analysis for image/photographed pages with margin exclusion and lower confidence; image-only pages still need the vision pass for option/answer/solution boxes)
   - [ ] Add provider adapters and formula/layout reconciliation
     - [x] Add page-scoped Gemini vision and Mathpix OCR benchmark adapters
     - [x] Store raw evidence, structured output, latency, quality metrics, failures, and audit logs
     - [x] Require an explicit Admin action and prevent duplicate credit usage by default
     - [x] Run the controlled pilot benchmark and score results against the source pages
     - [x] Select Gemini for primary image-page structuring and Mathpix for targeted formula-region evidence
+    - [x] Wire two-provider agreement into an admin reconcile route (Gemini + Mathpix readings already stored, no extra OCR spend); disputed formulas hold their question and surface as a review-queue risk blocker
+    - [x] Page-faithful source viewer: every PDF page shown as its rendered image with a positioned, selectable text layer (native PDF text built free at render; Mathpix OCR lines stored during extraction; OCR backfill only on an explicit, confirmed admin action); select across pages, copy as LaTeX, or insert into question / option / answer / solution
+    - [x] Page-count parity check against the PDF (missing / imageless / unexpected pages reported; Resume refills gaps); upload now renders every page
+    - [x] Extracted pages kept as a named draft for 60 days, then purged (rows, questions, figures and the original PDF are kept); scheduled sweep at /api/cron/purge-expired-drafts needs CRON_SECRET and a daily scheduler
     - [ ] Run a 100-page shadow extraction and measure verified-question yield, cost, and review time
       - [x] Prepare a private stratified 25-page sample for each of the four source profiles
       - [x] Exclude detected promotional/non-content pages and verify 100 unique source-image hashes

@@ -11,6 +11,14 @@ describe("API authorization policy", () => {
     expect(authorizeApiPath("/api/admin/stats", null)).toMatchObject({ allowed: false, status: 401 });
   });
 
+  it("lets scheduler routes past the session layer, but nothing that merely looks like them", () => {
+    // /api/cron/* authenticates itself with CRON_SECRET; the admin draft routes must stay admin-only.
+    expect(authorizeApiPath("/api/cron/purge-expired-drafts", null).allowed).toBe(true);
+    expect(authorizeApiPath("/api/admin/book-drafts", null)).toMatchObject({ allowed: false, status: 401 });
+    expect(authorizeApiPath("/api/admin/book-drafts/purge-expired", "STUDENT")).toMatchObject({ allowed: false, status: 403 });
+    expect(authorizeApiPath("/api/cronjobs", null)).toMatchObject({ allowed: false, status: 401 });
+  });
+
   it.each([
     ["ADMIN", "/api/admin/stats"],
     ["TEACHER", "/api/teacher/batches"],
