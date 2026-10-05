@@ -985,9 +985,15 @@ model StudentFlashcard {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Set when the card was copied from a book revision sheet (RevisionItem), so
+  // adding the same item twice is a no-op instead of a duplicate card.
+  revisionItemId String?
+
   user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   spacedRepetitionCards SpacedRepetitionCard[]
+  revisionItem          RevisionItem?          @relation(fields: [revisionItemId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, revisionItemId])
   @@index([userId, updatedAt])
   @@index([userId, topic])
 }
@@ -1344,6 +1350,7 @@ model Book {
 
   createdBy       User               @relation("BookCreator", fields: [createdById], references: [id])
   chapters        BookChapter[]
+  revisionItems   RevisionItem[]
   sourceDocuments SourceDocument[]
   questions       Question[]
   ingestionRuns   BookIngestionRun[]
@@ -1421,9 +1428,10 @@ model BookChapter {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  book      Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  exercises BookExercise[]
-  questions Question[]
+  book          Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  exercises     BookExercise[]
+  questions     Question[]
+  revisionItems RevisionItem[]
 
   @@unique([bookId, orderIndex])
   @@index([bookId, chapterNumber])
@@ -1919,4 +1927,52 @@ model QuestionEmbedding {
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@index([questionId])
+}
+
+enum RevisionItemKind {
+  DEFINITION
+  THEOREM
+  FORMULA
+  PROPERTY
+  KEY_POINT
+}
+
+enum RevisionItemStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+// A piece of reference text from a chapter of an ingested book -- a definition,
+// theorem statement, formula or property -- saved so it can feed revision sheets
+// and flashcards. Unlike the page buffer (DocumentPage), which is purged after
+// 60 days, these live on: they are the product of the extraction, not the buffer.
+// The body is transcribed from the book, never composed: verbatimScore records how
+// closely it matches the source page it was taken from, and nothing reaches
+// students until an admin approves it.
+model RevisionItem {
+  id              String             @id @default(cuid())
+  bookId          String
+  chapterId       String
+  kind            RevisionItemKind
+  title           String
+  body            String             @db.Text
+  contentHash     String
+  sourcePage      Int
+  verbatimScore   Float?
+  status          RevisionItemStatus @default(DRAFT)
+  reviewNotes     String?            @db.Text
+  reviewedById    String?
+  reviewedAt      DateTime?
+  orderIndex      Int                @default(0)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  book      Book               @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapter   BookChapter        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  flashcards StudentFlashcard[]
+
+  @@unique([chapterId, contentHash])
+  @@index([chapterId, status, orderIndex])
+  @@index([bookId, status])
 }

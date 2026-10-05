@@ -432,6 +432,16 @@ export default function StudentDashboardClient({
                                                     </div>
                                                     <h3 className="text-lg font-black text-gray-900">{assignment.test?.title}</h3>
                                                     {assignment.instructions && <p className="text-sm text-gray-600 mt-1">{assignment.instructions}</p>}
+                                                    {Array.isArray(assignment.revisionChapters) && assignment.revisionChapters.length > 0 && (
+                                                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+                                                            <span className="font-black uppercase tracking-widest text-[10px] text-violet-700">Revise first</span>
+                                                            {assignment.revisionChapters.slice(0, 3).map((chapter: { chapterId: string; name: string; items: number }) => (
+                                                                <Link key={chapter.chapterId} href={`/student/revision/${chapter.chapterId}`} className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 font-bold text-violet-700 hover:bg-violet-100">
+                                                                    {chapter.name} · {chapter.items}
+                                                                </Link>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                     <div className="flex items-center gap-4 text-xs text-gray-500 font-medium mt-1">
                                                         <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{assignment.test?.duration} mins</span>
                                                         <span>{assignment.test?.totalMarks} marks</span>

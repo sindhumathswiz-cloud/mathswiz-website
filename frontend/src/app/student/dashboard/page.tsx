@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import StudentDashboardClient from "./StudentDashboardClient";
 import { unstable_noStore as noStore } from "next/cache";
 import { isPremiumSubscription } from '@/lib/subscription';
+import { withRevisionLinks } from '@/lib/student-revision';
 
 export default async function StudentDashboard() {
     noStore(); // CRITICAL: Disables all static caching for this route.
@@ -160,7 +161,7 @@ export default async function StudentDashboard() {
                     initialPayments={payments}
                     initialSummary={{ totalAmount, totalPaid, totalOutstanding, overdueAmount }}
                     initialMaterials={materials}
-                    initialTests={tests}
+                    initialTests={isPremium ? await withRevisionLinks(tests) : tests}
                     initialAttempts={pastAttempts}
                     initialGoal={goal}
                     initialNotices={notices}

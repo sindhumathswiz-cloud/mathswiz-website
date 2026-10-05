@@ -16,6 +16,10 @@ import { removePrivateImage } from './book-storage';
  *  - Kept: every Question (standing rule: question data is archived, never
  *    hard-deleted), the cropped question-images, the original PDF, and the
  *    ingestion run itself -- so a book can be re-rendered from the PDF.
+ *  - Kept: RevisionItem rows (definitions, theorems and formulas saved for
+ *    revision sheets). They are the product of the extraction, not the buffer,
+ *    which is why they are saved at all: the page text they came from goes in 60
+ *    days, they do not.
  */
 
 export const DRAFT_RETENTION_DAYS = 60;

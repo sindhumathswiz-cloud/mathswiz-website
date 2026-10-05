@@ -202,6 +202,7 @@ Mathswiz's core experience is a continuous **study → practice → mock test �
     - [x] Page-faithful source viewer: every PDF page shown as its rendered image with a positioned, selectable text layer (native PDF text built free at render; Mathpix OCR lines stored during extraction; OCR backfill only on an explicit, confirmed admin action); select across pages, copy as LaTeX, or insert into question / option / answer / solution
     - [x] Page-count parity check against the PDF (missing / imageless / unexpected pages reported; Resume refills gaps); upload now renders every page
     - [x] Extracted pages kept as a named draft for 60 days, then purged (rows, questions, figures and the original PDF are kept); scheduled sweep at /api/cron/purge-expired-drafts needs CRON_SECRET and a daily scheduler
+    - [x] Chapter revision content: definitions, theorem statements, formulas and properties copied from each chapter (Gemini first; answer-key and solution pages kept away from the model), checked against the source page, admin-reviewed, then offered to Premium students as revision sheets and as flashcards in their own deck; chapters of an assigned test link as "Revise first"
     - [ ] Run a 100-page shadow extraction and measure verified-question yield, cost, and review time
       - [x] Prepare a private stratified 25-page sample for each of the four source profiles
       - [x] Exclude detected promotional/non-content pages and verify 100 unique source-image hashes

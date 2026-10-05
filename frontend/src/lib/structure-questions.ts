@@ -284,3 +284,29 @@ export async function structureQuestions(rawText: string, opts: StructureQuestio
     attempts.map((a, i) => `[${i + 1}] ${a}`).join(' | ')
   );
 }
+
+/**
+ * Runs one prompt that must be answered in JSON through the same provider chain
+ * as question structuring -- Gemini first, then Groq, then Mistral -- moving on
+ * when a provider throws or returns something `isUsable` rejects. Other callers
+ * that need faithful copying of source text (revision content) use this rather
+ * than the generic helper in llm.ts, which tries Groq first.
+ * Throws only when no provider could be reached at all; if providers answered but
+ * none produced a usable reply, the last reply is returned for the caller to judge.
+ */
+export async function completeJsonPrompt(prompt: string, isUsable: (reply: string) => boolean): Promise<{ content: string; provider: string }> {
+  const attempts: string[] = [];
+  let lastReply: { content: string; provider: string } | null = null;
+  for (const provider of PROVIDERS) {
+    try {
+      const content = await provider.call(prompt);
+      lastReply = { content, provider: provider.name };
+      if (isUsable(content)) return lastReply;
+      attempts.push(`${provider.name} returned an unusable reply`);
+    } catch (e) {
+      attempts.push(`${provider.name} threw: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  if (lastReply) return lastReply;
+  throw new Error(`No language model could be reached (${attempts.join('; ')})`);
+}

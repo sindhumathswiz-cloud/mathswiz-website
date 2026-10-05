@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import StudentDashboardClient from "../dashboard/StudentDashboardClient";
 import { unstable_noStore as noStore } from "next/cache";
 import { isPremiumSubscription } from '@/lib/subscription';
+import { withRevisionLinks } from '@/lib/student-revision';
 
 export default async function StudentTestsPage() {
     noStore();
@@ -47,7 +48,7 @@ export default async function StudentTestsPage() {
                 initialPayments={[]}
                 initialSummary={{ totalAmount: 0, totalPaid: 0, totalOutstanding: 0, overdueAmount: 0 }}
                 initialMaterials={[]}
-                initialTests={tests}
+                initialTests={isPremium ? await withRevisionLinks(tests) : tests}
                 initialAttempts={[]}
                 initialGoal={null}
                 defaultTab="tests"

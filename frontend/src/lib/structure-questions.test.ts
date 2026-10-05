@@ -245,3 +245,43 @@ describe('structureQuestions', () => {
     expect((init as RequestInit & { headers: Record<string, string> }).headers.Authorization).toBe('Bearer mistral-key');
   });
 });
+
+describe('completeJsonPrompt', () => {
+  const originalEnv = { ...process.env };
+  const usable = (reply: string) => { try { JSON.parse(reply); return true; } catch { return false; } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGenerateContent.mockReset();
+    process.env.GEMINI_API_KEY = 'gemini-key';
+    process.env.GROQ_API_KEY = 'groq-key';
+    process.env.MISTRAL_API_KEY = 'mistral-key';
+  });
+  afterEach(() => { process.env = { ...originalEnv }; });
+
+  it('asks Gemini first and stops there when its reply is usable', async () => {
+    geminiOk('{"items":[]}');
+    const { completeJsonPrompt } = await import('./structure-questions');
+    await expect(completeJsonPrompt('prompt', usable)).resolves.toEqual({ content: '{"items":[]}', provider: 'gemini' });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('moves to the next provider when a reply is unusable or a provider throws, and says who answered', async () => {
+    geminiOk('{"items": [ {"broken');
+    fetchOk('{"items":[1]}');
+    const { completeJsonPrompt } = await import('./structure-questions');
+    await expect(completeJsonPrompt('prompt', usable)).resolves.toEqual({ content: '{"items":[1]}', provider: 'groq' });
+  });
+
+  it('returns the last reply for the caller to judge when providers answered but none was usable, and throws only when none could be reached', async () => {
+    geminiOk('not json');
+    fetchOk('also not json');
+    fetchOk('still not json');
+    const { completeJsonPrompt } = await import('./structure-questions');
+    await expect(completeJsonPrompt('prompt', usable)).resolves.toMatchObject({ provider: 'mistral' });
+
+    geminiThrows();
+    mockFetch.mockRejectedValue(new Error('network down'));
+    await expect(completeJsonPrompt('prompt', usable)).rejects.toThrow(/No language model could be reached/);
+  });
+});
