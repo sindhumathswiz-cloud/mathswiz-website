@@ -219,5 +219,13 @@ Mathswiz's core experience is a continuous **study → practice → mock test �
 - [ ] Add human review queues for ambiguity, duplicates, figures, and low confidence
   - [x] Flag every question needing human judgement (missing source material, unrecoverable diagrams, ambiguous wording, duplicate rows) with evidence and a suggested resolution, tracked via `reviewNotes` and tags — 1,351 questions flagged
   - [ ] Build a dedicated queue UI/workflow surface for these flags (currently queryable via tags/`reviewNotes`, no dedicated screen)
-- [ ] Add teacher-facing book, chapter, and exercise selectors
+- [x] Add teacher-facing book, chapter, and exercise selectors
+  - [x] Book -> chapter -> exercise dropdowns with approved-question counts in the teacher test builder (repository list and filter-pick); only nodes with approved questions are offered
+  - [x] Exercises resolve by page range within their chapter, because no question is linked to an exercise yet; a mismatched chapter/exercise matches nothing rather than the whole book
 - [ ] Run a representative Class 11/12 pilot and choose paid providers from measured results
+  - [x] Provider purchase gate as code and screen (Book Library -> Provider pilot): coverage of the sample, provider scorecards, the criteria from PHASE_QB_PILOT.md, and a verdict that stays NOT_READY until every criterion is measured and met
+  - [x] Earlier pilot / shadow-sample / Mistral / OpenAI results summarised into a committed evidence file (`scripts/build-pilot-evidence.py`)
+  - [x] Per-run entry of review minutes and spend, turned into minutes per 100 questions and cost per verified question
+  - [ ] Run the pilot: 25 completed pages per source profile and per class (Class 11 has none yet), then record review time and spend; see PHASE_QB_PROVIDER_DECISION.md
+  - [ ] Hand-label a sample so option accuracy, solution-match precision and figure retention can be scored
+  - [ ] Choose the paid provider once the gate reads READY_TO_DECIDE

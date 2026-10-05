@@ -7,6 +7,7 @@ import {
   Printer, Save, Sparkles, X, Loader2, Filter
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionSourceSelector, { NO_SOURCE, type SourceSelection } from '@/components/teacher/QuestionSourceSelector';
 
 type Question = {
   id: string;
@@ -49,6 +50,8 @@ export default function TestCreatorStudio() {
   const [filterDifficulty, setFilterDifficulty] = useState('All');
   const [filterType, setFilterType] = useState('All');
   const [filterClass, setFilterClass] = useState('All');
+  // Book -> chapter -> exercise: where in a book the questions sit.
+  const [source, setSource] = useState<SourceSelection>(NO_SOURCE);
 
   // Right Panel - Test Cart State
   const [sections, setSections] = useState<TestSection[]>([]);
@@ -69,7 +72,7 @@ export default function TestCreatorStudio() {
   // Fetch Questions
   useEffect(() => {
     fetchQuestions();
-  }, [filterSubject, filterTopic, filterDifficulty, filterType, filterClass]);
+  }, [filterSubject, filterTopic, filterDifficulty, filterType, filterClass, source]);
 
   const fetchQuestions = async () => {
     setIsLoadingQuestions(true);
@@ -80,6 +83,9 @@ export default function TestCreatorStudio() {
       if (filterDifficulty !== 'All') query.append('difficulty', filterDifficulty);
       if (filterType !== 'All') query.append('type', filterType);
       if (filterClass !== 'All') query.append('class', filterClass);
+      if (source.bookId) query.append('bookId', source.bookId);
+      if (source.chapterId) query.append('bookChapterId', source.chapterId);
+      if (source.exerciseId) query.append('bookExerciseId', source.exerciseId);
 
       const res = await fetch(`/api/teacher/questions?${query.toString()}`);
       const data = await res.json();
@@ -228,6 +234,9 @@ export default function TestCreatorStudio() {
       if (filterTopic !== 'All') filter.topic = filterTopic;
       if (filterDifficulty !== 'All') filter.difficulty = filterDifficulty;
       if (filterType !== 'All') filter.type = filterType;
+      if (source.bookId) filter.bookId = source.bookId;
+      if (source.chapterId) filter.bookChapterId = source.chapterId;
+      if (source.exerciseId) filter.bookExerciseId = source.exerciseId;
 
       const res = await fetch('/api/teacher/tests/pick-questions', {
         method: 'POST',
@@ -338,6 +347,7 @@ export default function TestCreatorStudio() {
                 <option value="NDA">NDA</option>
             </select>
           </div>
+          <QuestionSourceSelector value={source} onChange={setSource} className="mt-3" />
         </div>
 
         {/* Scrollable Question List */}

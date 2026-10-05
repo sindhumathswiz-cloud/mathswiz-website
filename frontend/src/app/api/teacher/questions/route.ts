@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { isPremiumSubscription } from '@/lib/subscription';
+import { resolveSourceClauses } from '@/lib/question-sources';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +54,17 @@ export async function GET(request: Request) {
     if (topic && topic !== 'All') where.topic = topic;
     if (difficulty && difficulty !== 'All') where.difficulty = difficulty;
     if (type && type !== 'All') where.type = type;
+
+    // Book -> chapter -> exercise selector. AND-ed, because the scope filter above
+    // already uses OR.
+    const sourceFilter = {
+      bookId: searchParams.get('bookId'),
+      bookChapterId: searchParams.get('bookChapterId'),
+      bookExerciseId: searchParams.get('bookExerciseId'),
+    };
+    if (sourceFilter.bookId || sourceFilter.bookChapterId || sourceFilter.bookExerciseId) {
+      where.AND = await resolveSourceClauses(sourceFilter);
+    }
 
     const questions = await prisma.question.findMany({
       where,

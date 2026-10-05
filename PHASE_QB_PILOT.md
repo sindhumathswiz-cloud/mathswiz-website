@@ -52,3 +52,5 @@ Total pilot size: 1,243 pages, approximately 131 MB.
 ## Provider purchase gate
 
 Do not purchase a long-term plan before running a controlled representative sample from all four profiles. Compare providers using question recall, formula accuracy, option accuracy, solution-match precision, figure retention, review minutes per 100 questions, and total cost per verified question.
+
+The gate is implemented in `frontend/src/lib/provider-pilot.ts` and shown at Book Library -> Provider pilot. See `PHASE_QB_PROVIDER_DECISION.md` for the current reading and what the pilot still needs.

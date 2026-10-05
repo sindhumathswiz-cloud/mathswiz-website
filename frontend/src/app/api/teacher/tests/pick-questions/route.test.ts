@@ -44,6 +44,17 @@ describe('POST /api/teacher/tests/pick-questions', () => {
     expect(selectQuestionsByFilters).not.toHaveBeenCalled();
   });
 
+  it('passes book, chapter and exercise ids through, but only as plain strings', async () => {
+    selectQuestionsByFilters.mockResolvedValue([]);
+    const { POST } = await import('./route');
+    await POST(post({ filters: [{ bookId: 'b-1', bookChapterId: { $ne: null }, bookExerciseId: 'x'.repeat(200), count: 5 }, { bookExerciseId: 'ex-1' }] }));
+    const [sent] = selectQuestionsByFilters.mock.calls[0];
+    expect(sent[0].bookId).toBe('b-1');
+    expect(sent[0].bookChapterId).toBeUndefined();
+    expect(sent[0].bookExerciseId).toBeUndefined();
+    expect(sent[1].bookExerciseId).toBe('ex-1');
+  });
+
   it('delegates to the shared lib and returns its result', async () => {
     selectQuestionsByFilters.mockResolvedValue([{ id: 'q-1' }]);
     const { POST } = await import('./route');

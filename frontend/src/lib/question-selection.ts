@@ -1,11 +1,15 @@
 import type { Difficulty, Prisma, QuestionType } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { resolveSourceClauses } from '@/lib/question-sources';
 
 export interface QuestionFilterSpec {
   topic?: string;
   difficulty?: Difficulty;
   type?: QuestionType;
+  bookId?: string;
   bookChapterId?: string;
+  // Resolved by the exercise's page range within its chapter; see question-source-filter.ts.
+  bookExerciseId?: string;
   count?: number;
 }
 
@@ -23,7 +27,9 @@ export async function selectQuestionsByFilters(filters: QuestionFilterSpec[]) {
     if (filter.topic) where.topic = { contains: filter.topic, mode: 'insensitive' };
     if (filter.difficulty) where.difficulty = filter.difficulty;
     if (filter.type) where.type = filter.type;
+    if (filter.bookId) where.bookId = filter.bookId;
     if (filter.bookChapterId) where.bookChapterId = filter.bookChapterId;
+    if (filter.bookExerciseId) where.AND = await resolveSourceClauses({ bookId: filter.bookId, bookChapterId: filter.bookChapterId, bookExerciseId: filter.bookExerciseId });
 
     const matched = await prisma.question.findMany({
       where,

@@ -6,6 +6,12 @@ import { selectQuestionsByFilters, type QuestionFilterSpec } from "@/lib/questio
 
 export const dynamic = 'force-dynamic';
 
+// The book/chapter/exercise ids end up in a database query: keep them to plain strings.
+const asId = (value: unknown) => (typeof value === 'string' && value.length > 0 && value.length <= 64 ? value : undefined);
+function cleanFilter(raw: QuestionFilterSpec): QuestionFilterSpec {
+    return { ...raw, bookId: asId(raw?.bookId), bookChapterId: asId(raw?.bookChapterId), bookExerciseId: asId(raw?.bookExerciseId) };
+}
+
 /**
  * The non-AI counterpart to generate-blueprint: a teacher picks structured
  * filters (chapter/topic/difficulty/type/count) directly instead of
@@ -20,7 +26,7 @@ export async function POST(req: Request) {
         if (!guard.ok) return guard.response;
 
         const body = await req.json().catch(() => null);
-        const filters: QuestionFilterSpec[] = Array.isArray(body?.filters) ? body.filters : [];
+        const filters: QuestionFilterSpec[] = Array.isArray(body?.filters) ? body.filters.map(cleanFilter) : [];
         if (filters.length === 0) {
             return NextResponse.json({ error: "At least one filter is required" }, { status: 400 });
         }

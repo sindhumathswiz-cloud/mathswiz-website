@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, GitCompareArrows, Image as ImageIcon, ListTree, Layers, Loader2, Plus, ScanText, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, GitCompareArrows, Image as ImageIcon, ListTree, Layers, Loader2, Plus, Scale, ScanText, Search, Sparkles } from 'lucide-react';
 import { describePageList } from '@/lib/page-parity';
 
 type CatalogBook = {
@@ -378,6 +378,9 @@ export default function BookCatalogClient() {
             </Link>
             <Link href="/admin/question-bank/drafts" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
               <CalendarClock className="h-4 w-4 text-indigo-600 dark:text-brand" /> Extracted drafts
+            </Link>
+            <Link href="/admin/question-bank/provider-pilot" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
+              <Scale className="h-4 w-4 text-indigo-600 dark:text-brand" /> Provider pilot
             </Link>
           </div>
         </header>

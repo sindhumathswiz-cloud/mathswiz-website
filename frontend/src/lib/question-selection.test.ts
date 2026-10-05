@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const findMany = vi.fn();
+const findExercise = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({ default: { question: { findMany } } }));
+vi.mock('@/lib/prisma', () => ({ default: { question: { findMany }, bookExercise: { findUnique: findExercise } } }));
 
 describe('selectQuestionsByFilters', () => {
   beforeEach(() => {
@@ -26,6 +27,23 @@ describe('selectQuestionsByFilters', () => {
       where: { status: 'APPROVED', difficulty: 'HARD', type: 'SINGLE_CHOICE', bookChapterId: 'ch-1' },
       take: 10,
     });
+  });
+
+  it('narrows to a book, and to an exercise by its page range within the chapter', async () => {
+    findExercise.mockResolvedValue({ id: 'ex-1', chapterId: 'ch-7', startPage: 231, endPage: 237, chapter: { bookId: 'b-1' } });
+    const { selectQuestionsByFilters } = await import('./question-selection');
+    await selectQuestionsByFilters([{ bookId: 'b-1', bookChapterId: 'ch-7', bookExerciseId: 'ex-1', count: 8 }]);
+    const call = findMany.mock.calls[0][0];
+    expect(call.take).toBe(8);
+    expect(call.where).toMatchObject({ status: 'APPROVED', bookId: 'b-1', bookChapterId: 'ch-7' });
+    expect(call.where.AND).toContainEqual({ OR: [{ bookExerciseId: 'ex-1' }, { bookExerciseId: null, bookChapterId: 'ch-7', sourcePageStart: { gte: 231, lte: 237 } }] });
+  });
+
+  it('picks nothing, not the whole book, for an exercise that is not in the chosen chapter', async () => {
+    findExercise.mockResolvedValue({ id: 'ex-1', chapterId: 'ch-7', startPage: 231, endPage: 237, chapter: { bookId: 'b-1' } });
+    const { selectQuestionsByFilters } = await import('./question-selection');
+    await selectQuestionsByFilters([{ bookId: 'b-1', bookChapterId: 'ch-9', bookExerciseId: 'ex-1' }]);
+    expect(findMany.mock.calls[0][0].where.AND).toContainEqual({ id: { in: [] } });
   });
 
   it('concatenates results across multiple filters', async () => {
