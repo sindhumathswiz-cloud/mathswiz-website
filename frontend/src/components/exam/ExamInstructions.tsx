@@ -56,7 +56,7 @@ export default function ExamInstructions({
                 {rows.map(row => (
                   <tr key={row.title}>
                     <td className="p-3 font-black text-slate-900 dark:text-white">{row.title}</td>
-                    <td className="p-3 tabular-nums text-slate-700 dark:text-slate-300">{row.questions}{row.rule && <span className="ml-2 rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-brand/10 dark:text-brand">{row.rule}</span>}</td>
+                    <td className="p-3 tabular-nums text-slate-700 dark:text-slate-300">{row.questions}{row.alternatives > 0 && <span className="ml-2 rounded bg-violet-50 px-1.5 py-0.5 text-[11px] font-bold text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">{row.alternatives} with an alternative</span>}{row.rule && <span className="ml-2 rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-brand/10 dark:text-brand">{row.rule}</span>}</td>
                     <td className="p-3 text-slate-700 dark:text-slate-300">{row.marking}</td>
                     <td className="p-3 text-right font-black tabular-nums text-slate-900 dark:text-white">{row.maxMarks}</td>
                   </tr>

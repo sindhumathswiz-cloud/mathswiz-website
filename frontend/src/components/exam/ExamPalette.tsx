@@ -1,7 +1,7 @@
 'use client';
 
 import type { ExamSection, ExamResponse, QuestionStatus } from '@/lib/exam-view';
-import { statusCounts } from '@/lib/exam-view';
+import { slotRepresentatives, statusCounts } from '@/lib/exam-view';
 
 export const QUESTION_STATUS_LEGEND: Array<{ status: QuestionStatus; label: string; swatch: string }> = [
   { status: 'ANSWERED', label: 'Answered', swatch: 'bg-emerald-500 border-emerald-600' },
@@ -35,7 +35,7 @@ export default function ExamPalette({
   onSubmit: () => void;
   submitting: boolean;
 }) {
-  const counts = statusCounts(section.questionIds, responses);
+  const counts = statusCounts(slotRepresentatives(section, responses), responses);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-surface">
@@ -65,9 +65,10 @@ export default function ExamPalette({
                 key={id}
                 type="button"
                 onClick={() => onGo(flatIndex)}
-                aria-label={`Question ${offset + 1}, ${QUESTION_STATUS_LEGEND.find(item => item.status === status)?.label.toLowerCase()}`}
+                aria-label={`Question ${offset + 1}, ${QUESTION_STATUS_LEGEND.find(item => item.status === status)?.label.toLowerCase()}${section.choiceGroups[id] ? ', has an alternative' : ''}`}
+                title={section.choiceGroups[id] ? 'Internal choice: answer this or its alternative' : undefined}
                 aria-current={current ? 'true' : undefined}
-                className={`flex aspect-square items-center justify-center rounded-lg border-2 text-xs font-black transition ${CELL[status]} ${current ? 'outline outline-2 outline-offset-2 outline-slate-900 dark:outline-white' : ''}`}
+                className={`flex aspect-square items-center justify-center rounded-lg border-2 text-xs font-black transition ${CELL[status]} ${section.choiceGroups[id] ? '!border-dashed' : ''} ${current ? 'outline outline-2 outline-offset-2 outline-slate-900 dark:outline-white' : ''}`}
               >
                 {offset + 1}
               </button>

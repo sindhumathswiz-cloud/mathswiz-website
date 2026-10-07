@@ -48,6 +48,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ testId
                             create: section.questions.map((q) => ({
                                 questionId: q.questionId,
                                 orderIndex: q.orderIndex,
+                                choiceGroup: q.choiceGroup,
                             })),
                         },
                     })),

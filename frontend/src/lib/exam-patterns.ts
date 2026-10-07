@@ -75,7 +75,7 @@ export const EXAM_PATTERNS: ExamPattern[] = [
     name: 'CBSE Class 12 — Mathematics (board paper)',
     summary: '38 questions, 80 marks, 3 hours, with written sections',
     durationMinutes: 180,
-    verifyNote: 'Checked 6 Oct 2026 against the published 2025-26 sample paper structure: Sections A–E, every section compulsory, internal choice in two questions each of B, C and D (not enforced here: a teacher includes one version of each). Sections B–E are written and marked by the teacher. Confirm on cbseacademic.nic.in; the paper design is revised most years.',
+    verifyNote: 'Checked 6 Oct 2026 against the published 2025-26 sample paper structure: Sections A–E, every section compulsory, internal choice in two questions each of B, C and D (in the builder, add both versions and use the OR control on the second, so the pair counts as one question). Sections B–E are written and marked by the teacher. Confirm on cbseacademic.nic.in; the paper design is revised most years.',
     sections: [
       { title: 'Section A', instructions: '18 multiple-choice questions and 2 assertion-and-reason questions, 1 mark each. No negative marking.', kind: 'MCQ', questionType: 'SINGLE_CHOICE', questionCount: 20, attemptLimit: null, marksPerQuestion: 1, negativeMarks: 0 },
       { title: 'Section B', instructions: 'Very short answer questions, 2 marks each.', kind: 'WRITTEN', questionType: 'VERY_SHORT_ANSWER', questionCount: 5, attemptLimit: null, marksPerQuestion: 2, negativeMarks: 0 },

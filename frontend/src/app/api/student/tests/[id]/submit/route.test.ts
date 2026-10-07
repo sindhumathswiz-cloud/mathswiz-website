@@ -17,10 +17,11 @@ const $transaction = vi.fn(async (callback: (client: typeof tx) => unknown) => c
 const testAttempt = { findFirst: vi.fn() };
 const test = { findUnique: vi.fn() };
 const testAssignment = { findFirst: vi.fn() };
+const answerImage = { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
 
 vi.mock('next-auth', () => ({ getServerSession }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/prisma', () => ({ default: { testAttempt, test, testAssignment, $transaction } }));
+vi.mock('@/lib/prisma', () => ({ default: { testAttempt, test, testAssignment, answerImage, $transaction } }));
 vi.mock('next/cache', () => ({ revalidatePath }));
 vi.mock('@/lib/gamification', () => ({ awardPoints, POINTS_RULES: { TEST_COMPLETED: 10, TEST_PERFECT_SCORE: 20 } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext }));
@@ -318,5 +319,80 @@ describe('POST /api/student/tests/[id]/submit -- written answers in a mock exam'
     paper('MOCK_EXAM');
     await submit({ m1: { subjectiveText: 'sneaky' } })();
     expect(records().find(r => r.questionId === 'm1')?.status).toBe('SKIPPED');
+  });
+});
+
+describe('POST /api/student/tests/[id]/submit -- internal choice and photo answers', () => {
+  const choice = (id: string) => ({ id, type: 'SINGLE_CHOICE', correctAnswer: 'B', topic: 'Algebra', difficulty: 'EASY' });
+  const written = (id: string) => ({ id, type: 'LONG_ANSWER', correctAnswer: null, topic: 'Calculus', difficulty: 'HARD' });
+  const records = () => tx.testResponse.createMany.mock.calls[0][0].data as Array<{ questionId: string; status: string; reviewStatus: string; marksAwarded: number; subjectiveImage: string | null; isCorrect: boolean }>;
+  const totals = () => tx.testAttempt.updateMany.mock.calls[0][0].data as { totalScore: number; totalCorrect: number; totalIncorrect: number; totalSkipped: number };
+  const paper = (questions: Array<{ question: object; choiceGroup?: string }>) => test.findUnique.mockResolvedValue({
+    id: 'test-1', templateType: 'MOCK_EXAM', duration: 180,
+    sections: [{ marksPerQuestion: 3, negativeMarks: 0, attemptLimit: null, questions }],
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getServerSession.mockResolvedValue({ user: { id: 'student-1', role: 'STUDENT' } });
+    setUpTest();
+    answerImage.findMany.mockResolvedValue([]);
+  });
+
+  it('scores only one of two alternatives, even if the student answered both', async () => {
+    paper([{ question: choice('a'), choiceGroup: 'g' }, { question: choice('b'), choiceGroup: 'g' }]);
+    await submit({ a: { selectedOption: 'B' }, b: { selectedOption: 'B' } })();
+    expect(totals()).toMatchObject({ totalCorrect: 1, totalScore: 3 });
+    expect(records().map(r => [r.questionId, r.status])).toEqual([['a', 'ANSWERED'], ['b', 'OVER_LIMIT']]);
+  });
+
+  it('scores the alternative that was answered when only the second one was', async () => {
+    paper([{ question: choice('a'), choiceGroup: 'g' }, { question: choice('b'), choiceGroup: 'g' }]);
+    await submit({ b: { selectedOption: 'A' } })();
+    expect(records().find(r => r.questionId === 'b')).toMatchObject({ status: 'ANSWERED', isCorrect: false });
+    // The unanswered alternative is not a skipped question: it was never required.
+    expect(totals()).toMatchObject({ totalIncorrect: 1, totalSkipped: 0 });
+  });
+
+  it('counts a pair of alternatives that were both left blank as one skipped question, not two', async () => {
+    paper([{ question: choice('a'), choiceGroup: 'g' }, { question: choice('b'), choiceGroup: 'g' }, { question: choice('c') }]);
+    await submit({})();
+    expect(totals()).toMatchObject({ totalSkipped: 2 });
+  });
+
+  it('queues only the counted written alternative for the teacher', async () => {
+    paper([{ question: written('w1'), choiceGroup: 'g' }, { question: written('w2'), choiceGroup: 'g' }]);
+    const body = await (await submit({ w1: { subjectiveText: 'First' }, w2: { subjectiveText: 'Second' } })()).json();
+    expect(records().map(r => [r.questionId, r.status, r.reviewStatus])).toEqual([['w1', 'ANSWERED', 'PENDING'], ['w2', 'OVER_LIMIT', 'NOT_REQUIRED']]);
+    expect(body.pendingReview).toBe(1);
+  });
+
+  it('attaches only photos this student uploaded for that question, and stores our own paths', async () => {
+    paper([{ question: written('w1') }, { question: written('w2') }]);
+    answerImage.findMany.mockResolvedValue([{ id: 'img-mine', questionId: 'w1' }, { id: 'img-other-question', questionId: 'w2' }]);
+    await submit({ w1: { subjectiveImages: ['img-mine', 'img-other-question', 'made-up', 42] }, w2: { subjectiveImages: ['img-other-question'] } })();
+    const [w1, w2] = records();
+    expect(JSON.parse(w1.subjectiveImage!)).toEqual(['/api/answer-images/img-mine']);
+    expect(w1).toMatchObject({ status: 'ANSWERED', reviewStatus: 'PENDING' });
+    expect(JSON.parse(w2.subjectiveImage!)).toEqual(['/api/answer-images/img-other-question']);
+  });
+
+  it('never stores a raw url sent by the client, and a photo with no text is still an answer', async () => {
+    paper([{ question: written('w1') }]);
+    await submit({ w1: { subjectiveImage: 'https://evil.example/x.png', subjectiveText: '' } })();
+    expect(records()[0]).toMatchObject({ status: 'SKIPPED', subjectiveImage: null });
+    vi.clearAllMocks();
+    setUpTest();
+    paper([{ question: written('w1') }]);
+    answerImage.findMany.mockResolvedValue([{ id: 'img1', questionId: 'w1' }]);
+    await submit({ w1: { subjectiveImages: ['img1'] } })();
+    expect(records()[0]).toMatchObject({ status: 'ANSWERED', reviewStatus: 'PENDING' });
+  });
+
+  it('deletes uploaded photos that did not make it into an answer', async () => {
+    paper([{ question: written('w1') }]);
+    answerImage.findMany.mockResolvedValue([{ id: 'kept', questionId: 'w1' }, { id: 'stray', questionId: 'w1' }]);
+    await submit({ w1: { subjectiveImages: ['kept'] } })();
+    expect(answerImage.deleteMany).toHaveBeenCalledWith({ where: { attemptId: 'attempt-1', id: { notIn: ['kept'] } } });
   });
 });

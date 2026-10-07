@@ -32,6 +32,8 @@ const ROLE_RULES: readonly ApiRule[] = [
   { prefix: "/api/questions", roles: ["TEACHER", "ADMIN", "STUDENT"], methods: ["GET"] },
   { prefix: "/api/questions", roles: ["TEACHER", "ADMIN"] },
   { prefix: "/api/user/", roles: ["ADMIN", "TEACHER", "STUDENT", "PARENT"] },
+  // Photos on written answers: the route itself checks whose photo it is (the student, a teacher who marks the test, an admin).
+  { prefix: "/api/answer-images/", roles: ["ADMIN", "TEACHER", "STUDENT"] },
 ] as const;
 
 function matchesPrefix(pathname: string, prefix: string): boolean {

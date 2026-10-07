@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { requirePremiumTeacher } from "@/lib/teacher-api-guard";
 import { findExamPattern } from "@/lib/exam-patterns";
+import { sanitizeChoiceGroups, slotCountOf } from "@/lib/choice-groups";
 
 export async function POST(request: Request) {
   try {
@@ -30,21 +31,28 @@ export async function POST(request: Request) {
         examPattern: findExamPattern(examPattern) ? examPattern : null,
         createdById: userId,
         sections: {
-          create: sections.map((sect: any) => ({
-            title: sect.title,
-            instructions: sect.instructions,
-            marksPerQuestion: parseFloat(sect.marksPerQuestion) || 4.0,
-            // 0 is a real choice (no negative marking), so only a missing value falls back to 1.
-            negativeMarks: Number.isFinite(parseFloat(sect.negativeMarks)) ? Math.max(0, parseFloat(sect.negativeMarks)) : 1.0,
-            // "Attempt any N": a positive whole number, never more than the section holds.
-            attemptLimit: Number.isInteger(sect.attemptLimit) && sect.attemptLimit > 0 && sect.attemptLimit <= (sect.questions?.length ?? 0) ? sect.attemptLimit : null,
-            questions: {
-              create: sect.questions.map((q: any, index: number) => ({
-                questionId: q.id, 
-                orderIndex: index,
-              })),
-            },
-          })),
+          create: sections.map((sect: any) => {
+            // Internal choice: alternatives share a label; only well-formed runs of two or more survive.
+            const questions = sanitizeChoiceGroups<{ id: string; choiceGroup?: string | null }>(
+              (sect.questions ?? []).map((q: any) => ({ id: q.id, choiceGroup: q.choiceGroup })),
+            );
+            return {
+              title: sect.title,
+              instructions: sect.instructions,
+              marksPerQuestion: parseFloat(sect.marksPerQuestion) || 4.0,
+              // 0 is a real choice (no negative marking), so only a missing value falls back to 1.
+              negativeMarks: Number.isFinite(parseFloat(sect.negativeMarks)) ? Math.max(0, parseFloat(sect.negativeMarks)) : 1.0,
+              // "Attempt any N": a positive whole number, never more than the section's question slots.
+              attemptLimit: Number.isInteger(sect.attemptLimit) && sect.attemptLimit > 0 && sect.attemptLimit <= slotCountOf(questions) ? sect.attemptLimit : null,
+              questions: {
+                create: questions.map((q, index) => ({
+                  questionId: q.id,
+                  orderIndex: index,
+                  choiceGroup: q.choiceGroup ?? null,
+                })),
+              },
+            };
+          }),
         },
       },
       include: {

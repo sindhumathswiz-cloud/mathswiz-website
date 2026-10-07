@@ -640,6 +640,7 @@ model TestAttempt {
   totalSkipped   Int   @default(0)
 
   responses     TestResponse[]
+  answerImages  AnswerImage[]
   masteryEvents MasteryEvent[]
 
   test Test? @relation(fields: [testId], references: [id], onDelete: Cascade)
@@ -668,9 +669,30 @@ model TestQuestion {
   sectionId  String
   questionId String
   orderIndex Int    @default(0)
+  // Internal choice: questions in a section that share a label are alternatives ("Q3 OR Q4"); the
+  // student answers one of them. Null = an ordinary question.
+  choiceGroup String?
 
   section  TestSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   question Question    @relation(fields: [questionId], references: [id])
+}
+
+// A photo of handwritten working attached to a written answer during an exam. Kept in the database
+// (small, downscaled JPEG/PNG/WebP) so it does not depend on a storage backend; served only to the
+// student, the teacher who marks it, and admins.
+model AnswerImage {
+  id         String   @id @default(cuid())
+  attemptId  String
+  questionId String
+  userId     String
+  mimeType   String
+  size       Int
+  bytes      Bytes
+  createdAt  DateTime @default(now())
+
+  attempt TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, questionId])
 }
 
 // Student-Test Responses

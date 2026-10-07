@@ -5,9 +5,13 @@
  * over-attempting a limited section rather than silently discarding an answer).
  */
 
+import { slotKeyOf, hasChoiceGroups, type GroupedQuestion } from './choice-groups';
+
 export interface AnswerLike {
   selectedOption?: string | number | null;
   subjectiveText?: string | null;
+  // Photos of handwritten working (ids of uploaded images).
+  subjectiveImages?: string[] | null;
 }
 
 /** A picked option or typed number that is not just whitespace (a cleared numerical box is not an answer). */
@@ -21,9 +25,14 @@ export function hasWrittenText(response: AnswerLike | null | undefined): boolean
   return typeof response?.subjectiveText === 'string' && response.subjectiveText.trim() !== '';
 }
 
-/** The question holds an answer of either kind. */
+/** A written answer given as one or more photos. */
+export function hasWrittenImages(response: AnswerLike | null | undefined): boolean {
+  return Array.isArray(response?.subjectiveImages) && response.subjectiveImages.length > 0;
+}
+
+/** The question holds an answer of any kind: a choice, typed text, or a photo. */
 export function isAnswered(response: AnswerLike | null | undefined): boolean {
-  return hasChoice(response) || hasWrittenText(response);
+  return hasChoice(response) || hasWrittenText(response) || hasWrittenImages(response);
 }
 
 /** Question types the server can score by comparing with the stored answer. */
@@ -50,7 +59,7 @@ export function answersMatch(type: string, correct: string | null | undefined, s
 
 export interface LimitedSection {
   attemptLimit?: number | null;
-  questions: Array<{ id: string }>;
+  questions: GroupedQuestion[];
 }
 
 /**
@@ -61,12 +70,18 @@ export interface LimitedSection {
  * marks or earn them.
  */
 export function countedQuestionIds(section: LimitedSection, responses: Record<string, AnswerLike | undefined>): Set<string> | null {
-  const limit = section.attemptLimit;
-  if (limit == null || limit <= 0) return null;
+  const limit = section.attemptLimit != null && section.attemptLimit > 0 ? section.attemptLimit : null;
+  if (limit === null && !hasChoiceGroups(section.questions)) return null;
   const counted = new Set<string>();
+  const slotsUsed = new Set<string>();
   for (const question of section.questions) {
-    if (counted.size >= limit) break;
-    if (isAnswered(responses[question.id])) counted.add(question.id);
+    if (!isAnswered(responses[question.id])) continue;
+    const slot = slotKeyOf(question);
+    // Internal choice: the first alternative answered is the one that counts.
+    if (slotsUsed.has(slot)) continue;
+    if (limit !== null && slotsUsed.size >= limit) break;
+    slotsUsed.add(slot);
+    counted.add(question.id);
   }
   return counted;
 }

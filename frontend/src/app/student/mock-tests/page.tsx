@@ -33,7 +33,7 @@ export default async function MockTestsPage() {
             test: {
                 include: {
                     attempts: { where: { userId: userId, status: { in: ['SUBMITTED', 'AUTO_SUBMITTED'] } }, orderBy: { endTime: 'asc' } },
-                    sections: { select: { title: true, marksPerQuestion: true, attemptLimit: true, _count: { select: { questions: true } } } },
+                    sections: { select: { title: true, marksPerQuestion: true, attemptLimit: true, questions: { select: { choiceGroup: true } } } },
                 }
             }
         },

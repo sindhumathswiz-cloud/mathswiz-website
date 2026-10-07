@@ -62,4 +62,23 @@ describe('POST /api/teacher/tests', () => {
     expect(test.create.mock.calls[0][0].data.examPattern).toBeNull();
     expect(savedSections().map(s => s.attemptLimit)).toEqual([null, null, null, null, null, 10]);
   });
+
+  it('saves internal choice as a shared label, drops malformed or lone groups, and counts a group as one slot for the limit', async () => {
+    await post({
+      title: 'CBSE mock', duration: 180, totalMarks: 10, templateType: 'MOCK_EXAM',
+      sections: [{
+        title: 'Section B', marksPerQuestion: 2, negativeMarks: 0, attemptLimit: 3,
+        questions: [{ id: 'a' }, { id: 'b', choiceGroup: 'g1' }, { id: 'c', choiceGroup: 'g1' }, { id: 'd', choiceGroup: 'lonely' }, { id: 'e', choiceGroup: '<bad label>' }],
+      }],
+    });
+    const [section] = test.create.mock.calls[0][0].data.sections.create;
+    expect(section.questions.create.map((x: any) => [x.questionId, x.choiceGroup])).toEqual([['a', null], ['b', 'g1'], ['c', 'g1'], ['d', null], ['e', null]]);
+    // Four slots (a, b/c, d, e): a limit of 3 is within them, and one of 5 would not be.
+    expect(section.attemptLimit).toBe(3);
+  });
+
+  it('rejects an attempt limit larger than the number of slots once alternatives are counted once', async () => {
+    await post({ title: 'x', sections: [{ title: 'S', marksPerQuestion: 2, negativeMarks: 0, attemptLimit: 3, questions: [{ id: 'a', choiceGroup: 'g' }, { id: 'b', choiceGroup: 'g' }, { id: 'c' }] }] });
+    expect(test.create.mock.calls[0][0].data.sections.create[0].attemptLimit).toBeNull();
+  });
 });

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { ArrowLeft, CheckCircle2, ClipboardCheck, Loader2 } from 'lucide-react';
+import { decodeImageRefs } from '@/lib/answer-images';
 
 type Submission = {
   id: string;
@@ -60,7 +61,21 @@ export default function HomeworkReviewClient() {
           <article key={item.id} className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface p-6 shadow-sm">
             <div className="mb-4 flex flex-wrap justify-between gap-2"><div><p className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-brand">{item.attempt.test.title}</p><h2 className="font-display font-black text-slate-900 dark:text-white">{item.attempt.user.firstName} {item.attempt.user.lastName}</h2></div><span className={`rounded-full px-3 py-1 text-xs font-black ${item.reviewStatus === 'PENDING' ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-400' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400'}`}>{item.reviewStatus}</span></div>
             <p className="mb-3 font-semibold text-slate-800 dark:text-slate-200">{item.question.content}</p>
-            <div className="mb-5 rounded-2xl bg-slate-50 dark:bg-white/5 p-4 text-slate-700 dark:text-slate-300">{item.subjectiveText || 'Image submission'}{item.subjectiveImage && <a className="ml-2 font-bold text-indigo-700 dark:text-brand underline" href={item.subjectiveImage} target="_blank" rel="noreferrer">View image</a>}</div>
+            <div className="mb-5 rounded-2xl bg-slate-50 dark:bg-white/5 p-4 text-slate-700 dark:text-slate-300">
+              {item.subjectiveText ? <p className="whitespace-pre-wrap">{item.subjectiveText}</p> : decodeImageRefs(item.subjectiveImage).length === 0 && <p>No answer given.</p>}
+              {decodeImageRefs(item.subjectiveImage).length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-3" aria-label="Photos of the student's working">
+                  {decodeImageRefs(item.subjectiveImage).map((url, i) => (
+                    <li key={url}>
+                      <a href={url} target="_blank" rel="noreferrer" title="Open full size">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Photo ${i + 1} of the student's working`} data-testid="submission-photo" className="h-32 w-32 rounded-xl border border-slate-200 object-cover dark:border-white/10" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <form onSubmit={(event) => review(event, item.id)} className="grid gap-4 md:grid-cols-[140px_1fr_auto] md:items-end">
               <label className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">Marks{item.maxMarks !== null ? ` (out of ${item.maxMarks})` : ''}<input name="marksAwarded" type="number" min="0" max={item.maxMarks ?? 1000} step="0.5" required defaultValue={item.marksAwarded} className="mt-1 w-full rounded-xl border dark:border-white/10 dark:bg-white/5 p-3 text-base text-slate-900 dark:text-white" /></label>
               <label className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">Feedback<textarea name="teacherFeedback" required maxLength={5000} defaultValue={item.teacherFeedback || ''} rows={2} className="mt-1 w-full rounded-xl border dark:border-white/10 dark:bg-white/5 p-3 text-sm font-medium normal-case text-slate-900 dark:text-white" /></label>

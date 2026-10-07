@@ -49,7 +49,7 @@ describe('POST /api/teacher/tests/[testId]/duplicate', () => {
       templateType: 'WORKSHEET',
       examPattern: 'JEE_MAIN_MATHS',
       sections: [
-        { title: 'Section A', instructions: null, marksPerQuestion: 4, negativeMarks: 1, attemptLimit: 5, questions: [{ questionId: 'q-1', orderIndex: 0 }, { questionId: 'q-2', orderIndex: 1 }] },
+        { title: 'Section A', instructions: null, marksPerQuestion: 4, negativeMarks: 1, attemptLimit: 5, questions: [{ questionId: 'q-1', orderIndex: 0, choiceGroup: 'g1' }, { questionId: 'q-2', orderIndex: 1, choiceGroup: 'g1' }] },
       ],
     });
     test.create.mockResolvedValue({ id: 'test-2', title: 'Midterm (copy)', sections: [] });
@@ -71,7 +71,7 @@ describe('POST /api/teacher/tests/[testId]/duplicate', () => {
           create: [expect.objectContaining({
             title: 'Section A',
             attemptLimit: 5,
-            questions: { create: [{ questionId: 'q-1', orderIndex: 0 }, { questionId: 'q-2', orderIndex: 1 }] },
+            questions: { create: [{ questionId: 'q-1', orderIndex: 0, choiceGroup: 'g1' }, { questionId: 'q-2', orderIndex: 1, choiceGroup: 'g1' }] },
           })],
         },
       }),

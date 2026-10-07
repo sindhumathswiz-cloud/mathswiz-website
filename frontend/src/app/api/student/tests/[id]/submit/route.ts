@@ -8,10 +8,12 @@ import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { applyMasteryUpdate } from '@/lib/mastery';
 import { withSerializableRetry } from '@/lib/prisma-retry';
 import { recordQuestionReview } from '@/lib/spaced-repetition-review';
-import { AUTO_SCORED_TYPES, answersMatch, countedQuestionIds, hasChoice } from '@/lib/exam-scoring';
+import { AUTO_SCORED_TYPES, answersMatch, countedQuestionIds, hasChoice, isAnswered } from '@/lib/exam-scoring';
+import { slotKeyOf } from '@/lib/choice-groups';
 import { roundMarks } from '@/lib/exam-patterns';
 import { answersToScore, isPastGrace } from '@/lib/exam-clock';
 import { isWrittenType } from '@/lib/exam-view';
+import { answerImageUrl, encodeImageRefs, MAX_IMAGES_PER_ANSWER } from '@/lib/answer-images';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +50,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       submitted: submittedResponses,
       saved: attempt.savedResponses as Record<string, any> | null,
     });
-    const responses = scoring.responses as Record<string, any>;
+    // Photos can only be ones this student uploaded to this attempt for that question: a made-up or
+    // someone else's id is dropped, and no raw URL from the request is ever stored.
+    const uploaded = await prisma.answerImage.findMany({ where: { attemptId, userId: studentId }, select: { id: true, questionId: true } });
+    const imageIdsByQuestion = new Map<string, Set<string>>();
+    for (const image of uploaded) {
+      if (!imageIdsByQuestion.has(image.questionId)) imageIdsByQuestion.set(image.questionId, new Set());
+      imageIdsByQuestion.get(image.questionId)!.add(image.id);
+    }
+    const responses: Record<string, any> = {};
+    for (const [questionId, response] of Object.entries(scoring.responses as Record<string, any>)) {
+      if (!response || typeof response !== 'object') continue;
+      const valid = Array.isArray(response.subjectiveImages)
+        ? response.subjectiveImages.filter((id: unknown): id is string => typeof id === 'string' && !!imageIdsByQuestion.get(questionId)?.has(id)).slice(0, MAX_IMAGES_PER_ANSWER)
+        : [];
+      responses[questionId] = { ...response, subjectiveImages: valid };
+    }
 
     const homeworkAssignment = await prisma.testAssignment.findFirst({
       where: {
@@ -85,9 +102,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     for (const section of test.sections) {
       // "Attempt any N": only the first N answered questions score. Null = no limit.
       const counted = countedQuestionIds(
-        { attemptLimit: section.attemptLimit, questions: section.questions.map((tq) => ({ id: tq.question.id })) },
+        { attemptLimit: section.attemptLimit, questions: section.questions.map((tq) => ({ id: tq.question.id, choiceGroup: tq.choiceGroup })) },
         responses ?? {},
       );
+      // A question left blank counts as skipped once per slot: not at all if its alternative was answered,
+      // and once (not twice) when neither alternative was.
+      const slotAnswered = new Map<string, boolean>();
+      for (const tq of section.questions) {
+        const key = slotKeyOf({ id: tq.question.id, choiceGroup: tq.choiceGroup });
+        slotAnswered.set(key, (slotAnswered.get(key) ?? false) || isAnswered(responses[tq.question.id]));
+      }
+      const skippedSlots = new Set<string>();
+      const noteSkipped = (tq: { question: { id: string }; choiceGroup: string | null }) => {
+        const key = slotKeyOf({ id: tq.question.id, choiceGroup: tq.choiceGroup });
+        if (slotAnswered.get(key) || skippedSlots.has(key)) return;
+        skippedSlots.add(key);
+        totalSkipped++;
+      };
       for (const tq of section.questions) {
         const q = tq.question;
         const studentResponse = responses[q.id];
@@ -106,15 +137,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           subjectiveText = typeof studentResponse.subjectiveText === 'string'
             ? studentResponse.subjectiveText.trim().slice(0, 20_000) || null
             : null;
-          subjectiveImage = typeof studentResponse.subjectiveImage === 'string'
-            ? studentResponse.subjectiveImage.trim().slice(0, 2_000) || null
-            : null;
+          subjectiveImage = encodeImageRefs(studentResponse.subjectiveImages.map(answerImageUrl));
           if (subjectiveText || subjectiveImage) {
-            status = 'ANSWERED';
-            // Written answers are marked by a teacher: homework always, and a mock exam that has them.
-            reviewStatus = needsTeacherMarking ? 'PENDING' : 'NOT_REQUIRED';
+            if (counted && !counted.has(q.id)) {
+              // The other alternative (internal choice) or an "attempt any N" limit already used this slot:
+              // kept on the record, never queued for marking.
+              status = 'OVER_LIMIT';
+            } else {
+              status = 'ANSWERED';
+              // Written answers are marked by a teacher: homework always, and a mock exam that has them.
+              reviewStatus = needsTeacherMarking ? 'PENDING' : 'NOT_REQUIRED';
+            }
           } else {
-            totalSkipped++;
+            noteSkipped(tq);
           }
         } else if (!isSubjective && hasChoice(studentResponse)) {
           status = 'ANSWERED';
@@ -146,7 +181,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             }
           }
         } else {
-          totalSkipped++;
+          noteSkipped(tq);
         }
 
         totalScore += marksAwarded;
@@ -211,6 +246,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
       return tx.testAttempt.findUniqueOrThrow({ where: { id: attemptId } });
     }, { isolationLevel: 'Serializable' }));
+
+    // Photos uploaded during the exam but not attached to a submitted answer are of no further use.
+    const keptIds = responseRecords.flatMap((record) => (record.subjectiveImage ? JSON.parse(record.subjectiveImage) as string[] : []).map((url) => url.split('/').pop() as string));
+    await prisma.answerImage.deleteMany({ where: { attemptId, id: { notIn: keptIds } } }).catch(() => {});
 
     // Award points for test completion
     await awardPoints(studentId, POINTS_RULES.TEST_COMPLETED, 'Test completed', { testId: id, score: totalScore });

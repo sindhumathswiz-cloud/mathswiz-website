@@ -46,4 +46,13 @@ describe('summarizeMockExam', () => {
     expect(at([50, 50]).trend).toBe('FLAT');
     expect(at([50]).trend).toBeNull();
   });
+
+  it('counts a pair of alternatives as one question, in the count and in the marks', () => {
+    const cbse = summarizeMockExam({
+      sections: [{ title: 'Section B', marksPerQuestion: 2, attemptLimit: null, questions: [{}, { choiceGroup: 'g' }, { choiceGroup: 'g' }, {}, {}] }],
+    });
+    expect(cbse.sections).toEqual([{ title: 'Section B', questions: 4, rule: null }]);
+    expect(cbse.totalQuestions).toBe(4);
+    expect(cbse.maxMarks).toBe(8);
+  });
 });

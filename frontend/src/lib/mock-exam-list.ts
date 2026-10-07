@@ -1,4 +1,5 @@
 import { findExamPattern, examMaxMarks, roundMarks } from './exam-patterns';
+import { slotCountOf } from './choice-groups';
 
 /**
  * What the Mock Exams list shows for one assignment: the paper's shape (sections,
@@ -7,7 +8,14 @@ import { findExamPattern, examMaxMarks, roundMarks } from './exam-patterns';
  */
 
 interface RawAttempt { totalScore: number; endTime?: string | Date | null; startTime?: string | Date | null }
-interface RawSection { title: string; marksPerQuestion?: number | null; attemptLimit?: number | null; _count?: { questions: number } }
+interface RawSection {
+  title: string;
+  marksPerQuestion?: number | null;
+  attemptLimit?: number | null;
+  // Either the questions (so alternatives can be counted once) or just how many there are.
+  questions?: Array<{ choiceGroup?: string | null }>;
+  _count?: { questions: number };
+}
 interface RawTest {
   examPattern?: string | null;
   totalMarks?: number | null;
@@ -32,7 +40,10 @@ const timeOf = (attempt: RawAttempt) => new Date(attempt.endTime ?? attempt.star
 
 export function summarizeMockExam(test: RawTest): MockExamSummary {
   const sections = (test.sections ?? []).map(section => {
-    const questions = section._count?.questions ?? 0;
+    // A group of alternatives is one question to answer.
+    const questions = section.questions
+      ? slotCountOf(section.questions.map((question, index) => ({ id: String(index), choiceGroup: question.choiceGroup })))
+      : section._count?.questions ?? 0;
     const limit = section.attemptLimit != null && section.attemptLimit > 0 && section.attemptLimit < questions ? section.attemptLimit : null;
     return { title: section.title, questions, limit, marks: section.marksPerQuestion ?? 4 };
   });

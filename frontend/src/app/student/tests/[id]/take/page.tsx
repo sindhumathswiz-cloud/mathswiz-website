@@ -10,8 +10,10 @@ import ExamPalette from '@/components/exam/ExamPalette';
 import SubmitSummary from '@/components/exam/SubmitSummary';
 import { findExamPattern, markingLabel } from '@/lib/exam-patterns';
 import { isAnswered } from '@/lib/exam-scoring';
+import { MAX_IMAGES_PER_ANSWER } from '@/lib/answer-images';
+import { downscalePhoto } from '@/lib/image-downscale';
 import {
-    attemptedIn, buildExamSections, canAnswer, examMaxFromSections, instructionRows, isNumericalType, isWrittenType,
+    alternativePositions, attemptedIn, buildExamSections, canAnswer, examMaxFromSections, instructionRows, isNumericalType, isWrittenType,
     questionTypeLabel, sectionIndexOf, stableShuffle, summaryRows, type ExamResponse, type ExamSection,
 } from '@/lib/exam-view';
 import {
@@ -25,6 +27,8 @@ import {
     LayoutGrid,
     ShieldAlert,
     Delete,
+    Camera,
+    Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -330,8 +334,59 @@ export default function TestTakingUI() {
     };
 
     const handleWrittenChange = (qId: string, text: string) => {
-        const trimmed = text.trim() !== '';
-        setResponses(prev => ({ ...prev, [qId]: { ...prev[qId], subjectiveText: text.slice(0, 20_000), status: trimmed ? 'ANSWERED' : 'NOT_ANSWERED' } }));
+        const hasText = text.trim() !== '';
+        // The first characters are an "answer" and so must respect internal choice and attempt limits.
+        if (hasText && !allowedToAnswer(qId)) return;
+        setResponses(prev => {
+            const current = prev[qId];
+            const answered = hasText || (current?.subjectiveImages?.length ?? 0) > 0;
+            return { ...prev, [qId]: { ...current, subjectiveText: text.slice(0, 20_000), status: answered ? 'ANSWERED' : 'NOT_ANSWERED' } };
+        });
+    };
+
+    // Photos of handwritten working, for written answers.
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const attachPhoto = async (qId: string, file: File | undefined) => {
+        if (!file || uploadingPhoto) return;
+        if ((responses[qId]?.subjectiveImages?.length ?? 0) >= MAX_IMAGES_PER_ANSWER) {
+            toast.error(`You can attach up to ${MAX_IMAGES_PER_ANSWER} photos to an answer.`);
+            return;
+        }
+        if (!allowedToAnswer(qId)) return;
+        setUploadingPhoto(true);
+        try {
+            const photo = await downscalePhoto(file);
+            const form = new FormData();
+            form.set('attemptId', attemptIdRef.current);
+            form.set('questionId', qId);
+            form.set('file', photo);
+            const res = await fetch(`/api/student/tests/${testId}/answer-images`, { method: 'POST', body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'The photo could not be uploaded');
+            setResponses(prev => {
+                const current = prev[qId];
+                return { ...prev, [qId]: { ...current, subjectiveImages: [...(current?.subjectiveImages ?? []), data.id as string], status: 'ANSWERED' } };
+            });
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'The photo could not be uploaded');
+        } finally {
+            setUploadingPhoto(false);
+        }
+    };
+
+    const removePhoto = async (qId: string, imageId: string) => {
+        try {
+            const res = await fetch(`/api/student/tests/${testId}/answer-images/${imageId}`, { method: 'DELETE' });
+            if (!res.ok && res.status !== 404) throw new Error('The photo could not be removed');
+            setResponses(prev => {
+                const current = prev[qId];
+                const images = (current?.subjectiveImages ?? []).filter(id => id !== imageId);
+                const answered = images.length > 0 || (current?.subjectiveText ?? '').trim() !== '';
+                return { ...prev, [qId]: { ...current, subjectiveImages: images, status: answered ? 'ANSWERED' : 'NOT_ANSWERED' } };
+            });
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'The photo could not be removed');
+        }
     };
 
     const handleKeypad = (qId: string, key: string) => handleNumericChange(qId, `${responses[qId]?.selectedOption ?? ''}${key}`);
@@ -341,7 +396,7 @@ export default function TestTakingUI() {
 
     const handleClearResponse = () => {
         if (!currentQ) return;
-        setResponses(prev => ({ ...prev, [currentQ.id]: { ...prev[currentQ.id], selectedOption: null, subjectiveText: '', status: 'NOT_ANSWERED' } }));
+        setResponses(prev => ({ ...prev, [currentQ.id]: { ...prev[currentQ.id], selectedOption: null, subjectiveText: '', subjectiveImages: [], status: 'NOT_ANSWERED' } }));
     };
 
     const goToQuestion = (index: number) => {
@@ -416,6 +471,7 @@ export default function TestTakingUI() {
     const isLastQuestion = currentIndex === allQuestions.length - 1;
     const numerical = isNumericalType(currentQ.type);
     const written = isWrittenType(currentQ.type);
+    const alternatives = alternativePositions(activeSection, currentQ.id);
     const numericValue = String(responses[currentQ.id]?.selectedOption ?? '');
 
     // A full-screen layer above the student layout: its sidebar and links have no place in an exam,
@@ -484,6 +540,11 @@ export default function TestTakingUI() {
                         <div className="w-8 h-8 rounded-lg bg-indigo-900 text-white flex items-center justify-center font-black text-sm tabular-nums">{positionInSection}</div>
                         <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">{questionTypeLabel(currentQ.type)}</span>
                         <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">{markingLabel(activeSection)}</span>
+                        {alternatives.length > 0 && (
+                            <span data-testid="alternative-note" className="rounded-md bg-violet-50 px-2 py-1 text-[11px] font-black text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                                OR: answer this or Question {alternatives.join(' / ')}, not both
+                            </span>
+                        )}
                         <button type="button" onClick={() => setShowPalette(true)} className="ml-auto flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-white lg:hidden">
                             <LayoutGrid className="h-3.5 w-3.5" /> Questions
                         </button>
@@ -513,7 +574,33 @@ export default function TestTakingUI() {
                                             placeholder="Write your working and answer here. Use $...$ for maths if you like."
                                             className="w-full rounded-2xl border-2 border-slate-200 bg-white p-4 text-base font-medium leading-relaxed text-slate-900 outline-none focus:border-indigo-600 dark:border-white/10 dark:bg-surface-muted dark:text-white dark:focus:border-brand"
                                         />
-                                        <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Your teacher marks this after the exam. Your total is updated when they do.</p>
+                                        <div className="mt-4">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-slate-600 transition hover:border-indigo-400 hover:text-indigo-700 dark:border-white/20 dark:text-slate-300 ${uploadingPhoto || (responses[currentQ.id]?.subjectiveImages?.length ?? 0) >= MAX_IMAGES_PER_ANSWER ? 'pointer-events-none opacity-50' : ''}`}>
+                                                    <Camera className="h-4 w-4" /> {uploadingPhoto ? 'Uploading…' : 'Add a photo of your working'}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        data-testid="answer-photo-input"
+                                                        className="sr-only"
+                                                        onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; void attachPhoto(currentQ.id, file); }}
+                                                    />
+                                                </label>
+                                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Up to {MAX_IMAGES_PER_ANSWER} photos. Write clearly and keep the page flat.</span>
+                                            </div>
+                                            {(responses[currentQ.id]?.subjectiveImages?.length ?? 0) > 0 && (
+                                                <ul className="mt-3 flex flex-wrap gap-3" aria-label="Attached photos">
+                                                    {responses[currentQ.id]!.subjectiveImages!.map((imageId, i) => (
+                                                        <li key={imageId} className="relative">
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img src={`/api/answer-images/${imageId}`} alt={`Photo ${i + 1} of your working`} data-testid="answer-photo" className="h-24 w-24 rounded-xl border border-slate-200 object-cover dark:border-white/10" />
+                                                            <button type="button" onClick={() => void removePhoto(currentQ.id, imageId)} aria-label={`Remove photo ${i + 1}`} className="absolute -right-2 -top-2 rounded-full bg-rose-600 p-1.5 text-white shadow"><Trash2 className="h-3 w-3" /></button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Your teacher marks this after the exam. Your total is updated when they do.</p>
                                     </div>
                                 ) : numerical ? (
                                     <div className="max-w-sm">

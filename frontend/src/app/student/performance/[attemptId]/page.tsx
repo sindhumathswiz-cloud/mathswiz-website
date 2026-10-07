@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 import { isWrittenType } from '@/lib/exam-view';
+import { decodeImageRefs } from '@/lib/answer-images';
 import QuestionTrustBadge from '@/components/QuestionTrustBadge';
 import toast from 'react-hot-toast';
 
@@ -307,7 +308,14 @@ export default function PerformanceAnalytics() {
                                         {isWrittenType(r.question.type) && (
                                             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
                                                 <p className="text-[10px] font-black uppercase opacity-60">Your written answer</p>
-                                                <p className="mt-2 whitespace-pre-wrap text-sm font-medium text-slate-800 dark:text-slate-200">{r.subjectiveText || 'No answer given'}</p>
+                                                <p className="mt-2 whitespace-pre-wrap text-sm font-medium text-slate-800 dark:text-slate-200">{r.subjectiveText || (decodeImageRefs(r.subjectiveImage).length > 0 ? '' : 'No answer given')}</p>
+                                                {decodeImageRefs(r.subjectiveImage).length > 0 && (
+                                                    <ul className="mt-2 flex flex-wrap gap-3" aria-label="Photos of your working">
+                                                        {decodeImageRefs(r.subjectiveImage).map((url, i) => (
+                                                            <li key={url}><a href={url} target="_blank" rel="noreferrer">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={url} alt={`Photo ${i + 1} of your working`} className="h-24 w-24 rounded-xl border border-slate-200 object-cover dark:border-white/10" /></a></li>
+                                                        ))}
+                                                    </ul>
+                                                )}
                                                 <p className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
                                                     {r.reviewStatus === 'PENDING' ? 'Waiting for your teacher to mark this.' : r.reviewStatus === 'REVIEWED' ? `Marked: ${r.marksAwarded}` : 'Not marked.'}
                                                 </p>

@@ -1,5 +1,6 @@
 import { isAnswered } from './exam-scoring';
 import { attemptRuleLabel, examMaxMarks, markingLabel } from './exam-patterns';
+import { slotCountOf, slotKeyOf } from './choice-groups';
 
 /**
  * The exam screen's view logic, kept out of the component so it can be tested:
@@ -14,6 +15,8 @@ export interface ExamResponse {
   selectedOption: string | null;
   // The text of a written answer; the other kinds use selectedOption.
   subjectiveText?: string;
+  // Ids of uploaded photos of handwritten working.
+  subjectiveImages?: string[];
   status: QuestionStatus;
   timeSpent: number;
 }
@@ -26,6 +29,10 @@ export interface ExamSection {
   negativeMarks: number;
   attemptLimit: number | null;
   questionIds: string[];
+  // Internal choice: question id -> the group it shares with its alternatives. Absent for ordinary questions.
+  choiceGroups: Record<string, string>;
+  // Questions the student must deal with: each group of alternatives counts once.
+  slotCount: number;
   // Index of this section's first question in the flat question list.
   startIndex: number;
 }
@@ -37,21 +44,26 @@ interface RawSection {
   marksPerQuestion?: number | null;
   negativeMarks?: number | null;
   attemptLimit?: number | null;
-  questions: Array<{ question: { id: string } }>;
+  questions: Array<{ question: { id: string }; choiceGroup?: string | null }>;
 }
 
 export function buildExamSections(rawSections: RawSection[]): ExamSection[] {
   let startIndex = 0;
   return rawSections.map(section => {
     const questionIds = section.questions.map(item => item.question.id);
+    const choiceGroups: Record<string, string> = {};
+    for (const item of section.questions) if (item.choiceGroup) choiceGroups[item.question.id] = item.choiceGroup;
+    const slotCount = slotCountOf(section.questions.map(item => ({ id: item.question.id, choiceGroup: item.choiceGroup })));
     const built: ExamSection = {
       id: section.id,
       title: section.title,
       instructions: section.instructions ?? '',
       marksPerQuestion: section.marksPerQuestion ?? 4,
       negativeMarks: section.negativeMarks ?? 0,
-      attemptLimit: section.attemptLimit != null && section.attemptLimit > 0 && section.attemptLimit < questionIds.length ? section.attemptLimit : null,
+      attemptLimit: section.attemptLimit != null && section.attemptLimit > 0 && section.attemptLimit < slotCount ? section.attemptLimit : null,
       questionIds,
+      choiceGroups,
+      slotCount,
       startIndex,
     };
     startIndex += questionIds.length;
@@ -69,9 +81,32 @@ export function sectionIndexOf(sections: ExamSection[], flatIndex: number): numb
 
 const hasAnswer = (response: ExamResponse | undefined) => isAnswered(response);
 
-/** How many of a section's questions currently hold an answer. */
+const slotOf = (section: ExamSection, id: string) => slotKeyOf({ id, choiceGroup: section.choiceGroups[id] });
+
+/** How many of a section's questions currently hold an answer; a group of alternatives counts once. */
 export function attemptedIn(section: ExamSection, responses: Record<string, ExamResponse | undefined>): number {
-  return section.questionIds.filter(id => hasAnswer(responses[id])).length;
+  return new Set(section.questionIds.filter(id => hasAnswer(responses[id])).map(id => slotOf(section, id))).size;
+}
+
+/** The other questions a question is an alternative to, as 1-based positions within the section. */
+export function alternativePositions(section: ExamSection, questionId: string): number[] {
+  const group = section.choiceGroups[questionId];
+  if (!group) return [];
+  return section.questionIds.flatMap((id, index) => (id !== questionId && section.choiceGroups[id] === group ? [index + 1] : []));
+}
+
+/**
+ * One question id per slot, for counting statuses: the answered alternative if there is one,
+ * otherwise the first. Keeps the palette and summary counts in step with "questions to answer".
+ */
+export function slotRepresentatives(section: ExamSection, responses: Record<string, ExamResponse | undefined>): string[] {
+  const chosen = new Map<string, string>();
+  for (const id of section.questionIds) {
+    const slot = slotOf(section, id);
+    const current = chosen.get(slot);
+    if (current === undefined || (!hasAnswer(responses[current]) && hasAnswer(responses[id]))) chosen.set(slot, id);
+  }
+  return [...chosen.values()];
 }
 
 export type AnswerCheck = { ok: true } | { ok: false; reason: string };
@@ -84,7 +119,13 @@ export type AnswerCheck = { ok: true } | { ok: false; reason: string };
  * cost anything, instead of the surplus being quietly discarded at scoring.
  */
 export function canAnswer(section: ExamSection, responses: Record<string, ExamResponse | undefined>, questionId: string): AnswerCheck {
-  if (section.attemptLimit === null || hasAnswer(responses[questionId])) return { ok: true };
+  if (hasAnswer(responses[questionId])) return { ok: true };
+  // Internal choice: one answer per group of alternatives.
+  const answeredAlternative = alternativePositions(section, questionId).find(position => hasAnswer(responses[section.questionIds[position - 1]]));
+  if (answeredAlternative !== undefined) {
+    return { ok: false, reason: `This is an alternative to Question ${answeredAlternative}, which you have answered. Clear that answer first to answer this one instead.` };
+  }
+  if (section.attemptLimit === null) return { ok: true };
   if (attemptedIn(section, responses) >= section.attemptLimit) {
     return { ok: false, reason: `You can answer only ${section.attemptLimit} questions in ${section.title}. Clear one of your answers to answer this one.` };
   }
@@ -110,8 +151,8 @@ export function summaryRows(sections: ExamSection[], responses: Record<string, E
   return sections.map(section => ({
     sectionId: section.id,
     title: section.title,
-    total: section.questionIds.length,
-    counts: statusCounts(section.questionIds, responses),
+    total: section.slotCount,
+    counts: statusCounts(slotRepresentatives(section, responses), responses),
     attempted: attemptedIn(section, responses),
     attemptLimit: section.attemptLimit,
   }));
@@ -130,21 +171,23 @@ export function submitWarnings(rows: SummaryRow[]): string[] {
   return warnings;
 }
 
-export interface ExamSummaryLine { title: string; questions: number; rule: string | null; marking: string; maxMarks: number }
+export interface ExamSummaryLine { title: string; questions: number; alternatives: number; rule: string | null; marking: string; maxMarks: number }
 
 /** The table on the instructions screen: what each section asks and how it is marked. */
 export function instructionRows(sections: ExamSection[]): ExamSummaryLine[] {
   return sections.map(section => ({
     title: section.title,
-    questions: section.questionIds.length,
-    rule: attemptRuleLabel({ questionCount: section.questionIds.length, attemptLimit: section.attemptLimit }),
+    questions: section.slotCount,
+    // Extra questions offered as alternatives (internal choice).
+    alternatives: section.questionIds.length - section.slotCount,
+    rule: attemptRuleLabel({ questionCount: section.slotCount, attemptLimit: section.attemptLimit }),
     marking: markingLabel(section),
-    maxMarks: examMaxMarks([{ questionCount: section.questionIds.length, attemptLimit: section.attemptLimit, marksPerQuestion: section.marksPerQuestion }]),
+    maxMarks: examMaxMarks([{ questionCount: section.slotCount, attemptLimit: section.attemptLimit, marksPerQuestion: section.marksPerQuestion }]),
   }));
 }
 
 export function examMaxFromSections(sections: ExamSection[]): number {
-  return examMaxMarks(sections.map(section => ({ questionCount: section.questionIds.length, attemptLimit: section.attemptLimit, marksPerQuestion: section.marksPerQuestion })));
+  return examMaxMarks(sections.map(section => ({ questionCount: section.slotCount, attemptLimit: section.attemptLimit, marksPerQuestion: section.marksPerQuestion })));
 }
 
 // Answered in words and marked by a teacher. A case study is one box for its sub-parts.

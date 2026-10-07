@@ -74,3 +74,28 @@ describe('countedQuestionIds', () => {
     expect([...countedQuestionIds(section(1, 4), responses)!]).toEqual(['q3']);
   });
 });
+
+describe('internal choice and photo answers', () => {
+  const grouped = [{ id: 'a' }, { id: 'b', choiceGroup: 'g' }, { id: 'c', choiceGroup: 'g' }, { id: 'd' }];
+
+  it('counts only the first answered alternative of a group, and leaves unlimited sections to everything else', () => {
+    expect([...countedQuestionIds({ questions: grouped }, { a: { selectedOption: 'A' }, b: { selectedOption: 'B' }, c: { selectedOption: 'C' }, d: { selectedOption: 'D' } })!]).toEqual(['a', 'b', 'd']);
+    // Only the second alternative answered: that one counts.
+    expect([...countedQuestionIds({ questions: grouped }, { c: { selectedOption: 'C' } })!]).toEqual(['c']);
+    // No groups and no limit still means "everything counts".
+    expect(countedQuestionIds({ questions: [{ id: 'a' }] }, { a: { selectedOption: 'A' } })).toBeNull();
+  });
+
+  it('counts a group as one slot against an attempt limit', () => {
+    const all = { a: { selectedOption: '1' }, b: { selectedOption: '1' }, c: { selectedOption: '1' }, d: { selectedOption: '1' } };
+    // Limit 2 slots: a, then the b/c group; d is over the limit.
+    expect([...countedQuestionIds({ attemptLimit: 2, questions: grouped }, all)!]).toEqual(['a', 'b']);
+  });
+
+  it('treats a photo, with or without text, as an answer', () => {
+    expect(isAnswered({ subjectiveImages: ['img1'] })).toBe(true);
+    expect(isAnswered({ subjectiveImages: [] })).toBe(false);
+    expect(isAnswered({ subjectiveImages: null, subjectiveText: '  ' })).toBe(false);
+    expect(isAnswered({ subjectiveText: 'working', subjectiveImages: ['img1'] })).toBe(true);
+  });
+});

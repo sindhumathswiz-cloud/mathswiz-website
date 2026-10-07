@@ -9,6 +9,7 @@ import {
 import MathRenderer from '@/components/MathRenderer';
 import QuestionSourceSelector, { NO_SOURCE, type SourceSelection } from '@/components/teacher/QuestionSourceSelector';
 import { attemptRuleLabel, EXAM_PATTERNS, examMaxMarks, findExamPattern, sectionsFromPattern } from '@/lib/exam-patterns';
+import { normalizeChoiceGroups, slotCountOf, toggleAlternative } from '@/lib/choice-groups';
 
 type Question = {
   id: string;
@@ -19,6 +20,8 @@ type Question = {
   difficulty: string;
   subject?: string;
   topic?: string;
+  // Internal choice: questions sharing a label are alternatives ("Q3 OR Q4").
+  choiceGroup?: string | null;
 };
 
 type TestSection = {
@@ -157,7 +160,7 @@ export default function TestCreatorStudio() {
   const removeQuestionFromTest = (sectionId: string, questionId: string) => {
     setSections(sections.map(s => {
       if (s.id === sectionId) {
-        return { ...s, questions: s.questions.filter(q => q.id !== questionId) };
+        return { ...s, questions: normalizeChoiceGroups(s.questions.filter(q => q.id !== questionId)) };
       }
       return s;
     }));
@@ -172,10 +175,17 @@ export default function TestCreatorStudio() {
         } else if (direction === 'down' && index < newQs.length - 1) {
           [newQs[index + 1], newQs[index]] = [newQs[index], newQs[index + 1]];
         }
-        return { ...s, questions: newQs };
+        return { ...s, questions: normalizeChoiceGroups(newQs) };
       }
       return s;
     }));
+  };
+
+  // Make a question an alternative to the one above it ("Q3 OR Q4"), or undo that.
+  const toggleAlternativeAt = (sectionId: string, index: number) => {
+    setSections(sections.map(s => (s.id === sectionId
+      ? { ...s, questions: toggleAlternative(s.questions, index, `g${Date.now().toString(36)}${index}`) }
+      : s)));
   };
 
   // Shared by both auto-pick entry points (AI blueprint + structured filter
@@ -313,10 +323,10 @@ export default function TestCreatorStudio() {
     setIsSaving(true);
     try {
       // Only the questions that can score: a section that is "attempt any 5 of 10" is worth 5.
-      const computedTotal = examMaxMarks(sections.map(s => ({ questionCount: s.questions.length, attemptLimit: s.attemptLimit, marksPerQuestion: s.marksPerQuestion })));
+      const computedTotal = examMaxMarks(sections.map(s => ({ questionCount: slotCountOf(s.questions), attemptLimit: s.attemptLimit, marksPerQuestion: s.marksPerQuestion })));
 
-      const short = sections.filter(s => s.targetQuestions && s.questions.length < s.targetQuestions);
-      if (short.length > 0 && !confirm(`${short.map(s => `${s.title} has ${s.questions.length} of ${s.targetQuestions} questions`).join('; ')}. Save anyway?`)) {
+      const short = sections.filter(s => s.targetQuestions && slotCountOf(s.questions) < s.targetQuestions);
+      if (short.length > 0 && !confirm(`${short.map(s => `${s.title} has ${slotCountOf(s.questions)} of ${s.targetQuestions} questions`).join('; ')}. Save anyway?`)) {
         setIsSaving(false);
         return;
       }
@@ -331,7 +341,7 @@ export default function TestCreatorStudio() {
           duration,
           totalMarks: computedTotal,
           // A limit larger than the section is no limit; send what will actually apply.
-          sections: sections.map(s => ({ ...s, attemptLimit: s.attemptLimit && s.attemptLimit <= s.questions.length ? s.attemptLimit : null })),
+          sections: sections.map(s => ({ ...s, attemptLimit: s.attemptLimit && s.attemptLimit <= slotCountOf(s.questions) ? s.attemptLimit : null })),
           templateType: templateType || undefined,
           examPattern: examPattern || undefined,
         })
@@ -561,8 +571,8 @@ export default function TestCreatorStudio() {
                             <span className="bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-400 px-2 py-1 rounded print:bg-transparent print:p-0">Neg: <input type="number" step="0.5" value={section.negativeMarks} onChange={e => updateSection(section.id, 'negativeMarks', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} className="w-10 bg-transparent text-red-700 dark:text-rose-400 border-b border-red-300 dark:border-rose-500/30 text-center outline-none" /></span>
                           </div>
                           <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 print:hidden">
-                            <span className="bg-indigo-50 dark:bg-brand/10 text-indigo-700 dark:text-brand px-2 py-1 rounded">Attempt any <input type="number" min={1} max={Math.max(1, section.questions.length)} placeholder="all" aria-label={`${section.title} attempt limit`} value={section.attemptLimit ?? ''} onChange={e => { const n = parseInt(e.target.value, 10); updateSection(section.id, 'attemptLimit', Number.isInteger(n) && n > 0 ? n : null); }} onClick={e => e.stopPropagation()} className="w-10 bg-transparent border-b border-indigo-300 text-center outline-none" /> of {section.questions.length}</span>
-                            {section.targetQuestions ? <span className={section.questions.length >= section.targetQuestions ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>{section.questions.length}/{section.targetQuestions} questions</span> : null}
+                            <span className="bg-indigo-50 dark:bg-brand/10 text-indigo-700 dark:text-brand px-2 py-1 rounded">Attempt any <input type="number" min={1} max={Math.max(1, slotCountOf(section.questions))} placeholder="all" aria-label={`${section.title} attempt limit`} value={section.attemptLimit ?? ''} onChange={e => { const n = parseInt(e.target.value, 10); updateSection(section.id, 'attemptLimit', Number.isInteger(n) && n > 0 ? n : null); }} onClick={e => e.stopPropagation()} className="w-10 bg-transparent border-b border-indigo-300 text-center outline-none" /> of {slotCountOf(section.questions)}</span>
+                            {section.targetQuestions ? <span className={slotCountOf(section.questions) >= section.targetQuestions ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>{slotCountOf(section.questions)}/{section.targetQuestions} questions</span> : null}
                           </div>
                           <button onClick={(e) => { e.stopPropagation(); removeSection(section.id); }} className="text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-rose-400 print:hidden transition-colors"><Trash2 className="w-4 h-4" /></button>
                        </div>
@@ -578,6 +588,19 @@ export default function TestCreatorStudio() {
                       ) : (
                         section.questions.map((q, qIndex) => (
                            <div key={q.id} className="group relative pl-8 print:pl-6 print:break-inside-avoid print:mb-6">
+                              {qIndex > 0 && (
+                                <div className="mb-2 flex items-center gap-2 print:mb-1">
+                                  <span className={`text-[10px] font-black uppercase tracking-widest ${q.choiceGroup && q.choiceGroup === section.questions[qIndex - 1].choiceGroup ? 'text-indigo-600 dark:text-brand' : 'hidden print:hidden'}`}>— OR —</span>
+                                  <button
+                                    type="button"
+                                    data-testid={`alt-toggle-${section.id}-${qIndex}`}
+                                    onClick={() => toggleAlternativeAt(section.id, qIndex)}
+                                    className="print:hidden rounded-md border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500 opacity-0 transition-opacity hover:border-indigo-300 hover:text-indigo-600 focus:opacity-100 group-hover:opacity-100 dark:border-white/10 dark:text-slate-400"
+                                  >
+                                    {q.choiceGroup && q.choiceGroup === section.questions[qIndex - 1].choiceGroup ? `Not an alternative to Q${qIndex}` : `Make this an alternative to Q${qIndex}`}
+                                  </button>
+                                </div>
+                              )}
                               {/* Controls */}
                               <div className="absolute left-0 top-0 bottom-0 w-8 flex flex-col items-center pt-1 print:hidden opacity-0 group-hover:opacity-100 transition-opacity">
                                  <button onClick={() => moveQuestion(section.id, qIndex, 'up')} disabled={qIndex === 0} className="text-slate-400 hover:text-indigo-600 disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>

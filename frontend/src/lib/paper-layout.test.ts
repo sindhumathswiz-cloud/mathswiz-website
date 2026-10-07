@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answerKeyLines, answerLinesFor, optionList, paperShapeOf, questionNumber } from './paper-layout';
+import { answerKeyLines, answerLinesFor, optionList, paperShapeOf, printedNumbering, questionNumber } from './paper-layout';
 
 describe('paper layout', () => {
   it('lays each question type out the way a printed paper would', () => {
@@ -38,5 +38,16 @@ describe('paper layout', () => {
       { section: 'Section B', number: '1.', answer: 'Marked by the teacher' },
       { section: 'Section B', number: '2.', answer: 'Not recorded' },
     ]);
+  });
+
+  it('numbers alternatives as one question with an OR between them', () => {
+    const numbering = printedNumbering([{}, { choiceGroup: 'g' }, { choiceGroup: 'g' }, {}, { choiceGroup: 'h' }, { choiceGroup: 'h' }]);
+    expect(numbering.map(n => n.number)).toEqual(['1.', '2.', '2.', '3.', '4.', '4.']);
+    expect(numbering.map(n => n.orBefore)).toEqual([false, false, true, false, false, true]);
+  });
+
+  it('labels the second alternative in the answer key', () => {
+    const key = answerKeyLines([{ title: 'C', questions: [{ type: 'SHORT_ANSWER', correctAnswer: null, choiceGroup: 'g' }, { type: 'SHORT_ANSWER', correctAnswer: null, choiceGroup: 'g' }, { type: 'SINGLE_CHOICE', correctAnswer: 'D' }] }]);
+    expect(key.map(k => k.number)).toEqual(['1.', '1. (OR)', '2.']);
   });
 });

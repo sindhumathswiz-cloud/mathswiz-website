@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, request as playwrightRequest, test } from "@playwright/test";
 import { BUILDER_QUESTIONS, E2E_BATCH_NAME, NUMERIC_QUESTION, WRITTEN_QUESTION } from "./fixtures/data";
 import { STUDENT_STORAGE_STATE, TEACHER_STORAGE_STATE } from "./fixtures/storage-state";
 
@@ -335,4 +335,114 @@ test("a test prints as a paper: student copy has no answers, the teacher copy ad
   // Someone else's test is not found.
   const other = await page.goto(`/teacher/tests/not-a-real-test/print`);
   expect(other?.status()).toBe(404);
+});
+
+
+// A 1x1 JPEG: a real image as far as the server is concerned (it checks the first bytes), as small as can be.
+const TINY_JPEG = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
+
+async function assignedPaper(request: import("@playwright/test").APIRequestContext, title: string, sections: unknown[], duration = 30) {
+  const batches = await (await request.get("/api/teacher/batches")).json();
+  const batch = batches.find((b: { name: string }) => b.name === E2E_BATCH_NAME);
+  const created = await request.post("/api/teacher/tests", { data: { title, mode: "PRACTICE", duration, totalMarks: 10, templateType: "MOCK_EXAM", sections } });
+  const testId: string = (await created.json()).test.id;
+  await request.patch(`/api/teacher/tests/${testId}/publish`, { data: { isPublished: true } });
+  await request.post("/api/teacher/tests/assign", { data: { testId, batchId: batch.id } });
+  return testId;
+}
+
+test("internal choice: two alternatives count as one question, only one can be answered, and it prints with OR", async ({ request, browser, page: teacherPage }) => {
+  test.setTimeout(90_000);
+  const testId = await assignedPaper(request, "E2E Internal Choice", [
+    { title: "Section A", marksPerQuestion: 3, negativeMarks: 0, questions: [
+      { id: BUILDER_QUESTIONS[0].id, choiceGroup: "g1" }, { id: BUILDER_QUESTIONS[1].id, choiceGroup: "g1" }, { id: BUILDER_QUESTIONS[2].id },
+    ] },
+  ]);
+
+  const context = await browser.newContext({ storageState: STUDENT_STORAGE_STATE });
+  const page = await context.newPage();
+  await page.goto(`/student/tests/${testId}/take`);
+  await expect(page.getByText("1 with an alternative")).toBeVisible();
+  await page.getByRole("button", { name: "Start Examination" }).click();
+
+  await expect(page.getByTestId("alternative-note")).toContainText("Question 2");
+  await page.getByTestId("option-original-A").click(); // q1: correct, +3
+  await page.getByRole("button", { name: /^Question 2,/ }).click();
+  await expect(page.getByTestId("alternative-note")).toContainText("Question 1");
+  await page.getByTestId("option-original-B").click();
+  await expect(page.getByText(/alternative to Question 1, which you have answered/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Question 2, answered/ })).toHaveCount(0);
+
+  const submitResponse = page.waitForResponse((r) => r.url().includes(`/api/student/tests/${testId}/submit`) && r.ok());
+  await page.getByRole("button", { name: "Review & Submit" }).click();
+  const summary = page.getByRole("dialog", { name: "Review your paper" });
+  // Two questions to answer (the pair counts once), one answered.
+  await expect(summary).toContainText("Section A");
+  await summary.getByRole("button", { name: "Submit exam" }).click();
+  const result = await (await submitResponse).json();
+  expect(result).toMatchObject({ totalScore: 3, totalCorrect: 1, totalIncorrect: 0, totalSkipped: 1 });
+  await expect(page.getByText("/ 6")).toBeVisible();
+  await context.close();
+
+  await teacherPage.goto(`/teacher/tests/${testId}/print`);
+  const paper = teacherPage.locator(".paper");
+  await expect(paper).toContainText("Maximum marks: 6");
+  await expect(paper.getByText("OR", { exact: true })).toBeVisible();
+});
+
+test("a photo of handwritten working is attached, shown to the teacher who marks it, and kept private", async ({ request, browser }) => {
+  test.setTimeout(90_000);
+  const testId = await assignedPaper(request, "E2E Photo Answer", [
+    { title: "Section A", marksPerQuestion: 5, negativeMarks: 0, questions: [{ id: WRITTEN_QUESTION.id }] },
+  ]);
+
+  const context = await browser.newContext({ storageState: STUDENT_STORAGE_STATE });
+  const page = await context.newPage();
+  await page.goto(`/student/tests/${testId}/take`);
+  await page.getByRole("button", { name: "Start Examination" }).click();
+
+  const photo = { name: "working.jpg", mimeType: "image/jpeg", buffer: TINY_JPEG };
+  const upload = page.waitForResponse((r) => r.url().includes("/answer-images") && r.request().method() === "POST");
+  await page.getByTestId("answer-photo-input").setInputFiles(photo);
+  expect((await upload).ok()).toBeTruthy();
+  await expect(page.getByTestId("answer-photo")).toHaveCount(1);
+  // A photo alone is an answer.
+  await expect(page.getByRole("button", { name: /^Question 1, answered/ })).toBeVisible();
+
+  // Add a second, then take it away again: only what is still attached is handed in.
+  await page.getByTestId("answer-photo-input").setInputFiles(photo);
+  await expect(page.getByTestId("answer-photo")).toHaveCount(2);
+  await page.getByRole("button", { name: "Remove photo 2" }).click();
+  await expect(page.getByTestId("answer-photo")).toHaveCount(1);
+
+  // Anything that is not a photo is refused by the server, whatever its name says.
+  const notAnImage = await page.request.post(`/api/student/tests/${testId}/answer-images`, {
+    multipart: { attemptId: "x", questionId: WRITTEN_QUESTION.id, file: { name: "evil.jpg", mimeType: "image/jpeg", buffer: Buffer.from("<script>alert(1)</script>") } },
+  });
+  expect([404, 415]).toContain(notAnImage.status());
+
+  const submitResponse = page.waitForResponse((r) => r.url().includes(`/api/student/tests/${testId}/submit`) && r.ok());
+  await page.getByRole("button", { name: "Review & Submit" }).click();
+  await page.getByRole("dialog", { name: "Review your paper" }).getByRole("button", { name: "Submit exam" }).click();
+  const result = await (await submitResponse).json();
+  expect(result.pendingReview).toBe(1);
+
+  // The teacher sees the photo in the marking queue and can fetch it.
+  const queue = await (await request.get("/api/teacher/homework/submissions")).json();
+  const item = queue.submissions.find((x: { attempt: { id: string } }) => x.attempt.id === result.id);
+  expect(item, "the photo answer in the teacher queue").toBeTruthy();
+  const urls: string[] = JSON.parse(item.subjectiveImage);
+  expect(urls).toHaveLength(1);
+  const asTeacher = await request.get(urls[0]);
+  expect(asTeacher.status()).toBe(200);
+  expect(asTeacher.headers()["content-type"]).toBe("image/jpeg");
+  expect(asTeacher.headers()["x-content-type-options"]).toBe("nosniff");
+
+  // The student sees it in their report; a visitor with no session does not.
+  await page.goto(`/student/performance/${result.id}`);
+  await expect(page.getByRole("img", { name: "Photo 1 of your working" })).toBeVisible();
+  const anonymous = await playwrightRequest.newContext({ baseURL: "http://127.0.0.1:3000", storageState: { cookies: [], origins: [] } });
+  expect((await anonymous.get(urls[0])).status()).toBe(401);
+  await anonymous.dispose();
+  await context.close();
 });

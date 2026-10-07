@@ -66,3 +66,11 @@ describe("API authorization policy", () => {
     expect(authorizeApiPath("/api/future-feature", "STUDENT").allowed).toBe(true);
   });
 });
+
+describe("answer photo route", () => {
+  it("is for the signed-in people who legitimately see a written answer, and never parents or the public", () => {
+    for (const role of ["ADMIN", "TEACHER", "STUDENT"]) expect(authorizeApiPath("/api/answer-images/abc", role).allowed).toBe(true);
+    expect(authorizeApiPath("/api/answer-images/abc", "PARENT")).toMatchObject({ allowed: false, status: 403 });
+    expect(authorizeApiPath("/api/answer-images/abc", null)).toMatchObject({ allowed: false, status: 401 });
+  });
+});

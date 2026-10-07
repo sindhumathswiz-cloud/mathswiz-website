@@ -4,7 +4,7 @@ import MathRenderer from '@/components/MathRenderer';
 import { requireTeacherPremium, requireTeacherSession } from '@/lib/teacher-guard';
 import { buildExamSections, examMaxFromSections, instructionRows } from '@/lib/exam-view';
 import { findExamPattern, markingLabel } from '@/lib/exam-patterns';
-import { answerKeyLines, answerLinesFor, optionList, paperShapeOf, questionNumber } from '@/lib/paper-layout';
+import { answerKeyLines, answerLinesFor, optionList, paperShapeOf, printedNumbering } from '@/lib/paper-layout';
 import PrintControls from './PrintControls';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +53,7 @@ export default async function PrintPaperPage({ params, searchParams }: { params:
   const rows = instructionRows(sections);
   const pattern = findExamPattern(test.examPattern);
   const maxMarks = examMaxFromSections(sections);
-  const keyLines = withKey ? answerKeyLines(test.sections.map((s) => ({ title: s.title, questions: s.questions.map((q) => q.question) }))) : [];
+  const keyLines = withKey ? answerKeyLines(test.sections.map((s) => ({ title: s.title, questions: s.questions.map((q) => ({ ...q.question, choiceGroup: q.choiceGroup })) }))) : [];
 
   return (
     <div className="mx-auto max-w-4xl p-6 md:p-10">
@@ -84,6 +84,7 @@ export default async function PrintPaperPage({ params, searchParams }: { params:
 
         {test.sections.map((section, sectionIndex) => {
           const built = sections[sectionIndex];
+          const numbering = printedNumbering(section.questions);
           return (
             <section key={section.id} className="mb-10">
               <h2 className="mb-1 border-b border-slate-400 pb-1 font-display text-lg font-black">{section.title}</h2>
@@ -95,9 +96,12 @@ export default async function PrintPaperPage({ params, searchParams }: { params:
                 {section.questions.map(({ question }, index) => {
                   const shape = paperShapeOf(question.type);
                   const options = optionList(question.options);
+                  const printed = numbering[index];
                   return (
-                    <li key={question.id} className="keep-together flex gap-3">
-                      <span className="w-8 shrink-0 text-sm font-black">{questionNumber(index)}</span>
+                    <li key={question.id} className="keep-together">
+                      {printed.orBefore && <p className="mb-4 text-center text-sm font-black tracking-[0.3em]">OR</p>}
+                      <div className="flex gap-3">
+                      <span className="w-8 shrink-0 text-sm font-black">{printed.orBefore ? '' : printed.number}</span>
                       <div className="min-w-0 flex-1">
                         <div className="text-[15px] leading-relaxed"><MathRenderer content={question.content} /></div>
                         <span className="mt-1 block text-right text-xs font-bold text-slate-500">[{built.marksPerQuestion} mark{built.marksPerQuestion === 1 ? '' : 's'}]</span>
@@ -114,6 +118,7 @@ export default async function PrintPaperPage({ params, searchParams }: { params:
                             {Array.from({ length: answerLinesFor(built.marksPerQuestion) }).map((_, i) => <div key={i} className="h-7 border-b border-slate-300" />)}
                           </div>
                         )}
+                      </div>
                       </div>
                     </li>
                   );
