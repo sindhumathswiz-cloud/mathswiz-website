@@ -62,6 +62,21 @@ describe("API authorization proxy", () => {
     expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
   });
 
+  it.each([
+    ["/api/student/practice/generate", "ai"],
+    ["/api/student/practice/hint", "ai"],
+    ["/api/student/practice/worksheet-solve", "ai"],
+    ["/api/student/practice/next", "general"],
+    ["/api/student/practice/submit", "general"],
+    ["/api/student/practice/mistakes", "general"],
+    ["/api/student/doubt-buddy/ask", "ai"],
+  ])("rate-limits %s on the %s tier (model calls are scarce, plain reads and writes are not)", async (path, tier) => {
+    getToken.mockResolvedValue({ id: "student-1", role: "STUDENT" });
+    const { proxy } = await import("./proxy");
+    await proxy(new NextRequest(`http://localhost${path}`));
+    expect(checkRateLimit).toHaveBeenCalledWith("user:student-1", tier);
+  });
+
   it("fails safely when protection is unavailable for authentication", async () => {
     vi.stubEnv("NODE_ENV", "production");
     getToken.mockResolvedValue(null);

@@ -134,38 +134,38 @@ Mathswiz's core experience is a continuous **study → practice → mock test �
   - [x] Standardize navigation, empty states, loading states, and responsive behavior
   - [x] Add accessibility and visual regression coverage
 - [x] Establish courses, homework, mastery, and intervention foundations
-- [ ] Build topic learning paths that sequence concepts, worked examples, guided practice, timed quizzes, and recovery practice
-- [ ] Create a “My Mistakes” notebook that automatically captures wrong or flagged questions and schedules retries
-- [ ] Add student bookmarks, personal revision lists, and flashcards/formula cards
-- [ ] Show per-topic mastery based on accuracy, question difficulty, and time taken
+- [x] Build topic learning paths that sequence concepts, worked examples, guided practice, timed quizzes, and recovery practice
+- [x] Create a “My Mistakes” notebook that automatically captures wrong or flagged questions and schedules retries
+- [x] Add student bookmarks, personal revision lists, and flashcards/formula cards
+- [x] Show per-topic mastery based on accuracy, question difficulty, and time taken
 
 ### Phase 2 — Teacher-led practice and assessment
 
-- [ ] Build a teacher test builder with chapter, skill, difficulty, question-count, and time filters
-- [ ] Let teachers assign targeted remedial practice to individual students and groups
-- [ ] Add class heatmaps for weak concepts, common wrong answers, and students needing support
-- [ ] Support reusable teacher collections for worksheets, revision packs, mock exams, and homework
+- [x] Build a teacher test builder with chapter, skill, difficulty, question-count, and time filters
+- [x] Let teachers assign targeted remedial practice to individual students and groups
+- [x] Add class heatmaps for weak concepts, common wrong answers, and students needing support
+- [x] Support reusable teacher collections for worksheets, revision packs, mock exams, and homework
 
 ### Phase 3 — Feedback, revision, and analytics
 
-- [ ] Deliver rich post-test reports with solutions, time spent, confidence, error type, and a recommended next action
-- [ ] Add adaptive Smart Practice that selects questions from each student's weak skills
-- [ ] Create a weekly revision planner with spaced repetition and pending tasks
-- [ ] Provide exam-mode mock tests with an exam-style timer and performance trends
+- [x] Deliver rich post-test reports with solutions, time spent, confidence, error type, and a recommended next action
+- [x] Add adaptive Smart Practice that selects questions from each student's weak skills
+- [x] Create a weekly revision planner with spaced repetition and pending tasks
+- [x] Provide exam-mode mock tests with an exam-style timer and performance trends
 
 ### Phase 4 — Parent and school insight
 
-- [ ] Build a parent dashboard for weekly learning time, completed work, strengths, risks, and teacher comments
-- [ ] Provide parent action cards answering “What can I do this week?” rather than reporting raw marks alone
-- [ ] Add administrator reporting for curriculum coverage, class performance, content quality, and teacher activity
-- [ ] Send actionable alerts for prolonged inactivity, repeated concept difficulty, and upcoming assessments
+- [x] Build a parent dashboard for weekly learning time, completed work, strengths, risks, and teacher comments
+- [x] Provide parent action cards answering “What can I do this week?” rather than reporting raw marks alone
+- [x] Add administrator reporting for curriculum coverage, class performance, content quality, and teacher activity
+- [x] Send actionable alerts for prolonged inactivity, repeated concept difficulty, and upcoming assessments
 
 ### Phase 5 — Motivation and content trust
 
-- [ ] Add opt-in, teacher-moderated class leaderboards that reward improvement and consistency rather than marks alone
-- [ ] Add streaks, milestone badges, and moderated class challenges
-- [ ] Implement the question-quality workflow: draft, AI-generated candidate solution, external verification, approval, and audit history
-- [ ] Display a verified-solution badge so students and teachers can distinguish reviewed content from pending AI suggestions
+- [x] Add opt-in, teacher-moderated class leaderboards that reward improvement and consistency rather than marks alone
+- [x] Add streaks, milestone badges, and moderated class challenges
+- [x] Implement the question-quality workflow: draft, AI-generated candidate solution, external verification, approval, and audit history
+- [x] Display a verified-solution badge so students and teachers can distinguish reviewed content from pending AI suggestions
 
 ## Phase QB — Whole-book Mathematics ingestion
 
@@ -180,7 +180,7 @@ Mathswiz's core experience is a continuous **study → practice → mock test �
   - [x] Add private pilot storage, PDF signature/size validation, hashing, duplicate detection, and atomic ingestion records
   - [x] Add whole-PDF upload controls to the Admin Book Library
   - [ ] Replace pilot filesystem storage with durable private object storage before production
-  - [ ] Add multipart/resumable transfer for unstable connections and very large books
+  - [x] Add multipart/resumable transfer for unstable connections and very large books
 - [ ] Build page rendering, layout detection, and mathematical OCR adapters
   - [x] Add free local PDF page inventory and representative structural sampling
   - [x] Auto-route digital-math, mixed-layout assessment, image-book, and photographed-book sources
@@ -209,16 +209,16 @@ Mathswiz's core experience is a continuous **study → practice → mock test �
       - [x] Add resumable per-call checkpoints, quota stops, content-hash validation, and hard 100/25 provider ceilings
       - [ ] Obtain explicit approval for the expanded 100-page Gemini and conditional 25-page Mathpix transfer
       - [ ] Execute the shadow run and complete mathematical/content QA scoring
-- [ ] Build chapter/exercise/question inventory reconciliation
-- [ ] Match questions to answers and detailed solutions with page evidence
+- [x] Build chapter/exercise/question inventory reconciliation
+- [x] Match questions to answers and detailed solutions with page evidence
 - [x] Add deterministic and AI-assisted mathematical verification
   - [x] Run a full deterministic QA sweep (`question-qa.ts`) across every live `DRAFT`/`REPORTED` question (1,833 total)
   - [x] Independently re-derive and verify the mathematics by hand for the full backlog, not just the deterministic-clean subset
   - [x] Correct objectively-certain errors (rendering/delimiter defects, sign and arithmetic slips, merged/corrupted extraction rows, reversed inequalities, wrong trig values) with versioned history (`QuestionVersion`) and audit-log entries — 68 questions corrected
   - [x] Mark mathematically-confirmed questions ready for a second-model (Codex) confirmation pass rather than auto-approving — 482 questions marked `MATHEMATICALLY_VERIFIED`
-- [ ] Add human review queues for ambiguity, duplicates, figures, and low confidence
+- [x] Add human review queues for ambiguity, duplicates, figures, and low confidence
   - [x] Flag every question needing human judgement (missing source material, unrecoverable diagrams, ambiguous wording, duplicate rows) with evidence and a suggested resolution, tracked via `reviewNotes` and tags — 1,351 questions flagged
-  - [ ] Build a dedicated queue UI/workflow surface for these flags (currently queryable via tags/`reviewNotes`, no dedicated screen)
+  - [x] Build a dedicated queue UI/workflow surface for these flags (currently queryable via tags/`reviewNotes`, no dedicated screen)
 - [x] Add teacher-facing book, chapter, and exercise selectors
   - [x] Book -> chapter -> exercise dropdowns with approved-question counts in the teacher test builder (repository list and filter-pick); only nodes with approved questions are offered
   - [x] Exercises resolve by page range within their chapter, because no question is linked to an exercise yet; a mismatched chapter/exercise matches nothing rather than the whole book
@@ -229,3 +229,24 @@ Mathswiz's core experience is a continuous **study → practice → mock test �
   - [ ] Run the pilot: 25 completed pages per source profile and per class (Class 11 has none yet), then record review time and spend; see PHASE_QB_PROVIDER_DECISION.md
   - [ ] Hand-label a sample so option accuracy, solution-match precision and figure retention can be scored
   - [ ] Choose the paid provider once the gate reads READY_TO_DECIDE
+
+## Mock exam layout (2026-10-05)
+
+- [x] Exam-pattern templates the teacher can start a paper from (JEE Main Maths, NDA Maths, CUET Maths): sections, marks, negative marking and duration pre-filled and still editable, each with a note on what to verify against the current official notice (`src/lib/exam-patterns.ts`)
+- [x] "Attempt any N of M" sections (JEE Main's numerical section): `TestSection.attemptLimit` and `Test.examPattern` added with a migration; the builder sets the limit per section and the paper's maximum marks account for it
+- [x] Server-side scoring honours the limit (first N answered questions in section order are scored; the rest are stored as `OVER_LIMIT`, not counted as right, wrong or skipped, and excluded from mastery, analysis, reports, the wrong-answer heatmap and common-mistake counts)
+- [x] Numerical (INTEGER) answers compared as numbers; blank answers count as unanswered; stored totals rounded to two decimals
+- [x] Builder fixes found on the way: 0 negative marks was silently saved as 1; the save now warns if a section is short of its pattern's question count
+- [x] Redesigned in-exam screen: instructions page with the section/marking table, section tabs with answered counts, per-section question palette with live status counts, "Question k of n" per section, marking scheme and attempt-limit status on each question, numerical entry with an on-screen keypad, review-and-submit summary replacing the browser confirm, result screen with score out of the maximum
+- [x] Exam-screen bugs fixed: the automatic submit at time-out (and after a third tab-switch) sent a blank paper because the timer read stale state; time was charged to question 1; option order changed on every visit; fullscreen was forced in practice mode; the student sidebar showed through the exam; a duplicate start call could skip the instructions
+- [x] Mock Exams list shows pattern, section chips, marks, attempts left, best/last score and the trend between the last two attempts
+- [x] Performance report shows over-limit answers as "not scored" and shows numerical answers correctly
+- [x] Tests: unit coverage for patterns, scoring, view logic and list summary; e2e covering build → assign → sit (attempt-limit block, numerical answer, per-section scoring) → list, the time-out auto-submit, and the phone layout
+- [x] Exam clock enforced on the server: it starts when the student presses Start (`examStartedAt`), the browser only shows what the server says is left, a reload or a closed tab no longer pauses it, answers are saved to the server every few seconds (`savedResponses`), and a submit that arrives after the deadline plus 90 seconds is scored from the last saved copy instead of what the request claims
+- [x] Exam patterns checked against published summaries of the official bulletins on 6 Oct 2026 and corrected: JEE Main has had no "attempt 5 of 10" choice since 2023 and its numericals carry -1 (20 + 5 questions, all compulsory, 100 marks); CUET Mathematics is 50 compulsory questions, 250 marks; NDA confirmed. Each pattern now records when it was checked. The NTA site itself blocks automated access, so the official PDFs still deserve a look
+- [x] Written-answer sections: typed on the exam screen, queued for the teacher on a mock exam, marked in the teacher's review queue (capped at the question's marks), after which the student's total updates. Written and assertion-and-reason questions are kept out of right/wrong analytics. CBSE Class 12 Mathematics (80 marks, Sections A-E) added as a pattern
+- [x] Printable question paper (`/teacher/tests/[id]/print`): sections, marks, instructions, room to write, and an answer key only on the teacher copy
+- [x] Found and fixed while doing this: zero negative marking stored -0; the Mock Exams list hid every teacher-built paper from a student who had a class set; the e2e fixture student had no class
+- [ ] Image uploads for written answers (typed answers only today; the data model already has a place for an image)
+- [ ] Internal choice in the CBSE paper (the teacher includes one version of each question today)
+- [x] Learning-path end-to-end spec fixed (7 Oct): Practice Arena `next`, `submit` and `mistakes` were rate-limited as AI calls (10 a minute) though they only read and write the database, so a student answering quickly was throttled to about five questions a minute. Only `generate`, `hint` and `worksheet-solve` stay on the AI tier. The learning-path screen also no longer requests two quizzes or two guided questions on mount, and the spec now listens before reloading and tolerates the duplicated "Path complete!" text

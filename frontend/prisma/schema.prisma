@@ -601,6 +601,10 @@ model Test {
   // Null = a live test/homework. Non-null = a reusable, unassigned template a
   // teacher can duplicate rather than an assignment in its own right.
   templateType TestTemplateType?
+  // Id of the exam pattern (lib/exam-patterns.ts) this test was built from, so the
+  // exam screen and the Mock Exams list can say what it is modelled on. Null for a
+  // test built by hand.
+  examPattern String?
 
   sections    TestSection[]
   attempts    TestAttempt[]
@@ -622,6 +626,13 @@ model TestAttempt {
   startTime DateTime  @default(now())
   endTime   DateTime?
   status    String    @default("IN_PROGRESS") // IN_PROGRESS, SUBMITTED, AUTO_SUBMITTED
+  // The exam clock runs from the student pressing "Start Examination", not from the page
+  // loading. Null on older attempts, which fall back to startTime.
+  examStartedAt DateTime?
+  // The last answers the browser sent while the clock was running. A submit that arrives
+  // after the deadline plus grace is scored from this, not from the request.
+  savedResponses Json?
+  savedAt        DateTime?
 
   totalScore     Float @default(0)
   totalCorrect   Int   @default(0)
@@ -642,6 +653,10 @@ model TestSection {
   instructions     String?
   marksPerQuestion Float   @default(4.0)
   negativeMarks    Float   @default(1.0) // e.g., 1.0 means -1 for wrong answer
+  // "Attempt any N": only the first N answered questions of this section are
+  // scored (JEE Main's numerical section is 10 questions, attempt any 5). Null =
+  // every question counts.
+  attemptLimit     Int?
 
   questions TestQuestion[]
 

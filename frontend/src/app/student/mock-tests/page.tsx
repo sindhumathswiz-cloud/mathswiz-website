@@ -24,12 +24,17 @@ export default async function MockTestsPage() {
                         { batch: { enrollments: { some: { studentId: userId, status: 'APPROVED' } } } }
                     ]
                 },
-                { test: { class: studentClass, templateType: 'MOCK_EXAM' } }
+                // A paper the teacher assigned is the student's to take. Teacher-built tests carry no class, so a
+                // strict class match hid every one of them from any student who had a class set.
+                { test: { templateType: 'MOCK_EXAM', OR: [{ class: null }, ...(studentClass ? [{ class: studentClass }] : [])] } }
             ]
         },
         include: {
             test: {
-                include: { attempts: { where: { userId: userId, status: 'SUBMITTED' } } }
+                include: {
+                    attempts: { where: { userId: userId, status: { in: ['SUBMITTED', 'AUTO_SUBMITTED'] } }, orderBy: { endTime: 'asc' } },
+                    sections: { select: { title: true, marksPerQuestion: true, attemptLimit: true, _count: { select: { questions: true } } } },
+                }
             }
         },
         orderBy: { createdAt: 'desc' }

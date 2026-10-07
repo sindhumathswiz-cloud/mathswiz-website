@@ -89,3 +89,24 @@ export const WEAK_TOPIC_QUESTIONS = buildQuestions("wk", WEAK_TOPIC, 8, ["EASY"]
 export const HEATMAP_QUESTIONS = buildQuestions("hm", HEATMAP_TOPIC, 6, ["EASY", "MEDIUM"]);
 export const BUILDER_QUESTIONS = buildQuestions("tb", BUILDER_TOPIC, 5, ["EASY"]);
 export const MISTAKES_QUESTIONS = buildQuestions("mb", MISTAKES_TOPIC, 5, ["EASY", "MEDIUM"]);
+
+// A numerical-answer (INTEGER type) question for the mock-exam spec. It has its
+// own topic so answering it never touches the mastery numbers other specs assert.
+export const NUMERIC_TOPIC = "E2E Numerical Topic";
+export const NUMERIC_QUESTION = {
+  id: "e2e-num-q1",
+  content: "E2E numerical fixture: what is 25 / 2? Give the value as a decimal.",
+  correctAnswer: "12.5",
+  explanation: "Fixture numerical question, generated only for automated end-to-end testing.",
+  topic: NUMERIC_TOPIC,
+};
+
+// A written-answer (LONG_ANSWER) question for the mock-exam spec; it has no stored answer
+// to compare with, so a teacher marks it.
+export const WRITTEN_TOPIC = "E2E Written Topic";
+export const WRITTEN_QUESTION = {
+  id: "e2e-wr-q1",
+  content: "E2E written fixture: show that the sum of two even numbers is even.",
+  explanation: "Fixture written question, generated only for automated end-to-end testing.",
+  topic: WRITTEN_TOPIC,
+};

@@ -161,10 +161,14 @@ test("student progresses a topic through the full learning-path state machine: e
         return await current;
       } catch {
         await cooldownIfRateLimited();
+        // Listen *before* reloading: the page fetches its next question as it loads, and a listener
+        // registered after reload() resolves usually misses that response and then times out.
+        const afterReload = nextGuidedQuestionOrQuizStage();
+        afterReload.catch(() => {}); // not awaited if the quiz stage is already showing
         await page.reload();
         const reachedQuiz = await waitVisible(page.getByText("Step 3 of 4"), 10_000);
         if (reachedQuiz) return { advanced: true } as const;
-        current = nextGuidedQuestionOrQuizStage();
+        current = afterReload;
       }
     }
     return await current;
@@ -206,7 +210,7 @@ test("student progresses a topic through the full learning-path state machine: e
   // directly; an occasional miss (e.g. a submission the rate limiter
   // rejected) instead lands in recovery practice, whose actual job -- and
   // the thing this test cares about -- is reaching COMPLETED either way.
-  let reachedCompleted = await waitVisible(page.getByText("Path complete!"), 30_000);
+  let reachedCompleted = await waitVisible(page.getByText("Path complete!").first(), 30_000);
   let reachedRecovery = reachedCompleted ? false : await waitVisible(page.getByText("Step 4 of 4"), 5_000);
   if (!reachedCompleted && !reachedRecovery) {
     // Neither showed up -- most likely the /quiz/complete call for the
@@ -228,7 +232,7 @@ test("student progresses a topic through the full learning-path state machine: e
       await selectAndSubmit(correctLetter!);
       await page.waitForTimeout(1100);
     }
-    reachedCompleted = await waitVisible(page.getByText("Path complete!"), 30_000);
+    reachedCompleted = await waitVisible(page.getByText("Path complete!").first(), 30_000);
     reachedRecovery = reachedCompleted ? false : await waitVisible(page.getByText("Step 4 of 4"), 5_000);
   }
   if (!reachedCompleted) {
@@ -255,7 +259,7 @@ test("student progresses a topic through the full learning-path state machine: e
     await page.goto(`/student/learning-paths/${encodeURIComponent(LEARNING_PATH_TOPIC)}`);
     const checkAgain = page.getByRole("button", { name: "I've reviewed — check again" });
     if (await waitVisible(checkAgain, 5_000)) await checkAgain.click();
-    await expect(page.getByText("Path complete!")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Path complete!").first()).toBeVisible({ timeout: 20_000 });
   }
 
   // The topic's card on the index page reflects the completed state too.

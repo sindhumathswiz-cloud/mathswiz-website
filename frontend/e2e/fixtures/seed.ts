@@ -29,6 +29,8 @@ import {
   HEATMAP_QUESTIONS,
   BUILDER_QUESTIONS,
   MISTAKES_QUESTIONS,
+  NUMERIC_QUESTION,
+  WRITTEN_QUESTION,
   type FixtureQuestion,
 } from "./data";
 
@@ -46,7 +48,8 @@ async function upsertUser(fixture: { mobileNumber: string; password: string; fir
   const hashed = await hash(fixture.password, 12);
   return prisma.user.upsert({
     where: { mobileNumber: fixture.mobileNumber },
-    update: { password: hashed, role, accountStatus: "APPROVED", firstName: fixture.firstName, lastName: fixture.lastName },
+    // Both fixture users are premium: the teacher test builder, heatmap and homework screens are premium-gated.
+    update: { password: hashed, role, accountStatus: "APPROVED", subscription: "PREMIUM", firstName: fixture.firstName, lastName: fixture.lastName, ...(role === "STUDENT" ? { class: "Class 12" } : {}) },
     create: {
       mobileNumber: fixture.mobileNumber,
       password: hashed,
@@ -54,7 +57,8 @@ async function upsertUser(fixture: { mobileNumber: string; password: string; fir
       accountStatus: "APPROVED",
       firstName: fixture.firstName,
       lastName: fixture.lastName,
-      ...(role === "STUDENT" ? { subscription: "PREMIUM" as const, aiTokens: 100 } : {}),
+      subscription: "PREMIUM" as const,
+      ...(role === "STUDENT" ? { aiTokens: 100, class: "Class 12" } : {}),
     },
   });
 }
@@ -91,6 +95,44 @@ async function upsertQuestions(questions: FixtureQuestion[], createdById: string
       },
     });
   }
+}
+
+async function upsertNumericQuestion(createdById: string) {
+  const data = {
+    content: NUMERIC_QUESTION.content,
+    options: [],
+    correctAnswer: NUMERIC_QUESTION.correctAnswer,
+    explanation: NUMERIC_QUESTION.explanation,
+    difficulty: "EASY" as const,
+    topic: NUMERIC_QUESTION.topic,
+    status: "APPROVED" as const,
+    scope: "PUBLIC" as const,
+    type: "INTEGER" as const,
+  };
+  await prisma.question.upsert({
+    where: { id: NUMERIC_QUESTION.id },
+    update: data,
+    create: { id: NUMERIC_QUESTION.id, ...data, subject: "Mathematics", class: "Class 12", createdById },
+  });
+}
+
+async function upsertWrittenQuestion(createdById: string) {
+  const data = {
+    content: WRITTEN_QUESTION.content,
+    options: [],
+    correctAnswer: "",
+    explanation: WRITTEN_QUESTION.explanation,
+    difficulty: "EASY" as const,
+    topic: WRITTEN_QUESTION.topic,
+    status: "APPROVED" as const,
+    scope: "PUBLIC" as const,
+    type: "LONG_ANSWER" as const,
+  };
+  await prisma.question.upsert({
+    where: { id: WRITTEN_QUESTION.id },
+    update: data,
+    create: { id: WRITTEN_QUESTION.id, ...data, subject: "Mathematics", class: "Class 12", createdById },
+  });
 }
 
 export async function runSeed() {
@@ -148,6 +190,8 @@ export async function runSeed() {
   await upsertQuestions(HEATMAP_QUESTIONS, teacher.id);
   await upsertQuestions(BUILDER_QUESTIONS, teacher.id);
   await upsertQuestions(MISTAKES_QUESTIONS, teacher.id);
+  await upsertNumericQuestion(teacher.id);
+  await upsertWrittenQuestion(teacher.id);
 
   // Below-threshold mastery on WEAK_TOPIC so the teacher's "suggested
   // support" list and the heatmap's at-risk list both surface this student.

@@ -47,8 +47,9 @@ describe('POST /api/teacher/tests/[testId]/duplicate', () => {
       duration: 60,
       totalMarks: 40,
       templateType: 'WORKSHEET',
+      examPattern: 'JEE_MAIN_MATHS',
       sections: [
-        { title: 'Section A', instructions: null, marksPerQuestion: 4, negativeMarks: 1, questions: [{ questionId: 'q-1', orderIndex: 0 }, { questionId: 'q-2', orderIndex: 1 }] },
+        { title: 'Section A', instructions: null, marksPerQuestion: 4, negativeMarks: 1, attemptLimit: 5, questions: [{ questionId: 'q-1', orderIndex: 0 }, { questionId: 'q-2', orderIndex: 1 }] },
       ],
     });
     test.create.mockResolvedValue({ id: 'test-2', title: 'Midterm (copy)', sections: [] });
@@ -64,9 +65,12 @@ describe('POST /api/teacher/tests/[testId]/duplicate', () => {
         title: 'Midterm (copy)',
         isPublished: false,
         templateType: 'WORKSHEET',
+        // A duplicated JEE mock must keep its pattern and its "attempt any N" rule.
+        examPattern: 'JEE_MAIN_MATHS',
         sections: {
           create: [expect.objectContaining({
             title: 'Section A',
+            attemptLimit: 5,
             questions: { create: [{ questionId: 'q-1', orderIndex: 0 }, { questionId: 'q-2', orderIndex: 1 }] },
           })],
         },

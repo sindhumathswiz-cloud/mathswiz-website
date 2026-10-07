@@ -38,7 +38,7 @@ export async function GET(req: Request) {
 
   const grouped = await prisma.testResponse.groupBy({
     by: ['questionId', 'selectedOption'],
-    where: { attemptId: { in: attemptIds }, isCorrect: false, selectedOption: { not: null } },
+    where: { attemptId: { in: attemptIds }, isCorrect: false, selectedOption: { not: null }, status: { not: 'OVER_LIMIT' } },
     _count: { _all: true },
   });
   if (grouped.length === 0) return NextResponse.json({ questions: [] });

@@ -88,9 +88,11 @@ test("teacher builds a test by filters, saves it as a template, duplicates it, p
   await expect(studentPage.getByTestId(`option-original-${firstAnswer}`)).toBeVisible();
   await studentPage.getByTestId(`option-original-${firstAnswer}`).click();
 
-  studentPage.once("dialog", (dialog) => dialog.accept());
+  // Submitting now goes through a review summary rather than a browser confirm().
   const submitResponsePromise = studentPage.waitForResponse((r) => r.url().includes(`/api/student/tests/${testId}/submit`) && r.ok());
-  await studentPage.getByRole("button", { name: "Terminate & Submit" }).click();
+  await studentPage.getByRole("button", { name: "Review & Submit" }).click();
+  await expect(studentPage.getByRole("dialog", { name: "Review your paper" })).toBeVisible();
+  await studentPage.getByRole("button", { name: "Submit exam" }).click();
   const submitResponse = await submitResponsePromise;
   const submitData = await submitResponse.json();
   expect(submitData.status).toBe("SUBMITTED");

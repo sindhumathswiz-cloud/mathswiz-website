@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { isPremiumSubscription } from '@/lib/subscription';
+import { markableTestsFor } from '@/lib/written-review';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,14 +23,7 @@ export async function GET() {
       reviewStatus: { in: ['PENDING', 'REVIEWED'] },
       attempt: {
         status: { in: ['SUBMITTED', 'AUTO_SUBMITTED'] },
-        test: {
-          assignments: {
-            some: {
-              kind: 'HOMEWORK',
-              OR: [{ batch: { teacherId } }, { test: { createdById: teacherId } }],
-            },
-          },
-        },
+        test: markableTestsFor(teacherId),
       },
     },
     select: {
@@ -44,6 +38,7 @@ export async function GET() {
       attempt: {
         select: {
           id: true,
+          testId: true,
           endTime: true,
           user: { select: { id: true, firstName: true, lastName: true } },
           test: { select: { id: true, title: true, totalMarks: true } },
@@ -54,5 +49,15 @@ export async function GET() {
     take: 200,
   });
 
-  return NextResponse.json({ submissions: responses });
+  // The most a question can be marked out of is its section's marks per question.
+  const questionIds = [...new Set(responses.map((r) => r.question.id))];
+  const testIds = [...new Set(responses.map((r) => r.attempt.testId).filter((id): id is string => !!id))];
+  const placements = questionIds.length === 0 ? [] : await prisma.testQuestion.findMany({
+    where: { questionId: { in: questionIds }, section: { testId: { in: testIds } } },
+    select: { questionId: true, section: { select: { testId: true, marksPerQuestion: true } } },
+  });
+  const maxByKey = new Map(placements.map((p) => [`${p.section.testId}:${p.questionId}`, p.section.marksPerQuestion]));
+  const submissions = responses.map((r) => ({ ...r, maxMarks: maxByKey.get(`${r.attempt.testId}:${r.question.id}`) ?? null }));
+
+  return NextResponse.json({ submissions });
 }

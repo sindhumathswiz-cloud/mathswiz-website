@@ -51,6 +51,26 @@ describe('GET /api/student/performance/[attemptId] -- insights and recommended a
     expect(correctInsight.errorType).toBeNull();
   });
 
+  it('does not treat an unscored over-limit answer as a mistake', async () => {
+    testAttempt.findFirst.mockResolvedValue({
+      ...baseAttempt,
+      responses: [
+        ...baseAttempt.responses,
+        { id: 'r-over', questionId: 'q-3', isCorrect: false, status: 'OVER_LIMIT', selectedOption: '7', timeSpent: 200, question: { topic: 'Algebra' } },
+      ],
+    });
+    testResponse.groupBy.mockResolvedValue([{ questionId: 'q-3', selectedOption: '7', _count: { _all: 9 } }]);
+    const body = await (await call()).json();
+
+    expect(body.responseInsights.map((r: any) => r.responseId)).not.toContain('r-over');
+    // Not counted as a "wasted" slow wrong answer either.
+    expect(body.behavioral.wasted).toBe(0);
+    // And the common-mistake lookup never asked about it.
+    const asked = testResponse.groupBy.mock.calls[0][0].where;
+    expect(asked.questionId.in).not.toContain('q-3');
+    expect(asked.status).toEqual({ not: 'OVER_LIMIT' });
+  });
+
   it('recommends REVIEW_MISTAKES when the mistake queue has due entries', async () => {
     spacedRepetitionCard.findMany.mockResolvedValue([
       { questionId: 'q-9', lapses: 1, lastReviewedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), dueAt: new Date(Date.now() - 60_000) },

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
 import { isFreePreviewQuestion } from '@/lib/free-preview-content';
 import { isPremiumSubscription } from '@/lib/subscription';
+import { secondsRemaining } from '@/lib/exam-clock';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +50,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         sections: {
           include: {
             questions: {
+              // The order the teacher built (and the printed paper uses), not whatever the database returns.
+              orderBy: { orderIndex: 'asc' },
               include: {
                 question: {
                   select: { // CRITICAL: Exclude correctAnswer and explanation
@@ -96,7 +99,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         });
     }
 
-    return NextResponse.json({ test, attempt });
+    // Where the clock stands is the server's to say. Null until the student presses Start; after that it
+    // keeps running whether or not the page is open, so closing the tab does not pause it.
+    const remaining = attempt.examStartedAt ? secondsRemaining(attempt, test.duration, now) : null;
+    return NextResponse.json({ test, attempt, secondsRemaining: remaining });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+import { WRITTEN_QUESTION_TYPES } from '@/lib/exam-view';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -57,7 +58,7 @@ export async function GET(req: Request) {
 
     // Get topic analysis
     const responses = await (prisma as any).testResponse.findMany({
-      where: { attempt: { userId: studentId, status: 'SUBMITTED' } },
+      where: { attempt: { userId: studentId, status: 'SUBMITTED' }, status: { not: 'OVER_LIMIT' }, question: { type: { notIn: WRITTEN_QUESTION_TYPES } } },
       include: { question: { select: { topic: true } } },
     });
 

@@ -86,7 +86,7 @@ export default function TeacherSidebar() {
         { href: dashboardHref('Live Classes'), icon: <Video size={18} />, label: 'Live Classes', tab: 'Live Classes', premium: true },
         { href: dashboardHref('Question Bank'), icon: <BookOpen size={18} />, label: 'Question Bank', tab: 'Question Bank', premium: true },
         { href: dashboardHref('Test & Exam Engine'), icon: <ClipboardList size={18} />, label: 'Test & Exams', tab: 'Test & Exam Engine', premium: true },
-        { href: '/teacher/homework', icon: <ClipboardCheck size={18} />, label: 'Homework Review', premium: true },
+        { href: '/teacher/homework', icon: <ClipboardCheck size={18} />, label: 'Written Answers', premium: true },
     ];
 
     const insightItems: TeacherNavItem[] = [

@@ -35,6 +35,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ testId
                 totalMarks: source.totalMarks,
                 isPublished: false,
                 templateType: source.templateType,
+                examPattern: source.examPattern,
                 createdById: userId,
                 sections: {
                     create: source.sections.map((section) => ({
@@ -42,6 +43,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ testId
                         instructions: section.instructions,
                         marksPerQuestion: section.marksPerQuestion,
                         negativeMarks: section.negativeMarks,
+                        attemptLimit: section.attemptLimit,
                         questions: {
                             create: section.questions.map((q) => ({
                                 questionId: q.questionId,

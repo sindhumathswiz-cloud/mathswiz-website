@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { isPremiumSubscription } from '@/lib/subscription';
+import { markableTestsFor } from '@/lib/written-review';
+import { roundMarks } from '@/lib/exam-patterns';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ responseId: string }> }) {
   const session = await getServerSession(authOptions);
@@ -21,26 +23,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ respon
     where: {
       id: responseId,
       reviewStatus: { in: ['PENDING', 'REVIEWED'] },
-      attempt: {
-        test: {
-          assignments: {
-            some: {
-              kind: 'HOMEWORK',
-              OR: [{ batch: { teacherId } }, { test: { createdById: teacherId } }],
-            },
-          },
-        },
-      },
+      attempt: { test: markableTestsFor(teacherId) },
     },
-    select: { id: true, attemptId: true },
+    select: { id: true, attemptId: true, questionId: true, attempt: { select: { testId: true } } },
   });
   if (!existing) return NextResponse.json({ error: 'Submission not found' }, { status: 404 });
+
+  // No more than the question is worth in its section (a 5-mark answer cannot be given 50).
+  const placement = existing.attempt?.testId
+    ? await prisma.testQuestion.findFirst({
+        where: { questionId: existing.questionId, section: { testId: existing.attempt.testId } },
+        select: { section: { select: { marksPerQuestion: true } } },
+      })
+    : null;
+  const maxMarks = placement?.section.marksPerQuestion ?? 1_000;
 
   const body = await req.json();
   const marksAwarded = Number(body.marksAwarded);
   const teacherFeedback = typeof body.teacherFeedback === 'string' ? body.teacherFeedback.trim() : '';
-  if (!Number.isFinite(marksAwarded) || marksAwarded < 0 || marksAwarded > 1_000) {
-    return NextResponse.json({ error: 'Marks must be between 0 and 1000' }, { status: 400 });
+  if (!Number.isFinite(marksAwarded) || marksAwarded < 0 || marksAwarded > maxMarks) {
+    return NextResponse.json({ error: `Marks must be between 0 and ${maxMarks}` }, { status: 400 });
   }
   if (!teacherFeedback || teacherFeedback.length > 5_000) {
     return NextResponse.json({ error: 'Feedback is required and must be under 5000 characters' }, { status: 400 });
@@ -63,7 +65,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ respon
     });
     await tx.testAttempt.update({
       where: { id: existing.attemptId },
-      data: { totalScore: aggregate._sum.marksAwarded ?? 0 },
+      data: { totalScore: roundMarks(aggregate._sum.marksAwarded ?? 0) },
     });
     return response;
   });

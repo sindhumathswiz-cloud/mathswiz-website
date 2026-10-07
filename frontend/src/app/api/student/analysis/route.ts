@@ -1,3 +1,4 @@
+import { WRITTEN_QUESTION_TYPES } from '@/lib/exam-view';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -21,6 +22,10 @@ export async function GET(req: Request) {
           userId: studentId,
           status: 'SUBMITTED',
         },
+        // Answers over an attempt-any-N limit are not scored, so they are not evidence either way.
+        status: { not: 'OVER_LIMIT' },
+        // Written answers have no stored answer to be right or wrong against.
+        question: { type: { notIn: WRITTEN_QUESTION_TYPES } },
       },
       include: {
         question: {

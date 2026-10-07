@@ -9,7 +9,11 @@ const AI_PATHS = [
   "/api/extract",
   "/api/rag/",
   "/api/student/doubt-buddy/",
-  "/api/student/practice/",
+  // Only the practice routes that call a model. next, submit and mistakes are database reads and writes:
+  // with the whole prefix here a student answering quickly was throttled to 5 questions a minute.
+  "/api/student/practice/generate",
+  "/api/student/practice/hint",
+  "/api/student/practice/worksheet-solve",
   "/api/admin/ingest/",
   "/api/admin/auto-populate",
   "/api/admin/solutions/",

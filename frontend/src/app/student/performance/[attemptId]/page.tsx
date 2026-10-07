@@ -24,6 +24,7 @@ import {
     PartyPopper
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import { isWrittenType } from '@/lib/exam-view';
 import QuestionTrustBadge from '@/components/QuestionTrustBadge';
 import toast from 'react-hot-toast';
 
@@ -90,7 +91,7 @@ export default function PerformanceAnalytics() {
     const timeSeriesData = attempt.responses.map((r: any, i: number) => ({
         index: i + 1,
         time: Math.round(r.timeSpent),
-        status: r.isCorrect ? 'Correct' : 'Incorrect',
+        status: r.status === 'OVER_LIMIT' || isWrittenType(r.question?.type) ? 'Not scored' : r.isCorrect ? 'Correct' : 'Incorrect',
         median: behavioral.medianTime
     }));
 
@@ -254,7 +255,7 @@ export default function PerformanceAnalytics() {
                                     <Area type="monotone" dataKey="time" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorTime)" dot={(props: any) => {
                                         const { cx, cy, payload } = props;
                                         const isCorrect = payload.status === 'Correct';
-                                        return <circle cx={cx} cy={cy} r={5} fill={isCorrect ? '#10b981' : '#f43f5e'} stroke="white" strokeWidth={2} />;
+                                        return <circle cx={cx} cy={cy} r={5} fill={isCorrect ? '#10b981' : payload.status === 'Not scored' ? '#94a3b8' : '#f43f5e'} stroke="white" strokeWidth={2} />;
                                     }} />
                                 </AreaChart>
                             </ResponsiveContainer>
@@ -303,14 +304,28 @@ export default function PerformanceAnalytics() {
                                             <MathRenderer content={r.question.content} />
                                         </div>
 
+                                        {isWrittenType(r.question.type) && (
+                                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+                                                <p className="text-[10px] font-black uppercase opacity-60">Your written answer</p>
+                                                <p className="mt-2 whitespace-pre-wrap text-sm font-medium text-slate-800 dark:text-slate-200">{r.subjectiveText || 'No answer given'}</p>
+                                                <p className="mt-3 text-sm font-bold text-slate-900 dark:text-white">
+                                                    {r.reviewStatus === 'PENDING' ? 'Waiting for your teacher to mark this.' : r.reviewStatus === 'REVIEWED' ? `Marked: ${r.marksAwarded}` : 'Not marked.'}
+                                                </p>
+                                                {r.teacherFeedback && <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{r.teacherFeedback}</p>}
+                                            </div>
+                                        )}
+
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className={`p-4 rounded-2xl border ${r.isCorrect ? 'bg-emerald-50 border-emerald-100 text-emerald-900 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300' : 'bg-rose-50 border-rose-100 text-rose-900 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300'} flex items-center gap-3`}>
+                                            {!isWrittenType(r.question.type) && <div className={`p-4 rounded-2xl border ${r.status === 'OVER_LIMIT' ? 'bg-slate-50 border-slate-200 text-slate-700 dark:bg-white/5 dark:border-white/10 dark:text-slate-300' : r.isCorrect ? 'bg-emerald-50 border-emerald-100 text-emerald-900 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300' : 'bg-rose-50 border-rose-100 text-rose-900 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300'} flex items-center gap-3`}>
                                                 {r.isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                                                 <div>
                                                     <p className="text-[10px] font-black uppercase opacity-60">Your Response</p>
-                                                    <p className="text-sm font-bold">Option {r.selectedOption || 'Skipped'} {r.isCorrect ? '(Correct)' : '(Incorrect)'}</p>
+                                                    <p className="text-sm font-bold">
+                                                        {r.question.type === 'INTEGER' && r.selectedOption ? `Answer ${r.selectedOption}` : `Option ${r.selectedOption || 'Skipped'}`}{' '}
+                                                        {r.status === 'OVER_LIMIT' ? '(Not scored: over the attempt limit)' : r.isCorrect ? '(Correct)' : '(Incorrect)'}
+                                                    </p>
                                                 </div>
-                                            </div>
+                                            </div>}
                                             <div className="p-4 rounded-2xl border bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/10 text-slate-900 dark:text-white flex items-center gap-3">
                                                 <Clock className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                                                 <div>
@@ -320,7 +335,7 @@ export default function PerformanceAnalytics() {
                                             </div>
                                         </div>
 
-                                        {!r.isCorrect && (
+                                        {!r.isCorrect && r.status !== 'OVER_LIMIT' && !isWrittenType(r.question.type) && (
                                             <div className="bg-indigo-50/50 dark:bg-brand/5 border border-indigo-100 dark:border-brand/20 rounded-3xl p-6">
                                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                                     <p className="text-xs font-black text-indigo-600 dark:text-brand uppercase tracking-widest flex items-center gap-2">

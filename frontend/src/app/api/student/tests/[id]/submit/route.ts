@@ -8,6 +8,10 @@ import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { applyMasteryUpdate } from '@/lib/mastery';
 import { withSerializableRetry } from '@/lib/prisma-retry';
 import { recordQuestionReview } from '@/lib/spaced-repetition-review';
+import { AUTO_SCORED_TYPES, answersMatch, countedQuestionIds, hasChoice } from '@/lib/exam-scoring';
+import { roundMarks } from '@/lib/exam-patterns';
+import { answersToScore, isPastGrace } from '@/lib/exam-clock';
+import { isWrittenType } from '@/lib/exam-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     const studentId = (session.user as any).id;
 
-    const { attemptId, responses } = await req.json();
+    const { attemptId, responses: submittedResponses } = await req.json();
 
     const attempt = await prisma.testAttempt.findFirst({
       where: { id: attemptId, userId: studentId }
@@ -36,6 +40,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (!test) return NextResponse.json({ error: 'Test not found' }, { status: 404 });
 
+    // The server's clock decides which answers count. Within the deadline plus a short grace the request is
+    // trusted; after it, only what was saved while the clock was running is scored, so a paper cannot be
+    // kept open and answered late.
+    const scoring = answersToScore<Record<string, any>>({
+      pastGrace: isPastGrace(attempt, test.duration),
+      submitted: submittedResponses,
+      saved: attempt.savedResponses as Record<string, any> | null,
+    });
+    const responses = scoring.responses as Record<string, any>;
+
     const homeworkAssignment = await prisma.testAssignment.findFirst({
       where: {
         testId: id,
@@ -47,6 +61,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
       select: { id: true },
     });
+    const needsTeacherMarking = !!homeworkAssignment || test.templateType === 'MOCK_EXAM';
 
     let totalScore = 0;
     let totalCorrect = 0;
@@ -68,6 +83,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const masteryItems: Array<{ topic: string; questionId: string; isCorrect: boolean; difficulty: string | null; timeSpent: number; wasMarkedForReview: boolean }> = [];
 
     for (const section of test.sections) {
+      // "Attempt any N": only the first N answered questions score. Null = no limit.
+      const counted = countedQuestionIds(
+        { attemptLimit: section.attemptLimit, questions: section.questions.map((tq) => ({ id: tq.question.id })) },
+        responses ?? {},
+      );
       for (const tq of section.questions) {
         const q = tq.question;
         const studentResponse = responses[q.id];
@@ -80,7 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         let subjectiveImage = null;
         let reviewStatus: 'NOT_REQUIRED' | 'PENDING' = 'NOT_REQUIRED';
 
-        const isSubjective = ['SUBJECTIVE', 'SHORT_ANSWER', 'LONG_ANSWER', 'VERY_SHORT_ANSWER'].includes(q.type);
+        const isSubjective = isWrittenType(q.type);
 
         if (isSubjective && studentResponse) {
           subjectiveText = typeof studentResponse.subjectiveText === 'string'
@@ -91,22 +111,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             : null;
           if (subjectiveText || subjectiveImage) {
             status = 'ANSWERED';
-            reviewStatus = homeworkAssignment ? 'PENDING' : 'NOT_REQUIRED';
+            // Written answers are marked by a teacher: homework always, and a mock exam that has them.
+            reviewStatus = needsTeacherMarking ? 'PENDING' : 'NOT_REQUIRED';
           } else {
             totalSkipped++;
           }
-        } else if (studentResponse && studentResponse.selectedOption !== null && studentResponse.selectedOption !== undefined) {
+        } else if (!isSubjective && hasChoice(studentResponse)) {
           status = 'ANSWERED';
-          selectedOption = String(studentResponse.selectedOption);
+          selectedOption = String(studentResponse.selectedOption).trim();
 
-          if (q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE' || q.type === 'INTEGER' || q.type === 'TRUE_FALSE') {
-            if (q.correctAnswer === selectedOption) {
+          if (counted && !counted.has(q.id)) {
+            // Answered beyond the section's limit: kept on the record, but it neither
+            // scores nor counts as right, wrong or skipped.
+            status = 'OVER_LIMIT';
+          } else if (AUTO_SCORED_TYPES.includes(q.type)) {
+            if (answersMatch(q.type, q.correctAnswer, selectedOption)) {
               isCorrect = true;
               marksAwarded = section.marksPerQuestion;
               totalCorrect++;
             } else {
               isCorrect = false;
-              marksAwarded = -section.negativeMarks; // subtract negative marks
+              marksAwarded = section.negativeMarks > 0 ? -section.negativeMarks : 0; // subtract negative marks (never store -0)
               totalIncorrect++;
             }
             if (q.topic) {
@@ -130,7 +155,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // gets persisted for the response, so propagating the client's
         // "marked for review" flag here can't affect isCorrect/marksAwarded
         // or any of the totals.
-        const storedStatus = (studentResponse?.status === 'MARKED_FOR_REVIEW' || studentResponse?.status === 'ANSWERED_AND_MARKED')
+        const storedStatus = status !== 'OVER_LIMIT' && (studentResponse?.status === 'MARKED_FOR_REVIEW' || studentResponse?.status === 'ANSWERED_AND_MARKED')
           ? 'MARKED_FOR_REVIEW'
           : status;
 
@@ -148,6 +173,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         });
       }
     }
+
+    // Fractional schemes (2.5 for, 0.83 against) otherwise leave 1.6700000000000002 in the database.
+    totalScore = roundMarks(totalScore);
 
     // A per-attempt time baseline for SM-2 quality derivation (no per-question
     // history query needed here, unlike the single-question practice-arena
@@ -198,14 +226,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       action: 'TEST_SUBMITTED',
       entityType: 'TestAttempt',
       entityId: attemptId,
-      metadata: { testId: id, totalScore, totalCorrect, totalIncorrect, totalSkipped },
+      metadata: { testId: id, totalScore, totalCorrect, totalIncorrect, totalSkipped, ...(scoring.usedSavedCopy ? { scoredFromSavedCopy: true } : {}) },
       ...requestAuditContext(req),
     });
 
     // Nuclear Revalidation: Refresh all student pages
     revalidatePath('/student', 'layout');
 
-    return NextResponse.json({ ...updatedAttempt, pointsAwarded: POINTS_RULES.TEST_COMPLETED });
+    return NextResponse.json({ ...updatedAttempt, pointsAwarded: POINTS_RULES.TEST_COMPLETED, scoredFromSavedCopy: scoring.usedSavedCopy, pendingReview: responseRecords.filter((r) => r.reviewStatus === 'PENDING').length });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

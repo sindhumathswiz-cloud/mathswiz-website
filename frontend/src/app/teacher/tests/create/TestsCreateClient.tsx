@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 import QuestionSourceSelector, { NO_SOURCE, type SourceSelection } from '@/components/teacher/QuestionSourceSelector';
+import { attemptRuleLabel, EXAM_PATTERNS, examMaxMarks, findExamPattern, sectionsFromPattern } from '@/lib/exam-patterns';
 
 type Question = {
   id: string;
@@ -26,6 +27,13 @@ type TestSection = {
   instructions: string;
   marksPerQuestion: number;
   negativeMarks: number;
+  // "Attempt any N": only the first N answered questions are scored. null = all count.
+  attemptLimit: number | null;
+  // Set when the section came from an exam pattern: how many questions it should hold,
+  // and which kind, so the picker can pre-filter.
+  targetQuestions?: number;
+  kind?: 'MCQ' | 'NUMERICAL' | 'WRITTEN';
+  questionType?: string;
   questions: Question[];
 };
 
@@ -39,6 +47,8 @@ export default function TestCreatorStudio() {
   const [duration, setDuration] = useState('60');
   // Empty string = a live test/homework (not saved as a template).
   const [templateType, setTemplateType] = useState('');
+  // Id of the exam pattern the sections were started from ('' = built by hand).
+  const [examPattern, setExamPattern] = useState('');
   
   // Left Panel - Repository State
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
@@ -105,6 +115,7 @@ export default function TestCreatorStudio() {
       instructions: '',
       marksPerQuestion: 4.0,
       negativeMarks: 1.0,
+      attemptLimit: null,
       questions: []
     };
     setSections([...sections, newSection]);
@@ -179,12 +190,15 @@ export default function TestCreatorStudio() {
         instructions: '',
         marksPerQuestion: 4.0,
         negativeMarks: 1.0,
+        attemptLimit: null,
         questions: []
       };
       currentSections = [newSection];
     }
 
-    const targetSection = currentSections[0];
+    // The section being filled (the active one), not always the first: a mock
+    // exam has several, and picking for Section B must not land in Section A.
+    const targetSection = currentSections.find(section => section.id === activeSectionId) ?? currentSections[0];
     const combinedQuestions = [...targetSection.questions];
 
     questions.forEach((q: Question) => {
@@ -193,10 +207,42 @@ export default function TestCreatorStudio() {
        }
     });
 
-    targetSection.questions = combinedQuestions;
-    setSections(currentSections);
+    setSections(currentSections.map(section => (section.id === targetSection.id ? { ...section, questions: combinedQuestions } : section)));
     setActiveSectionId(targetSection.id);
   };
+
+  // Start from a real paper's structure: sections, marking, attempt rules and duration.
+  const applyPattern = (patternId: string) => {
+    const pattern = findExamPattern(patternId);
+    if (!pattern) { setExamPattern(''); return; }
+    if (sections.some(section => section.questions.length > 0) && !confirm('Replace the sections you have built with this pattern? Questions you have added will be removed.')) return;
+    const created: TestSection[] = sectionsFromPattern(pattern).map(section => ({
+      id: crypto.randomUUID(),
+      title: section.title,
+      instructions: section.instructions,
+      marksPerQuestion: section.marksPerQuestion,
+      negativeMarks: section.negativeMarks,
+      attemptLimit: section.attemptLimit,
+      targetQuestions: section.targetQuestions,
+      kind: section.kind,
+      questionType: section.questionType,
+      questions: [],
+    }));
+    setSections(created);
+    setActiveSectionId(created[0]?.id ?? null);
+    setExamPattern(pattern.id);
+    setDuration(String(pattern.durationMinutes));
+    setMode('STRICT');
+    setTemplateType('MOCK_EXAM');
+    if (!title.trim()) setTitle(`${pattern.name} — mock`);
+  };
+
+  // Picking for a numerical section means numerical questions; for the rest, choice questions.
+  useEffect(() => {
+    const active = sections.find(section => section.id === activeSectionId);
+    if (active?.kind) setFilterType(active.questionType ?? (active.kind === 'NUMERICAL' ? 'INTEGER' : 'SINGLE_CHOICE'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSectionId]);
 
   // AI Blueprint
   const handleGenerateBlueprint = async () => {
@@ -266,11 +312,14 @@ export default function TestCreatorStudio() {
 
     setIsSaving(true);
     try {
-      // Calculate total marks based on logic
-      let computedTotal = 0;
-      sections.forEach(s => {
-        computedTotal += (s.marksPerQuestion * s.questions.length);
-      });
+      // Only the questions that can score: a section that is "attempt any 5 of 10" is worth 5.
+      const computedTotal = examMaxMarks(sections.map(s => ({ questionCount: s.questions.length, attemptLimit: s.attemptLimit, marksPerQuestion: s.marksPerQuestion })));
+
+      const short = sections.filter(s => s.targetQuestions && s.questions.length < s.targetQuestions);
+      if (short.length > 0 && !confirm(`${short.map(s => `${s.title} has ${s.questions.length} of ${s.targetQuestions} questions`).join('; ')}. Save anyway?`)) {
+        setIsSaving(false);
+        return;
+      }
 
       const res = await fetch('/api/teacher/tests', {
         method: 'POST',
@@ -281,8 +330,10 @@ export default function TestCreatorStudio() {
           mode,
           duration,
           totalMarks: computedTotal,
-          sections,
+          // A limit larger than the section is no limit; send what will actually apply.
+          sections: sections.map(s => ({ ...s, attemptLimit: s.attemptLimit && s.attemptLimit <= s.questions.length ? s.attemptLimit : null })),
           templateType: templateType || undefined,
+          examPattern: examPattern || undefined,
         })
       });
 
@@ -339,6 +390,11 @@ export default function TestCreatorStudio() {
               <option value="MULTIPLE_CHOICE">Multi MCQ</option>
               <option value="INTEGER">Integer</option>
               <option value="SUBJECTIVE">Subjective</option>
+              <option value="ASSERTION_REASONING">Assertion–reason</option>
+              <option value="VERY_SHORT_ANSWER">Very short answer</option>
+              <option value="SHORT_ANSWER">Short answer</option>
+              <option value="LONG_ANSWER">Long answer</option>
+              <option value="CASE_STUDY">Case study</option>
             </select>
             <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="bg-white dark:bg-white/5 dark:text-white border dark:border-white/10 rounded p-2 text-sm outline-none focus:border-indigo-500 dark:focus:border-brand">
                 <option value="All">All Classes</option>
@@ -439,6 +495,14 @@ export default function TestCreatorStudio() {
                <input type="number" value={duration} onChange={e => setDuration(e.target.value)} className="w-full border-b-2 border-slate-300 dark:border-white/10 focus:border-indigo-500 dark:focus:border-brand outline-none text-sm font-bold py-1.5 print:border-none bg-transparent dark:text-white" />
              </div>
           </div>
+          <div className="mb-4 print:hidden" data-testid="exam-pattern-picker">
+             <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Start from an exam pattern</label>
+             <select aria-label="Exam pattern" value={examPattern} onChange={e => applyPattern(e.target.value)} className="w-full border dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg p-2 text-sm outline-none focus:border-indigo-500 dark:focus:border-brand">
+                <option value="">Custom — build the sections yourself</option>
+                {EXAM_PATTERNS.map(pattern => <option key={pattern.id} value={pattern.id}>{pattern.name} · {pattern.summary}</option>)}
+             </select>
+             {findExamPattern(examPattern) && <p className="mt-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">{findExamPattern(examPattern)!.verifyNote}</p>}
+          </div>
           <div className="mb-4 print:hidden">
              <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">Save as</label>
              <select data-testid="save-as-select" value={templateType} onChange={e => setTemplateType(e.target.value)} className="w-full border dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg p-2 text-sm outline-none focus:border-indigo-500 dark:focus:border-brand">
@@ -495,6 +559,10 @@ export default function TestCreatorStudio() {
                           <div className="flex gap-2 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
                             <span className="bg-slate-100 dark:bg-white/5 px-2 py-1 rounded print:bg-transparent print:p-0">Marks: <input type="number" step="0.5" value={section.marksPerQuestion} onChange={e => updateSection(section.id, 'marksPerQuestion', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} className="w-10 bg-transparent text-slate-800 dark:text-white border-b border-slate-300 dark:border-white/20 text-center outline-none" /></span>
                             <span className="bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-400 px-2 py-1 rounded print:bg-transparent print:p-0">Neg: <input type="number" step="0.5" value={section.negativeMarks} onChange={e => updateSection(section.id, 'negativeMarks', parseFloat(e.target.value))} onClick={e => e.stopPropagation()} className="w-10 bg-transparent text-red-700 dark:text-rose-400 border-b border-red-300 dark:border-rose-500/30 text-center outline-none" /></span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 print:hidden">
+                            <span className="bg-indigo-50 dark:bg-brand/10 text-indigo-700 dark:text-brand px-2 py-1 rounded">Attempt any <input type="number" min={1} max={Math.max(1, section.questions.length)} placeholder="all" aria-label={`${section.title} attempt limit`} value={section.attemptLimit ?? ''} onChange={e => { const n = parseInt(e.target.value, 10); updateSection(section.id, 'attemptLimit', Number.isInteger(n) && n > 0 ? n : null); }} onClick={e => e.stopPropagation()} className="w-10 bg-transparent border-b border-indigo-300 text-center outline-none" /> of {section.questions.length}</span>
+                            {section.targetQuestions ? <span className={section.questions.length >= section.targetQuestions ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>{section.questions.length}/{section.targetQuestions} questions</span> : null}
                           </div>
                           <button onClick={(e) => { e.stopPropagation(); removeSection(section.id); }} className="text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-rose-400 print:hidden transition-colors"><Trash2 className="w-4 h-4" /></button>
                        </div>

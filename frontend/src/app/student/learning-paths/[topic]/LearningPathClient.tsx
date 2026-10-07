@@ -163,7 +163,14 @@ function GuidedPracticeStage({ topic, encodedTopic, detail, onAdvance }: { topic
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchNext(); }, [topic]);
+  // Once per topic. React's development double-run of effects used to fetch two different random
+  // questions, and the page could show one while the other was the one recorded.
+  const firstFetchFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (firstFetchFor.current === topic) return;
+    firstFetchFor.current = topic;
+    fetchNext();
+  }, [topic]);
 
   const handleAnswered = async (isCorrect: boolean | null) => {
     if (isCorrect === null) {
@@ -215,8 +222,13 @@ function TimedQuizStage({ encodedTopic, onAdvance }: { encodedTopic: string; onA
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const completingRef = useRef(false);
+  const quizStartedFor = useRef<string | null>(null);
 
   useEffect(() => {
+    // Starting a quiz picks a random set of questions, so starting twice (React's development
+    // double-run of effects) would hand out two different quizzes and show only one of them.
+    if (quizStartedFor.current === encodedTopic) return;
+    quizStartedFor.current = encodedTopic;
     fetch(`/api/student/learning-paths/${encodedTopic}/quiz/start`, { method: 'POST' })
       .then(async (response) => {
         const data = await readJsonResponse<{ questions?: any[]; startedAt?: string; suggestedSeconds?: number; error?: string }>(response);
