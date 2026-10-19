@@ -123,4 +123,23 @@ describe("LLM provider fallback", () => {
     expect(urls.some((u) => u.includes("gemini-2.0-flash"))).toBe(false);
     expect(bodies.some((b) => b.model === "llama-3.3-70b-versatile" || b.model === "llama-3.1-8b-instant")).toBe(false);
   });
+
+  it("can be limited to named providers, and fails clearly when none of them has a key", async () => {
+    vi.stubEnv("GROQ_API_KEY", "groq-test-key");
+    vi.stubEnv("OPENAI_API_KEY", "");
+    vi.stubEnv("OPENAI_API_KEY_1", "");
+    vi.stubEnv("GEMINI_API_KEY", "gemini-test-key");
+    vi.stubEnv("GEMINI_API_KEY_1", "");
+    vi.stubEnv("GEMINI_API_KEY_2", "");
+    vi.stubEnv("GEMINI_API_KEY_3", "");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchFromLLM("S", "U", { only: ["gemini"] })).resolves.toBe('{"ok":true}');
+    expect(fetchMock.mock.calls.every(call => String(call[0]).includes("generativelanguage.googleapis.com"))).toBe(true);
+
+    await expect(fetchFromLLM("S", "U", { only: ["openai"] })).rejects.toThrow("No LLM API keys configured");
+  });
 });

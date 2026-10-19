@@ -65,3 +65,7 @@ verification.*
 # Python bytecode from helper scripts
 __pycache__/
 *.pyc
+
+rectify-plan*
+draft-solutions-results*
+recover-plan*

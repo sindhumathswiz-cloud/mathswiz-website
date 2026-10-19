@@ -20,8 +20,16 @@ interface ProviderEntry {
 export async function fetchFromLLM(
   systemPrompt: string,
   userPrompt: string,
-  options: { json?: boolean; maxTokens?: number } = { json: true },
+  options: {
+    json?: boolean;
+    maxTokens?: number;
+    // Use only these providers, in the usual order. For work that needs two independent opinions.
+    only?: Array<'openai' | 'gemini' | 'groq'>;
+    // Per-request timeout; a reasoning model solving a problem can need longer than the 30s default.
+    timeoutMs?: number;
+  } = { json: true },
 ): Promise<string> {
+  const timeoutMs = options.timeoutMs ?? 30_000;
   const allKeys: ProviderEntry[] = [
     ...(process.env.GROQ_API_KEY ? [{ key: process.env.GROQ_API_KEY, provider: 'groq' as const }] : []),
     ...(process.env.OPENAI_API_KEY ? [{ key: process.env.OPENAI_API_KEY, provider: 'openai' as const }] : []),
@@ -30,7 +38,7 @@ export async function fetchFromLLM(
     ...(process.env.GEMINI_API_KEY_1 ? [{ key: process.env.GEMINI_API_KEY_1, provider: 'gemini' as const }] : []),
     ...(process.env.GEMINI_API_KEY_2 ? [{ key: process.env.GEMINI_API_KEY_2, provider: 'gemini' as const }] : []),
     ...(process.env.GEMINI_API_KEY_3 ? [{ key: process.env.GEMINI_API_KEY_3, provider: 'gemini' as const }] : []),
-  ].filter(k => k.key);
+  ].filter(k => k.key && (!options.only || options.only.includes(k.provider)));
 
   if (allKeys.length === 0) throw new Error("No LLM API keys configured");
 
@@ -59,7 +67,7 @@ export async function fetchFromLLM(
                 method: "POST",
                 headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
                 body: JSON.stringify(body),
-                signal: AbortSignal.timeout(30_000),
+                signal: AbortSignal.timeout(timeoutMs),
               });
               if (res.status === 413) { errors.push(`Groq/${model} 413`); break groqModels; }
               if (res.status === 429) { errors.push(`Groq/${model} 429`); continue; }
@@ -86,7 +94,7 @@ export async function fetchFromLLM(
             method: "POST",
             headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
             body: JSON.stringify(body),
-            signal: AbortSignal.timeout(30_000),
+            signal: AbortSignal.timeout(timeoutMs),
           });
           if (res.status === 429 || res.status === 413) { errors.push(`OpenAI ${res.status}`); continue; }
           if (!res.ok) { const b = await res.text().catch(() => ''); errors.push(`OpenAI ${res.status}: ${b.substring(0, 200)}`); continue; }
@@ -108,7 +116,7 @@ export async function fetchFromLLM(
                   maxOutputTokens: options.maxTokens ?? 8192,
                 },
               }),
-              signal: AbortSignal.timeout(30_000),
+              signal: AbortSignal.timeout(timeoutMs),
             });
             if (res.status === 429) { const b = await res.text().catch(() => ''); errors.push(`Gemini/${model} 429: ${b.substring(0, 200)}`); continue; }
             if (!res.ok) { const b = await res.text().catch(() => ''); errors.push(`Gemini/${model} ${res.status}: ${b.substring(0, 200)}`); continue; }

@@ -30,7 +30,7 @@ const OBJECTIVE_TYPES = new Set(['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'INTEGER', 
 const PLACEHOLDER_EXPLANATION = /try\s+(it\s+)?yourself|do\s+(it\s+)?yourself|similar to (the above|q\.?\s*no|question|previous)|refer to (the )?(above|previous|q\b)|same as (the )?(above|q\b)|left as an exercise|as in q\.?\s*no/i;
 
 /** Extract $$...$$ and $...$ math blocks from a string. */
-function mathBlocks(s: string): string[] {
+export function mathBlocks(s: string): string[] {
     if (!s) return [];
     const out: string[] = [];
     let m: RegExpExecArray | null;
@@ -42,7 +42,7 @@ function mathBlocks(s: string): string[] {
     return out;
 }
 
-function latexRenders(block: string): boolean {
+export function latexRenders(block: string): boolean {
     try {
         katex.renderToString(block, { throwOnError: true, strict: false, displayMode: true });
         return true;
