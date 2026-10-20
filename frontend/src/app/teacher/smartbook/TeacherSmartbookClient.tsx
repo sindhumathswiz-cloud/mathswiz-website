@@ -1,20 +1,16 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { BookOpenText, ChevronDown, ClipboardList, Eye, Loader2 } from 'lucide-react';
+import { Bookmark, BookOpenText, ChevronDown, ClipboardList, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import MathRenderer from '@/components/MathRenderer';
 import type { SourceBook } from '@/lib/question-source-filter';
-
-interface PreviewQuestion { id: string; content: string; printedNumber: string | null; sourcePageStart: number | null }
 
 /** Books, their chapters and exercises; any exercise becomes a test or homework in one step. */
 export default function TeacherSmartbookClient({ books }: { books: SourceBook[] }) {
   const router = useRouter();
   const [making, setMaking] = useState<string | null>(null);
-  const [previewing, setPreviewing] = useState<string | null>(null);
-  const [preview, setPreview] = useState<Record<string, PreviewQuestion[]>>({});
 
   const makeTest = async (exerciseId: string) => {
     setMaking(exerciseId);
@@ -30,21 +26,6 @@ export default function TeacherSmartbookClient({ books }: { books: SourceBook[] 
     }
   };
 
-  const togglePreview = async (exerciseId: string) => {
-    if (preview[exerciseId]) { setPreview(({ [exerciseId]: _, ...rest }) => rest); return; }
-    setPreviewing(exerciseId);
-    try {
-      const res = await fetch(`/api/teacher/questions?bookExerciseId=${encodeURIComponent(exerciseId)}&limit=200`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Could not load the questions');
-      const approved = (body.questions ?? []).filter((q: { status: string }) => q.status === 'APPROVED');
-      setPreview((all) => ({ ...all, [exerciseId]: approved }));
-    } catch (error) {
-      toast.error((error as Error).message);
-    } finally {
-      setPreviewing(null);
-    }
-  };
 
   return (
     <main className="min-h-screen bg-slate-50 p-6 dark:bg-background md:p-10">
@@ -53,8 +34,9 @@ export default function TeacherSmartbookClient({ books }: { books: SourceBook[] 
           <BookOpenText className="h-9 w-9 text-indigo-600 dark:text-brand" />
           <div>
             <h1 className="font-display text-3xl font-black text-slate-900 dark:text-white">Smartbook</h1>
-            <p className="text-slate-600 dark:text-slate-400">Pick any exercise of a book and set it as a test or homework. Only approved questions are included, in the order the book prints them.</p>
+            <p className="text-slate-600 dark:text-slate-400">Open any exercise of a book to go through its questions with their solutions, bookmark them or add them to a test, or set the whole exercise as a test or homework. Only approved questions are included, in the order the book prints them.</p>
           </div>
+          <Link href="/teacher/smartbook/bookmarks" data-testid="my-bookmarks" className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-white/15 dark:bg-surface dark:text-slate-200"><Bookmark className="h-4 w-4" /> My bookmarks</Link>
         </div>
 
         {books.length === 0 && (
@@ -83,25 +65,13 @@ export default function TeacherSmartbookClient({ books }: { books: SourceBook[] 
                           <div className="flex flex-wrap items-center gap-3">
                             <span className="min-w-0 flex-1 font-bold text-slate-900 dark:text-white">{exercise.label}</span>
                             <span className="text-xs tabular-nums text-slate-500">{exercise.total} questions</span>
-                            <button type="button" onClick={() => togglePreview(exercise.id)} disabled={previewing === exercise.id} aria-expanded={Boolean(preview[exercise.id])} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/5">
-                              {previewing === exercise.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />} {preview[exercise.id] ? 'Hide questions' : 'See questions'}
-                            </button>
+                            <Link href={`/teacher/smartbook/${book.id}/exercises/${exercise.id}`} data-testid={`open-exercise-${exercise.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/5">
+                              <Eye className="h-3.5 w-3.5" /> Open
+                            </Link>
                             <button type="button" onClick={() => makeTest(exercise.id)} disabled={making !== null} data-testid={`make-test-${exercise.id}`} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 dark:bg-brand">
                               {making === exercise.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardList className="h-3.5 w-3.5" />} Make a test
                             </button>
                           </div>
-                          {preview[exercise.id] && (
-                            <ol className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm dark:border-white/10">
-                              {preview[exercise.id].length === 0 && <li className="text-slate-500">No approved questions found.</li>}
-                              {preview[exercise.id].map((q) => (
-                                <li key={q.id} className="flex gap-3">
-                                  <span className="w-10 shrink-0 text-xs font-bold text-slate-500">{q.printedNumber ? `Q${q.printedNumber}` : ''}</span>
-                                  <span className="min-w-0 flex-1 text-slate-800 dark:text-slate-200"><MathRenderer content={q.content} /></span>
-                                  {q.sourcePageStart != null && <span className="shrink-0 text-xs tabular-nums text-slate-400">p. {q.sourcePageStart}</span>}
-                                </li>
-                              ))}
-                            </ol>
-                          )}
                         </li>
                       ))}
                     </ul>

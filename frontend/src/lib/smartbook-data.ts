@@ -2,6 +2,7 @@
  * Database side of the Smartbook (see smartbook.ts for the rules). Every loader checks the student's access itself:
  * the book is published as a Smartbook, active, and for the student's class; callers also check Premium.
  */
+import type { Prisma } from '@prisma/client';
 import prisma from './prisma';
 import { isPremiumSubscription } from './subscription';
 import { buildOutline, exercisePages, inPrintedOrder, type SmartbookOutline } from './smartbook';
@@ -49,11 +50,22 @@ export interface SmartbookQuestion {
   options: unknown;
   printedNumber: string | null;
   sourcePageStart: number | null;
+  correctAnswer?: string | null;
+  explanation?: string | null;
 }
 
-/** One exercise to read: its printed pages and its approved questions, without answers. */
+/** One exercise to read: its printed pages and its approved questions, without answers (students). */
 export async function loadSmartbookExercise(bookId: string, exerciseId: string, className: string | null) {
-  const book = await prisma.book.findFirst({ where: { id: bookId, ...publishedFor(className) }, select: { id: true, title: true, className: true } });
+  return loadExercise(bookId, exerciseId, publishedFor(className), false);
+}
+
+/** The same for a teacher: any active book, and each question's answer and worked solution included. */
+export async function loadExerciseForTeacher(bookId: string, exerciseId: string) {
+  return loadExercise(bookId, exerciseId, { isActive: true }, true);
+}
+
+async function loadExercise(bookId: string, exerciseId: string, bookWhere: Prisma.BookWhereInput, withAnswers: boolean) {
+  const book = await prisma.book.findFirst({ where: { id: bookId, ...bookWhere }, select: { id: true, title: true, className: true } });
   if (!book) return null;
   const exercise = await prisma.bookExercise.findFirst({
     where: { id: exerciseId, chapter: { bookId } },
@@ -63,11 +75,15 @@ export async function loadSmartbookExercise(bookId: string, exerciseId: string, 
 
   const candidates = await prisma.question.findMany({
     where: { bookId, ...approvedPublic, OR: [{ bookExerciseId: exercise.id }, { bookExerciseId: null, bookChapterId: exercise.chapterId }] },
-    select: { id: true, content: true, type: true, options: true, printedNumber: true, sourcePageStart: true, createdAt: true, bookId: true, bookChapterId: true, bookExerciseId: true },
+    select: { id: true, content: true, type: true, options: true, printedNumber: true, sourcePageStart: true, createdAt: true, bookId: true, bookChapterId: true, bookExerciseId: true, correctAnswer: true, explanation: true },
   });
   const range = { id: exercise.id, chapterId: exercise.chapterId, bookId, startPage: exercise.startPage, endPage: exercise.endPage };
   const questions: SmartbookQuestion[] = inPrintedOrder(candidates.filter((q) => questionInExercise(q, range)))
-    .map(({ id, content, type, options, printedNumber, sourcePageStart }) => ({ id, content, type, options, printedNumber, sourcePageStart }));
+    .map(({ id, content, type, options, printedNumber, sourcePageStart, correctAnswer, explanation }) => ({
+      id, content, type, options, printedNumber, sourcePageStart,
+      // Never part of what a student's page receives: they get these after answering.
+      ...(withAnswers ? { correctAnswer, explanation } : {}),
+    }));
 
   // Neighbouring exercises (in book order, with questions) for "previous / next".
   const outline = await outlineOf(bookId);
@@ -87,8 +103,17 @@ export async function loadSmartbookExercise(bookId: string, exerciseId: string, 
 
 /** The stored image of one page of a published book, if that page is inside one of its exercises or sections. */
 export async function smartbookPageImagePath(bookId: string, pageNumber: number, className: string | null): Promise<string | null> {
+  return pageImagePath(bookId, pageNumber, publishedFor(className));
+}
+
+/** The same for a teacher: any active book, still only pages inside its exercises or sections. */
+export async function teacherPageImagePath(bookId: string, pageNumber: number): Promise<string | null> {
+  return pageImagePath(bookId, pageNumber, { isActive: true });
+}
+
+async function pageImagePath(bookId: string, pageNumber: number, bookWhere: Prisma.BookWhereInput): Promise<string | null> {
   const book = await prisma.book.findFirst({
-    where: { id: bookId, ...publishedFor(className) },
+    where: { id: bookId, ...bookWhere },
     select: { ingestionRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { sourceDocumentId: true } } },
   });
   const documentId = book?.ingestionRuns[0]?.sourceDocumentId;
