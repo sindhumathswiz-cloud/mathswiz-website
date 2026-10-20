@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, Activity, Clock, Eye, Filter, Download, Plus, Trash2, X, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 interface UserDirectoryTableProps {
@@ -29,6 +30,16 @@ const StatusBadge = ({ status }: { status: string }) => {
         </span>
     );
 };
+
+const SubscriptionBadge = ({ premium }: { premium: boolean }) => (
+    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+        premium
+            ? 'bg-violet-100 text-violet-700 border-violet-200'
+            : 'bg-slate-100 text-slate-600 border-slate-200'
+    }`}>
+        {premium ? 'Premium' : 'Free'}
+    </span>
+);
 
 function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
     const [loading, setLoading] = useState(false);
@@ -175,6 +186,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 }
 
 export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserAdded, onUserDeleted }: UserDirectoryTableProps) {
+    const router = useRouter();
     const [filterRole, setFilterRole] = React.useState('ALL');
     const [showAddModal, setShowAddModal] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -193,12 +205,15 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
         setDeletingId(userId);
         try {
             const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.success) {
+            const contentType = res.headers.get('content-type') || '';
+            const data = contentType.includes('application/json') ? await res.json() : null;
+
+            if (res.ok && data?.success) {
                 toast.success('User deleted successfully');
                 onUserDeleted?.();
+                router.refresh();
             } else {
-                toast.error(data.error || 'Failed to delete user');
+                toast.error(data?.error || `Failed to delete user (${res.status})`);
             }
         } catch (err: any) {
             toast.error('Delete failed: ' + err.message);
@@ -267,15 +282,18 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                     </div>
                 </div>
             </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+            <div
+                className="min-h-[22rem] max-h-[60dvh] w-full overflow-auto overscroll-contain rounded-b-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-surface"
+                aria-label="User directory table"
+            >
+                <table className="min-w-[850px] w-full text-left border-collapse">
                     <thead>
-                        <tr className="bg-gray-50/50 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 dark:border-white/10 dark:text-slate-400 dark:bg-surface-muted">
-                            <th className="px-6 py-4">User Details</th>
-                            <th className="px-6 py-4">Status & Role</th>
-                            <th className="px-6 py-4">Engagement</th>
-                            <th className="px-6 py-4">Activity</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
+                        <tr className="bg-gray-50/95 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100 dark:border-white/10 dark:text-slate-400 dark:bg-surface-muted/95">
+                            <th className="sticky top-0 z-10 bg-gray-50/95 px-6 py-4 dark:bg-surface-muted/95">User Details</th>
+                            <th className="sticky top-0 z-10 bg-gray-50/95 px-6 py-4 dark:bg-surface-muted/95">Status, Role & Plan</th>
+                            <th className="sticky top-0 z-10 bg-gray-50/95 px-6 py-4 dark:bg-surface-muted/95">Engagement</th>
+                            <th className="sticky top-0 z-10 bg-gray-50/95 px-6 py-4 dark:bg-surface-muted/95">Activity</th>
+                            <th className="sticky top-0 z-10 bg-gray-50/95 px-6 py-4 text-right dark:bg-surface-muted/95">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -297,6 +315,7 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                                     <div className="flex flex-col gap-1.5">
                                         <StatusBadge status={user.accountStatus} />
                                         <StatusBadge status={user.role} />
+                                        <SubscriptionBadge premium={Boolean(user.microsoftId?.trim()) || user.subscription === 'PREMIUM'} />
                                     </div>
                                 </td>
                                 <td className="px-6 py-5">

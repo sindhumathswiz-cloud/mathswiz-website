@@ -29,6 +29,23 @@ describe("POST /api/auth/register", () => {
     expect(user.create).not.toHaveBeenCalled();
   });
 
+  it("rejects a mobile number that is not exactly 10 digits", async () => {
+    const { POST } = await import("./route");
+    const response = await POST(new Request("http://localhost/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({
+        firstName: "Ada",
+        lastName: "Student",
+        mobileNumber: "98765432101",
+        password: "password123",
+        role: "STUDENT",
+      }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(user.create).not.toHaveBeenCalled();
+  });
+
   it("hashes passwords and never returns them", async () => {
     user.findUnique.mockResolvedValue(null);
     user.create.mockResolvedValue({

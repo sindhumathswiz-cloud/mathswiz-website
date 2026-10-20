@@ -21,7 +21,6 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     MoreHorizontal,
-    UserPlus,
     Lock,
     Eye,
     BookOpen,
@@ -117,9 +116,7 @@ export default function AdminDashboardClient({
         setIsSigningOut(true);
         await signOut({ callbackUrl: '/login' });
     };
-    const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
-    const [newLead, setNewLead] = useState({ name: '', phone: '', courseInterest: '' });
-    const [leads, setLeads] = useState(initialLeads);
+    const leads = initialLeads;
     type AdminTab = 'Platform Overview' | 'User Directory' | 'Approvals' | 'Lead CRM' | 'Test & Exam Engine' | 'Reports & Export' | 'System Features' | 'Fee Management' | 'Question Bank';
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<AdminTab>('Platform Overview');
@@ -148,26 +145,6 @@ export default function AdminDashboardClient({
             pendingTeacherReview: prev?.pendingTeacherReview ?? 0,
         }));
     }, []);
-
-    const handleAddLeadSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            const res = await fetch('/api/admin/leads', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newLead)
-            });
-            if (res.ok) {
-                const lead = await res.json();
-                setLeads([lead, ...leads]);
-                setIsAddLeadOpen(false);
-                setNewLead({ name: '', phone: '', courseInterest: '' });
-                toast.success('Lead added successfully!');
-            }
-        } catch (error) {
-            toast.error('Failed to add lead');
-        }
-    };
 
     const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
     const [approvalsLoading, setApprovalsLoading] = useState(true);
@@ -457,41 +434,12 @@ export default function AdminDashboardClient({
                                 <SummaryTile title="Active Subscriptions" value={stats.userDirectory?.activeEnrolled} icon={CheckCircle2} color="text-emerald-600" bg="bg-emerald-50" detail="Enrolled in batches" />
                                 <SummaryTile title="Suspended" value={stats.userDirectory?.suspended} icon={AlertCircle} color="text-red-600" bg="bg-red-50" />
                             </div>
-                            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                                <div className="xl:col-span-2 space-y-6">
-                                    <UserDirectoryTable 
-                                        users={users} 
-                                        searchQuery={searchQuery} 
-                                        onSearchChange={setSearchQuery} 
-                                    />
-                                </div>
-                                <div className="xl:col-span-1 space-y-6">
-                                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full max-h-[800px]">
-                                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                                            <div>
-                                                <h2 className="text-lg font-bold text-gray-900">Entrance Interest</h2>
-                                                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">Live Lead Queue</p>
-                                            </div>
-                                            <button onClick={() => setIsAddLeadOpen(true)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100"><UserPlus className="w-4 h-4" /></button>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto divide-y divide-gray-50 p-2">
-                                            {leads.map((lead: any) => (
-                                                <div key={lead.id} className="p-4 hover:bg-gray-50 rounded-xl transition-colors flex justify-between items-start gap-4">
-                                                    <div className="space-y-1 min-w-0">
-                                                        <div className="text-sm font-bold text-gray-900 truncate">{lead.name}</div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-black">{lead.courseInterest}</span>
-                                                            <span className="text-[10px] font-bold text-gray-400">{lead.phone}</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-end gap-2 text-[10px] text-gray-400 font-bold" suppressHydrationWarning>
-                                                        {new Date(lead.createdAt).toLocaleDateString()}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="min-w-0">
+                                <UserDirectoryTable
+                                    users={users}
+                                    searchQuery={searchQuery}
+                                    onSearchChange={setSearchQuery}
+                                />
                             </div>
                         </div>
                     )}
@@ -536,36 +484,6 @@ export default function AdminDashboardClient({
                     )}
                 </div>
             </div>
-
-            {/* Modal: Add Lead */}
-            {isAddLeadOpen && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-100">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-900">Manually Inject Lead</h3>
-                            <button onClick={() => setIsAddLeadOpen(false)} className="text-gray-400 hover:text-gray-900 transition"><XCircle className="w-5 h-5" /></button>
-                        </div>
-                        <form onSubmit={handleAddLeadSubmit} className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Full Name</label>
-                                <input required type="text" value={newLead.name} onChange={e => setNewLead({ ...newLead, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium transition" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Mobile / WhatsApp</label>
-                                <input required type="text" value={newLead.phone} onChange={e => setNewLead({ ...newLead, phone: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium transition" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Batch Interest (e.g., NDA 2026)</label>
-                                <input required type="text" value={newLead.courseInterest} onChange={e => setNewLead({ ...newLead, courseInterest: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium transition" />
-                            </div>
-                            <div className="flex justify-end gap-3 pt-6">
-                                <button type="button" onClick={() => setIsAddLeadOpen(false)} className="px-6 py-2.5 text-sm text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition">Cancel</button>
-                                <button type="submit" className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md transition shadow-indigo-100">Add Live Lead</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
 
             {/* Drawer: Create Batch */}
             {isCreateBatchOpen && (

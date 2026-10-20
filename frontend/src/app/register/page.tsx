@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import Image from 'next/image';
 import { User, Phone, Loader2, ArrowRight, BookOpen, Users, GraduationCap, ChevronLeft, Lock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
@@ -74,7 +75,7 @@ export default function RegisterPage() {
                 const data = await res.json();
                 alert(data.message || 'Registration failed');
             }
-        } catch (err) {
+        } catch {
             alert('Registration failed. Please check your connection.');
         } finally {
             setIsLoading(false);
@@ -132,7 +133,7 @@ export default function RegisterPage() {
                                 </div>
                                 <div className="ml-4">
                                     <h3 className="text-lg font-semibold text-gray-900">I am a Parent</h3>
-                                    <p className="text-sm text-gray-500">Track your child's performance and fees.</p>
+                                    <p className="text-sm text-gray-500">Track your child&apos;s performance and fees.</p>
                                 </div>
                             </button>
 
@@ -160,7 +161,6 @@ export default function RegisterPage() {
 
                             <button
                                 onClick={() => {
-                                    const { signIn } = require('next-auth/react');
                                     signIn('azure-ad');
                                 }}
                                 className="w-full flex items-center justify-center p-4 border-2 border-indigo-600 bg-indigo-50/50 rounded-xl hover:bg-indigo-600 hover:text-white transition group text-center gap-3 shadow-sm"
@@ -222,9 +222,9 @@ export default function RegisterPage() {
                                         <Phone className="h-5 w-5 text-gray-400" />
                                     </div>
                                     <input
-                                        type="text" required value={mobile} onChange={(e) => setMobile(e.target.value)}
+                                        type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} required value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
                                         className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-lg py-3 bg-gray-50 border outline-none"
-                                        placeholder="Enter mobile number"
+                                        placeholder="10-digit mobile number"
                                     />
                                 </div>
                             </div>
@@ -271,16 +271,16 @@ export default function RegisterPage() {
                             {selectedRole === 'PARENT' && (
                                 <>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Child's Name</label>
+                                        <label className="block text-sm font-medium text-gray-700">Child Name</label>
                                         <input type="text" required value={childName} onChange={(e) => setChildName(e.target.value)}
                                             className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-lg py-3 px-4 bg-gray-50 border outline-none"
                                             placeholder="John Doe Jr." />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Child's Mobile Number (Optional)</label>
-                                        <input type="text" value={childMobile} onChange={(e) => setChildMobile(e.target.value)}
+                                        <label className="block text-sm font-medium text-gray-700">Child Mobile Number (Optional)</label>
+                                        <input type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} value={childMobile} onChange={(e) => setChildMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
                                             className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-lg py-3 px-4 bg-gray-50 border outline-none"
-                                            placeholder="Enter child's mobile" />
+                                            placeholder="10-digit child mobile" />
                                     </div>
                                 </>
                             )}

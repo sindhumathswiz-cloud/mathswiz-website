@@ -8,7 +8,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Suspense fallback={<div className="w-72 h-screen border-r border-slate-200 dark:border-white/10 shrink-0 bg-white dark:bg-surface" />}>
                 <AdminSidebar />
             </Suspense>
-            <main className="flex-1 h-screen overflow-y-auto custom-scrollbar">
+            <main className="flex-1 min-w-0 h-screen overflow-y-auto custom-scrollbar">
                 <StagingSiteStrip />
                 {children}
             </main>

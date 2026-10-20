@@ -119,19 +119,27 @@ export const authOptions: NextAuthOptions = {
                 const dbUser = await prisma.user.findUnique({ where: { email: email } });
                 if (dbUser && dbUser.accountStatus !== "APPROVED") return false;
                 
+                const isMicrosoftSignIn = account?.provider === "azure-ad";
+
                 await prisma.user.upsert({
                     where: { email: email },
                     update: {
-                        microsoftId: account?.providerAccountId || "",
                         lastLoginAt: new Date(),
                         loginDevice: "SSO",
+                        ...(isMicrosoftSignIn ? {
+                            microsoftId: account?.providerAccountId || undefined,
+                            subscription: "PREMIUM",
+                        } : {}),
                         ...(isSuperAdmin || isTeacherAdmin ? { role: assignedRole } : {})
                     },
                     create: {
                         email: email,
                         firstName: user?.name?.split(' ')[0] || (profile as Record<string, unknown>)?.name?.toString().split(' ')[0] || "SSO",
                         lastName: user?.name?.split(' ').slice(1).join(' ') || (profile as Record<string, unknown>)?.name?.toString().split(' ').slice(1).join(' ') || "User",
-                        microsoftId: account?.providerAccountId || "",
+                        ...(isMicrosoftSignIn ? {
+                            microsoftId: account?.providerAccountId || undefined,
+                            subscription: "PREMIUM",
+                        } : {}),
                         role: assignedRole,
                         accountStatus: "APPROVED",
                         lastActiveAt: new Date(),

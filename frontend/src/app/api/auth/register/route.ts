@@ -8,14 +8,14 @@ export const dynamic = 'force-dynamic';
 const registrationSchema = z.object({
     firstName: z.string().trim().min(1).max(80),
     lastName: z.string().trim().min(1).max(80),
-    mobileNumber: z.string().trim().regex(/^\+?[0-9]{10,15}$/),
-    phone: z.string().trim().regex(/^\+?[0-9]{10,15}$/).optional(),
+    mobileNumber: z.string().trim().regex(/^\d{10}$/, "Enter a 10-digit mobile number"),
+    phone: z.string().trim().regex(/^\d{10}$/, "Enter a 10-digit mobile number").optional(),
     password: z.string().min(8).max(128),
     role: z.enum(["STUDENT", "TEACHER", "PARENT"]),
     class: z.string().trim().max(50).optional(),
     subjectExpertise: z.string().trim().max(200).optional(),
     childName: z.string().trim().max(160).optional(),
-    childMobile: z.string().trim().regex(/^\+?[0-9]{10,15}$/).optional(),
+    childMobile: z.string().trim().regex(/^\d{10}$/, "Enter a 10-digit mobile number").optional(),
     selectedPlan: z.enum(["FREE", "MONTHLY", "YEARLY"]).optional().default("FREE"),
     paymentMethod: z.enum(["UPI", "CARD", "BANK_TRANSFER"]).optional(),
 });
