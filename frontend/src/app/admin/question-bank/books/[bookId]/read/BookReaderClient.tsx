@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, Columns2, Loader2, Ro
 import MathRenderer from '@/components/MathRenderer';
 import { analyzeQuestion } from '@/lib/question-qa';
 import { editedFields, optionsOf, type QuestionDraft } from '@/lib/reader-edit';
+import { NOT_ON_PAGE_TAG } from '@/lib/source-agreement';
 import SourcePageViewer, { type InsertTarget } from '../../../SourcePageViewer';
 
 interface PageQuestion {
@@ -126,6 +127,33 @@ export default function BookReaderClient({ bookId, initialPage, initialQuestionI
     }
   };
 
+  // Saves any correction and approves in one step, then opens the next question here that is not approved yet. The
+  // approval gates (provenance, structure, figures) still apply: a refusal says why and nothing moves on.
+  const approveAndNext = async () => {
+    if (!selected || !draft) return;
+    const changes = editedFields(draftOf(selected), draft);
+    // Approving says the reviewer checked it against the page, so a "not found on page" flag goes with it.
+    const tags = selected.tags.includes(NOT_ON_PAGE_TAG) ? selected.tags.filter((t) => t !== NOT_ON_PAGE_TAG) : undefined;
+    setSavingId(selected.id);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/questions/${selected.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...changes, ...(tags ? { tags } : {}), status: 'APPROVED' }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Could not approve this question');
+      const updated: PageQuestion = { ...selected, content: draft.content, options: draft.options, correctAnswer: draft.correctAnswer, explanation: draft.explanation, status: 'APPROVED', tags: tags ?? selected.tags };
+      setQuestions((all) => all.map((q) => (q.id === updated.id ? updated : q)));
+      setPinned((p) => (p && p.id === updated.id ? updated : p));
+      const at = list.findIndex((q) => q.id === selected.id);
+      const next = [...list.slice(at + 1), ...list.slice(0, at)].find((q) => q.status !== 'APPROVED' && q.status !== 'ARCHIVED');
+      if (next) select(next);
+      else setNotice({ kind: 'ok', text: 'Approved. Every question on these pages is approved; scroll on in the book for more.' });
+    } catch (e) {
+      setNotice({ kind: 'error', text: e instanceof Error ? e.message : 'Could not approve this question' });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const highlight = selected && selected.sourcePageStart ? { page: selected.sourcePageStart, content: selected.content } : null;
 
   return (
@@ -182,12 +210,14 @@ export default function BookReaderClient({ bookId, initialPage, initialQuestionI
                       <span className={`rounded px-1.5 py-0.5 ${STATUS_STYLE[q.status] ?? 'bg-slate-100 text-slate-600'}`}>{q.status.replace('_', ' ').toLowerCase()}</span>
                       <span className="text-slate-400">p.{q.sourcePageStart}{q.sourcePageEnd && q.sourcePageEnd !== q.sourcePageStart ? `–${q.sourcePageEnd}` : ''}</span>
                       {issues.length > 0 && <span className="inline-flex items-center gap-1 text-amber-600"><AlertTriangle className="h-3 w-3" />{issues.map((i) => i.code.toLowerCase().replaceAll('_', ' ')).join(', ')}</span>}
+                      {q.tags.includes(NOT_ON_PAGE_TAG) && <span data-testid="not-on-page" className="inline-flex items-center gap-1 rounded bg-rose-100 px-1.5 py-0.5 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"><AlertTriangle className="h-3 w-3" />not found on page</span>}
                     </div>
                     {!isSelected && <div className="line-clamp-3 text-sm text-slate-800 dark:text-slate-200"><MathRenderer content={q.content} /></div>}
                   </button>
 
                   {isSelected && draft && (
                     <div className="mt-2 space-y-3">
+                      {q.reviewNotes && <p data-testid="review-notes" className="whitespace-pre-line rounded-lg bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">{q.reviewNotes}</p>}
                       <Field label="Question" id={`q-${q.id}-content`}>
                         <textarea id={`q-${q.id}-content`} data-testid="edit-content" value={draft.content} onChange={(e) => patchDraft({ content: e.target.value })} rows={4} className="w-full rounded-lg border border-slate-200 p-2 font-mono text-xs dark:border-white/10 dark:bg-white/5" />
                         <div className="mt-1 rounded-lg bg-white p-2 text-sm text-slate-800 dark:bg-white/5 dark:text-slate-200"><MathRenderer content={draft.content} /></div>
@@ -214,6 +244,11 @@ export default function BookReaderClient({ bookId, initialPage, initialQuestionI
                         <button type="button" onClick={() => void save()} disabled={savingId === q.id || Object.keys(editedFields(draftOf(q), draft)).length === 0} data-testid="save-question" className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-black text-white disabled:opacity-40">
                           {savingId === q.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save correction
                         </button>
+                        {q.status !== 'APPROVED' && (
+                          <button type="button" onClick={() => void approveAndNext()} disabled={savingId === q.id} data-testid="approve-next" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-500 disabled:opacity-40">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Approve and next
+                          </button>
+                        )}
                         {notice && <span role="status" className={`inline-flex items-center gap-1 text-xs font-semibold ${notice.kind === 'ok' ? 'text-emerald-700' : 'text-red-600'}`}>{notice.kind === 'ok' && <CheckCircle2 className="h-3.5 w-3.5" />}{notice.text}</span>}
                       </div>
                     </div>

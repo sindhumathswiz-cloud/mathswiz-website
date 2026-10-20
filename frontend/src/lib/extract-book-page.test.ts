@@ -68,6 +68,31 @@ describe('extractQuestionsFromPage', () => {
     expect(result.questions[0].contentHash).toBe('hash:Solve for x');
   });
 
+  it('reuses what Mathpix already read from the page instead of paying for it again', async () => {
+    const { getPageRawText } = await import('./extract-book-page');
+    const fetchSpy = vi.fn<MathpixFetch>();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    const stored = '15. Differentiate w.r.t. x: y = (x cos x)^x. Sol. We have log y = x log(x cos x) ...';
+
+    const result = await getPageRawText({
+      pageNumber: 147, nativeText: null, pageImagePath: '/private/p147.png', processedImagePath: null, requiresVisionSegmentation: false,
+      storedText: stored, storedProvider: 'MATHPIX_OCR', storedConfidence: 0.91,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ provider: 'MATHPIX_OCR', rawText: stored, ocrConfidence: 0.91, textLayer: null, diagramRegions: [] });
+  });
+
+  it('reads the page again when asked to, or when the stored text is too short to trust', async () => {
+    const { getPageRawText } = await import('./extract-book-page');
+    const fetchSpy = vi.fn<MathpixFetch>(async () => ({ ok: true, json: async () => ({ text: 'fresh ocr text', confidence: 0.8 }) }));
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    const base = { pageNumber: 9, nativeText: null, pageImagePath: '/private/p9.png', processedImagePath: null, requiresVisionSegmentation: false, storedProvider: 'MATHPIX_OCR' };
+
+    await getPageRawText({ ...base, storedText: 'a long enough stored page text from an earlier Mathpix read', reocr: true });
+    await getPageRawText({ ...base, storedText: 'too short' });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it('falls back to Mathpix OCR when the layout analyzer flags vision segmentation, even with native text present', async () => {
     const { extractQuestionsFromPage } = await import('./extract-book-page');
     const fetchSpy = vi.fn<MathpixFetch>(async () => ({ ok: true, json: async () => ({ text: 'raw ocr text', confidence: 0.87 }) }));

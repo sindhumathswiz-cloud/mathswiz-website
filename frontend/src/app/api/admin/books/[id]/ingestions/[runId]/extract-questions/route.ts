@@ -16,6 +16,7 @@ import { snapToChapter } from '@/lib/chapter-classifier';
 import { loadConfirmedChapters, chapterForPage, sectionForPage, answerKeySectionForPage, solutionsSectionForPage } from '@/lib/book-manifest';
 import { exerciseForPage } from '@/lib/exercise-link';
 import { findOrCreateBookChapter } from '@/lib/book-chapters';
+import { sourceAgreement, notOnPageNote, NOT_ON_PAGE_TAG, SOURCE_AGREEMENT_THRESHOLD } from '@/lib/source-agreement';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -174,6 +175,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const requestedBatchSize = Number.isInteger(body.batchSize) ? body.batchSize : DEFAULT_BATCH_SIZE;
   const batchSize = Math.min(MAX_BATCH_SIZE, Math.max(1, requestedBatchSize));
   const force = body.force === true;
+  // Pages already read by Mathpix are structured again from the stored text; reocr pays for a fresh read.
+  const reocr = body.reocr === true;
+  // Re-run only pages that were read but gave no question (a structuring miss), never pages that did: running those
+  // again could add near-copies of questions already saved. Pairs with the stored-text reuse above: no OCR cost.
+  const emptyPagesOnly = body.emptyPagesOnly === true;
   // Optional upper page bound -- lets the manifest UI extract one chapter at a
   // time instead of the whole book.
   const endPage: number | null = Number.isInteger(body.endPage) ? body.endPage : null;
@@ -243,7 +249,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       documentId: run.sourceDocumentId,
       pageNumber: pageWindow,
       pageImagePath: { not: null },
-      ...(force
+      ...(emptyPagesOnly
+        ? { status: 'COMPLETED' as const, detectedQuestions: 0 }
+        : force
         ? {}
         : recoverableEmptyPages.length
           ? {
@@ -256,7 +264,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
     orderBy: { pageNumber: 'asc' },
     take: batchSize,
-    select: { id: true, pageNumber: true, nativeText: true, pageImagePath: true, processedImagePath: true, layoutData: true, width: true, height: true },
+    select: { id: true, pageNumber: true, nativeText: true, pageImagePath: true, processedImagePath: true, layoutData: true, width: true, height: true, rawMarkdown: true, ocrProvider: true, ocrConfidence: true },
   });
 
   if (pages.length === 0) {
@@ -378,6 +386,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         requiresVisionSegmentation: Boolean(layout.requiresVisionSegmentation),
         width: page.width,
         height: page.height,
+        storedText: page.rawMarkdown,
+        storedProvider: page.ocrProvider,
+        storedConfidence: page.ocrConfidence,
+        reocr,
       });
 
       const stitching = pendingFragment && pendingFragment.lastPage + 1 === page.pageNumber;
@@ -541,7 +553,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         // explanationType, deduped -- a question the model already tagged
         // "Hint Available" itself (unlikely, but possible) shouldn't end up
         // listed twice.
-        const tags = Array.from(new Set([...(question.tags ?? []), ...deriveExplanationTags(question.explanationType)]));
+        // A question whose text is not on its page was reworded or made up by the model: flag it for a person (lib/source-agreement).
+        const onPage = sourceAgreement(question.questionContent, textForStructuring);
+        const notOnPage = onPage < SOURCE_AGREEMENT_THRESHOLD;
+        const tags = Array.from(new Set([...(question.tags ?? []), ...deriveExplanationTags(question.explanationType), ...(notOnPage ? [NOT_ON_PAGE_TAG] : [])]));
         const created = await prisma.question.create({
           data: {
             content: question.questionContent,
@@ -570,7 +585,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             sourcePageEnd,
             sourceLocator: { ingestionRunId: run.id, documentPageIds: sourceDocumentPageIds, ocrProvider: pageRaw.provider } as Prisma.InputJsonValue,
             confidence,
-            verificationStatus: severity === 'error' ? 'NEEDS_REVIEW' : 'STRUCTURALLY_VALID',
+            verificationStatus: severity === 'error' || notOnPage ? 'NEEDS_REVIEW' : 'STRUCTURALLY_VALID',
+            reviewNotes: notOnPage ? notOnPageNote(onPage) : null,
           },
         });
         savedCount++;

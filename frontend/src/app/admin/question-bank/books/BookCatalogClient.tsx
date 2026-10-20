@@ -519,6 +519,11 @@ export default function BookCatalogClient() {
                     </Link>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
+                    <Link href={`/admin/question-bank/books/${book.id}/coverage`} data-testid={`coverage-${book.id}`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
+                      <ListTree className="h-4 w-4" /> Coverage
+                    </Link>
+                  )}
+                  {book.ingestionRuns[0]?.processedPages > 0 && (
                     <button
                       type="button"
                       onClick={() => setSmartbook(book, !book.smartbookPublishedAt)}

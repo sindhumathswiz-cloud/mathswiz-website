@@ -46,7 +46,16 @@ export interface PageForExtraction {
   // text still extracts, it just gets no positioned layer.
   width?: number | null;
   height?: number | null;
+  // What an earlier run already read from this page with Mathpix. Reused instead of paying for the same OCR again,
+  // unless `reocr` asks for a fresh read (a page whose stored text is wrong).
+  storedText?: string | null;
+  storedProvider?: string | null;
+  storedConfidence?: number | null;
+  reocr?: boolean;
 }
+
+/** Shorter stored text than this is not trusted as a page's OCR (an empty or failed earlier read). */
+const MIN_STORED_OCR_CHARS = 40;
 
 export interface PageRawText {
   provider: PageOcrProvider;
@@ -169,6 +178,13 @@ export async function getPageRawText(page: PageForExtraction): Promise<PageRawTe
     // just to catch this would multiply Mathpix cost across the whole
     // book for a comparatively rare page shape.
     return { provider: 'NATIVE_TEXT', rawText: nativeText, ocrConfidence: null, diagramRegions: [], textLines: [], ocrImagePath: null, textLayer: null };
+  }
+
+  const stored = (page.storedText || '').trim();
+  if (!page.reocr && page.storedProvider === 'MATHPIX_OCR' && stored.length >= MIN_STORED_OCR_CHARS) {
+    // Already read by Mathpix: structure the stored text again at no OCR cost. Its figures were cropped on that
+    // first read, and its text layer is kept (a null layer here changes nothing).
+    return { provider: 'MATHPIX_OCR', rawText: stored, ocrConfidence: page.storedConfidence ?? null, diagramRegions: [], textLines: [], ocrImagePath: null, textLayer: null };
   }
 
   const imagePath = page.processedImagePath || page.pageImagePath;
