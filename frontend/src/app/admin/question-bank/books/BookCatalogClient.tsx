@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, GitCompareArrows, Image as ImageIcon, ListTree, Layers, Loader2, Plus, Scale, ScanText, Search, Sparkles } from 'lucide-react';
 import { describePageList } from '@/lib/page-parity';
+import PageImageImport from './PageImageImport';
 
 type CatalogBook = {
   id: string;
@@ -31,6 +32,8 @@ export default function BookCatalogClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingBookId, setUploadingBookId] = useState<string | null>(null);
+  // The book whose page-image import dialog is open (screenshots or photos of its pages instead of a PDF).
+  const [importingImagesFor, setImportingImagesFor] = useState<CatalogBook | null>(null);
   const [uploadProgress, setUploadProgress] = useState<{ percent: number; bytesUploaded: number; totalBytes: number; resumed: boolean } | null>(null);
   const [renderingBookId, setRenderingBookId] = useState<string | null>(null);
   const [extractingBookId, setExtractingBookId] = useState<string | null>(null);
@@ -447,7 +450,10 @@ export default function BookCatalogClient() {
                         {uploadingBookId === book.id ? (uploadProgress ? `Uploading ${uploadProgress.percent}%…` : 'Starting upload…') : 'Upload whole PDF'}
                         <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={event => { void uploadBookPdf(book.id, event.target.files?.[0] || null); event.currentTarget.value = ''; }} />
                       </label>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">Private storage · PDF only · maximum 250 MB · resumes automatically if interrupted</span>
+                      <button type="button" disabled={Boolean(uploadingBookId)} onClick={() => setImportingImagesFor(book)} data-testid={`import-images-${book.id}`} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:text-slate-200">
+                        <ImageIcon className="h-4 w-4" /> Import page images
+                      </button>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Private storage · PDF or page images · maximum 250 MB · resumes automatically if interrupted</span>
                     </div>
                     {uploadingBookId === book.id && uploadProgress && (
                       <div className="mt-3">
@@ -489,6 +495,11 @@ export default function BookCatalogClient() {
                     </Link>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (
+                    <Link href={`/admin/question-bank/books/${book.id}/read`} data-testid={`read-book-${book.id}`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-700 hover:bg-indigo-100 sm:ml-3 dark:border-brand/30 dark:bg-brand/10 dark:text-brand">
+                      <BookOpen className="h-4 w-4" /> Compare with questions
+                    </Link>
+                  )}
+                  {book.ingestionRuns[0]?.processedPages > 0 && (
                     <Link href={`/admin/question-bank/books/${book.id}/revision`} className="mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 sm:ml-3 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
                       <Layers className="h-4 w-4" /> Revision content
                     </Link>
@@ -510,6 +521,13 @@ export default function BookCatalogClient() {
           </div>
         </section>
       </div>
+      {importingImagesFor && (
+        <PageImageImport
+          bookTitle={importingImagesFor.title}
+          onClose={() => setImportingImagesFor(null)}
+          onPdfReady={(pdf) => { const book = importingImagesFor; setImportingImagesFor(null); void uploadBookPdf(book.id, pdf); }}
+        />
+      )}
     </main>
   );
 }

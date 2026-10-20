@@ -6,6 +6,7 @@ import { AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, 
 import MathRenderer from '@/components/MathRenderer';
 import { joinSelectedLines, type PageTextLayer } from '@/lib/page-text-layer';
 import { describePageList } from '@/lib/page-parity';
+import { locateOnPage } from '@/lib/locate-on-page';
 
 /**
  * The book exactly as printed, page for page: each page is the rendered image
@@ -44,9 +45,18 @@ function lineKey(page: number, line: number, word?: number) { return word === un
 
 export default function SourcePageViewer({
   bookId, initialPage, insertTargets, onInsert, height = '78vh', showHeaderLink = true,
+  layout = 'scroll', coverAlone = true, highlight = null, onVisiblePage,
 }: {
   bookId: string;
   initialPage?: number | null;
+  /** "spread" lays pages out two across, like an open book. */
+  layout?: 'scroll' | 'spread';
+  /** In spread layout, the first page sits alone on the right (a cover), as in a printed book. */
+  coverAlone?: boolean;
+  /** A question to point out: its page is scrolled into view and the line where it starts is marked. */
+  highlight?: { page: number; content: string } | null;
+  /** Called with the page at the top of the view as the reader scrolls. */
+  onVisiblePage?: (page: number) => void;
   insertTargets?: InsertTarget[];
   onInsert?: (text: string, targetId: string) => void;
   height?: string | number;
@@ -125,6 +135,47 @@ export default function SourcePageViewer({
     if (wanted && scrolledTo.current !== wanted) { scrolledTo.current = wanted; requestAnimationFrame(() => scrollToPage(wanted)); }
   }, [overview, initialPage, scrollToPage]);
 
+  // ---- visible page ------------------------------------------------------
+  const lastVisible = useRef<number | null>(null);
+  useEffect(() => {
+    const root = scroller.current;
+    if (!root || !onVisiblePage || !overview || overview.pages.length === 0) return;
+    let frame = 0;
+    const report = () => {
+      const top = root.getBoundingClientRect().top + 60;
+      let current: number | null = null;
+      for (const el of root.querySelectorAll<HTMLElement>('[data-page-wrap]')) {
+        if (el.getBoundingClientRect().bottom > top) { current = Number(el.dataset.pageWrap); break; }
+      }
+      if (current !== null && current !== lastVisible.current) { lastVisible.current = current; setPageInput(String(current)); onVisiblePage(current); }
+    };
+    const onScroll = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(report); };
+    root.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => { root.removeEventListener('scroll', onScroll); cancelAnimationFrame(frame); };
+  }, [overview, onVisiblePage, layout, zoom]);
+
+  // ---- highlighted question ---------------------------------------------
+  const highlightKey = highlight ? `${highlight.page}:${highlight.content.slice(0, 60)}` : null;
+  const scrolledToHighlight = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlight || !overview || overview.pages.length === 0) { scrolledToHighlight.current = null; return; }
+    if (scrolledToHighlight.current === highlightKey) return;
+    const layer = layers[highlight.page];
+    const located = layer ? locateOnPage(layer.lines, highlight.content) : null;
+    if (layer === undefined) {
+      // The page's text is still loading; bring the page into view so that it starts loading.
+      scrollToPage(highlight.page);
+      return;
+    }
+    scrolledToHighlight.current = highlightKey;
+    requestAnimationFrame(() => {
+      const band = scroller.current?.querySelector('[data-highlight]');
+      if (located && band) band.scrollIntoView({ block: 'center' });
+      else scrollToPage(highlight.page);
+    });
+  }, [highlight, highlightKey, layers, overview, scrollToPage]);
+
   // ---- selection -> text -------------------------------------------------
   useEffect(() => {
     let frame = 0;
@@ -179,6 +230,7 @@ export default function SourcePageViewer({
   };
 
   const pages = overview?.pages ?? [];
+  const step = layout === 'spread' ? 2 : 1;
   const goTo = (page: number) => {
     const clamped = Math.min(Math.max(1, page), Math.max(1, pages.length));
     setPageInput(String(clamped));
@@ -217,7 +269,7 @@ export default function SourcePageViewer({
           {needsText > 0 && <TextLayerBuilder bookId={bookId} runId={overview.runId} missing={overview.textLayers?.none ?? 0} garbled={overview.textLayers?.garbledNative ?? 0} onDone={loadOverview} />}
 
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => goTo(Number(pageInput) - 1)} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50" aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button>
+            <button type="button" onClick={() => goTo(Number(pageInput) - step)} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50" aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button>
             <input
               type="number" min={1} max={pages.length} value={pageInput} aria-label="Go to page"
               onChange={(e) => setPageInput(e.target.value)}
@@ -225,7 +277,7 @@ export default function SourcePageViewer({
               className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-center text-sm"
             />
             <span className="text-xs text-gray-400">of {pages.length}</span>
-            <button type="button" onClick={() => goTo(Number(pageInput) + 1)} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50" aria-label="Next page"><ChevronRight className="h-4 w-4" /></button>
+            <button type="button" onClick={() => goTo(Number(pageInput) + step)} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50" aria-label="Next page"><ChevronRight className="h-4 w-4" /></button>
             <span className="mx-1 h-5 w-px bg-gray-200" />
             <button type="button" onClick={() => setZoom((z) => Math.max(50, z - 15))} className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50" aria-label="Zoom out"><ZoomOut className="h-4 w-4" /></button>
             <span className="w-10 text-center text-xs tabular-nums text-gray-500">{zoom}%</span>
@@ -260,7 +312,8 @@ export default function SourcePageViewer({
               </div>
             )}
 
-            <div className="mx-auto flex flex-col items-center gap-4 p-4" style={{ width: `${zoom}%`, minWidth: 'min-content' }}>
+            <div className={layout === 'spread' ? 'mx-auto grid grid-cols-2 items-start gap-x-3 gap-y-4 p-4' : 'mx-auto flex flex-col items-center gap-4 p-4'} style={{ width: `${zoom}%`, minWidth: 'min-content' }} data-layout={layout}>
+              {layout === 'spread' && coverAlone && <div aria-hidden />}
               {pages.map((page) => {
                 const aspect = page.width && page.height ? page.width / page.height : ASPECT_FALLBACK;
                 const isNear = near.has(page.pageNumber);
@@ -309,6 +362,17 @@ export default function SourcePageViewer({
                           ))}
                         </div>
                       )}
+                      {highlight && highlight.page === page.pageNumber && layer && (() => {
+                        const found = locateOnPage(layer.lines, highlight.content);
+                        if (!found) return null;
+                        return (
+                          <div
+                            data-highlight data-testid="question-highlight" aria-label="Where this question starts"
+                            className="pointer-events-none absolute left-0 right-0 border-y-2 border-amber-500 bg-amber-300/30"
+                            style={{ top: `${Math.max(0, found.y - 0.004) * 100}%`, height: `${Math.max(found.height * 1.5, 0.02) * 100}%` }}
+                          />
+                        );
+                      })()}
                       {isNear && layer === undefined && page.hasImage && <Loader2 className="absolute right-2 top-2 h-4 w-4 animate-spin text-gray-300" />}
                     </div>
                   </div>

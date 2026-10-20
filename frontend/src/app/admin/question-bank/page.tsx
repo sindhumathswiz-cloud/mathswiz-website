@@ -669,6 +669,9 @@ export default function AdminQuestionBank() {
                                                             <Crop className="w-3.5 h-3.5" /> Page image (snip)
                                                         </button>
                                                     </div>
+                                                    {selectedQuestion.bookId && (
+                                                        <a href={`/admin/question-bank/books/${selectedQuestion.bookId}/read?question=${selectedQuestion.id}`} target="_blank" rel="noreferrer" data-testid="open-side-by-side" className="mb-3 inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:underline">Open side by side with the book ↗</a>
+                                                    )}
                                                     {sourceTab === 'pages' ? (
                                                         selectedQuestion.bookId ? (
                                                             <SourcePageViewer
