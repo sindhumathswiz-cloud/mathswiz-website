@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { LayoutDashboard, Activity, Clock, Eye, Filter, Download, Plus, Trash2, X, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Activity, Clock, Eye, Filter, Download, Plus, Trash2, X, Loader2, Ban, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -190,6 +190,9 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
     const [filterRole, setFilterRole] = React.useState('ALL');
     const [showAddModal, setShowAddModal] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [blockingId, setBlockingId] = useState<string | null>(null);
+    // A delete that was refused because the account has records: why, and the offer to block it instead.
+    const [refusal, setRefusal] = useState<{ userId: string; userName: string; message: string } | null>(null);
 
     const filteredUsers = users.filter((user: any) => {
         const matchesSearch = user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -201,8 +204,9 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
     });
 
     const handleDelete = async (userId: string, userName: string) => {
-        if (!confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) return;
+        if (!confirm(`Delete ${userName} permanently? Only accounts with no records (no content, classes, tests or practice) can be deleted; for anyone else, block the account instead.`)) return;
         setDeletingId(userId);
+        setRefusal(null);
         try {
             const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
             const contentType = res.headers.get('content-type') || '';
@@ -212,6 +216,8 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                 toast.success('User deleted successfully');
                 onUserDeleted?.();
                 router.refresh();
+            } else if (res.status === 409 && data?.canBlock) {
+                setRefusal({ userId, userName, message: data.error });
             } else {
                 toast.error(data?.error || `Failed to delete user (${res.status})`);
             }
@@ -219,6 +225,28 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
             toast.error('Delete failed: ' + err.message);
         } finally {
             setDeletingId(null);
+        }
+    };
+
+    // Blocking stops the person signing in and keeps everything they made or did; unblocking restores access.
+    const setBlocked = async (userId: string, userName: string, block: boolean) => {
+        if (block && !confirm(`Block ${userName}? They will not be able to sign in. Everything they made or did is kept, and you can unblock them later.`)) return;
+        setBlockingId(userId);
+        try {
+            const res = await fetch('/api/admin/users', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, action: block ? 'BLOCK' : 'UNBLOCK' }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
+            toast.success(block ? `${userName} is blocked` : `${userName} can sign in again`);
+            if (refusal?.userId === userId) setRefusal(null);
+            router.refresh();
+        } catch (err: any) {
+            toast.error((block ? 'Could not block: ' : 'Could not unblock: ') + err.message);
+        } finally {
+            setBlockingId(null);
         }
     };
 
@@ -282,6 +310,24 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                     </div>
                 </div>
             </div>
+            {refusal && (
+                <div role="alert" data-testid="delete-refused" className="flex flex-col gap-3 border-x border-amber-200 bg-amber-50 px-6 py-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                    <p className="font-medium">{refusal.message}</p>
+                    <div className="flex shrink-0 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setBlocked(refusal.userId, refusal.userName, true)}
+                            disabled={blockingId === refusal.userId}
+                            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-500 disabled:opacity-50"
+                        >
+                            {blockingId === refusal.userId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />} Block {refusal.userName}
+                        </button>
+                        <button type="button" onClick={() => setRefusal(null)} className="rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-500/20">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            )}
             <div
                 className="min-h-[22rem] max-h-[60dvh] w-full overflow-auto overscroll-contain rounded-b-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-surface"
                 aria-label="User directory table"
@@ -347,11 +393,33 @@ export function UserDirectoryTable({ users, searchQuery, onSearchChange, onUserA
                                         >
                                             <Eye className="w-3 h-3" /> Profile
                                         </Link>
+                                        {user.accountStatus === 'BLOCKED' ? (
+                                            <button
+                                                onClick={() => setBlocked(user.id, `${user.firstName} ${user.lastName}`, false)}
+                                                disabled={blockingId === user.id}
+                                                className="p-1.5 bg-white border border-gray-200 text-emerald-600 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-all disabled:opacity-50 dark:bg-surface dark:border-white/10 hover:dark:bg-emerald-500/10"
+                                                title="Unblock: let them sign in again"
+                                                aria-label={`Unblock ${user.firstName} ${user.lastName}`}
+                                            >
+                                                {blockingId === user.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => setBlocked(user.id, `${user.firstName} ${user.lastName}`, true)}
+                                                disabled={blockingId === user.id}
+                                                className="p-1.5 bg-white border border-gray-200 text-amber-600 rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-all disabled:opacity-50 dark:bg-surface dark:border-white/10 hover:dark:bg-amber-500/10"
+                                                title="Block: stop them signing in, keep their records"
+                                                aria-label={`Block ${user.firstName} ${user.lastName}`}
+                                            >
+                                                {blockingId === user.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => handleDelete(user.id, `${user.firstName} ${user.lastName}`)}
                                             disabled={deletingId === user.id}
                                             className="p-1.5 bg-white border border-gray-200 text-red-500 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all disabled:opacity-50 dark:bg-surface dark:border-white/10 hover:dark:bg-red-500/10"
-                                            title="Delete User"
+                                            title="Delete: only for accounts with no records"
+                                            aria-label={`Delete ${user.firstName} ${user.lastName}`}
                                         >
                                             {deletingId === user.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                         </button>
