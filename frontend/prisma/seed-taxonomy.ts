@@ -1,18 +1,13 @@
 import dotenv from 'dotenv';
-dotenv.config({ path: '.env' });
+dotenv.config({ path: '.env.local' });
 
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
-// Direct connection parameters (avoids URL parsing issues with @ in password)
-const adapter = new PrismaPg({
-  host: 'aws-1-ap-south-1.pooler.supabase.com',
-  port: 5432,
-  user: 'postgres.nlzntnjvkbuxttmmcpyl',
-  password: 'Vrishab@12345',
-  database: 'postgres',
-  ssl: { rejectUnauthorized: false },
-});
+// The connection comes from DATABASE_URL in .env.local, as for the app itself (src/lib/prisma.ts). Never put a
+// password in this file.
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is missing: add it to frontend/.env.local');
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 type TagType = 'CLASS' | 'SUBJECT' | 'TOPIC' | 'SUBTOPIC' | 'EXAM_TYPE' | 'CUSTOM';
