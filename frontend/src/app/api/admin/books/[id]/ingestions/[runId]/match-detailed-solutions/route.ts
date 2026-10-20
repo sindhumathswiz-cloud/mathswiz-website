@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
-import { findOrCreateBookChapter } from '../extract-questions/route';
+import { findOrCreateBookChapter } from '@/lib/book-chapters';
 import {
   parseSolutionBlocks,
   isLikelyDetailedSolutionsPage,

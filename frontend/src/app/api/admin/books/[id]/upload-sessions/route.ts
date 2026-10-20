@@ -3,17 +3,10 @@ import prisma from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { MAX_BOOK_PDF_BYTES, deleteUploadSessionChunks } from '@/lib/book-storage';
+import { CHUNK_SIZE_BYTES } from '@/lib/book-upload';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
-
-// Each HTTP request for a chunked upload should be small and fast -- this is
-// the whole point of chunking large PDFs instead of one giant POST. 4MB
-// comfortably clears every platform request-body ceiling this app might run
-// behind (Vercel's historical serverless-function limit is far smaller than
-// the app's own 250MB PDF cap), while still keeping the chunk count
-// reasonable for a 250MB file (~63 chunks).
-export const CHUNK_SIZE_BYTES = 4 * 1024 * 1024;
 
 // An abandoned session (browser closed mid-upload, admin gave up) left with
 // its chunks on disk/in Supabase Storage forever is just wasted storage, not

@@ -53,7 +53,8 @@ describe('POST /api/admin/books/[id]/upload-sessions', () => {
 
   it('creates a new session with the correct chunk count', async () => {
     bookUploadSession.create.mockResolvedValue({ id: 'session-1', totalChunks: 3, receivedChunkCount: 0 });
-    const { POST, CHUNK_SIZE_BYTES } = await import('./route');
+    const { POST } = await import('./route');
+    const { CHUNK_SIZE_BYTES } = await import('@/lib/book-upload');
     const fileSize = CHUNK_SIZE_BYTES * 2 + 100;
     const response = await POST(new Request('http://localhost', { method: 'POST', body: JSON.stringify({ fileName: 'book.pdf', fileSize }) }), { params: params('book-1') }) as Response;
     expect(response.status).toBe(201);

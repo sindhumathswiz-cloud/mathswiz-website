@@ -13,7 +13,7 @@ const loadConfirmedChapters = vi.fn();
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
 vi.mock('@/lib/prisma', () => ({ default: { bookIngestionRun, documentPage, question } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
-vi.mock('../extract-questions/route', () => ({ findOrCreateBookChapter }));
+vi.mock('@/lib/book-chapters', () => ({ findOrCreateBookChapter }));
 vi.mock('@/lib/book-manifest', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/book-manifest')>()),
   loadConfirmedChapters,
