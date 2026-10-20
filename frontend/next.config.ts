@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The e2e suite builds into its own folder (NEXT_DIST_DIR) so its server never collides with `npm run dev`.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   turbopack: {},
   images: {
     remotePatterns: [

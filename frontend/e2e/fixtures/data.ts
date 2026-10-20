@@ -19,6 +19,17 @@ export const E2E_STUDENT = {
   lastName: "Student",
 };
 
+export const E2E_ADMIN = {
+  mobileNumber: "9990000003",
+  password: "E2eAdmin!Pass1",
+  firstName: "E2E",
+  lastName: "Admin",
+};
+
+// Books the book-import spec creates are named with this prefix so the seed can clear them between runs.
+export const E2E_BOOK_PREFIX = "E2E ";
+export const E2E_READER_TAG = "E2E-Reader";
+
 export const E2E_BATCH_CODE = "E2EBATCH01";
 export const E2E_BATCH_NAME = "E2E Test Batch";
 

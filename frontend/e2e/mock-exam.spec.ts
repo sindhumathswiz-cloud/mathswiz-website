@@ -1,6 +1,7 @@
 import { expect, request as playwrightRequest, test } from "@playwright/test";
 import { BUILDER_QUESTIONS, E2E_BATCH_NAME, NUMERIC_QUESTION, WRITTEN_QUESTION } from "./fixtures/data";
 import { STUDENT_STORAGE_STATE, TEACHER_STORAGE_STATE } from "./fixtures/storage-state";
+import { E2E_BASE_URL } from "./test-database";
 
 test.use({ storageState: TEACHER_STORAGE_STATE });
 
@@ -441,7 +442,7 @@ test("a photo of handwritten working is attached, shown to the teacher who marks
   // The student sees it in their report; a visitor with no session does not.
   await page.goto(`/student/performance/${result.id}`);
   await expect(page.getByRole("img", { name: "Photo 1 of your working" })).toBeVisible();
-  const anonymous = await playwrightRequest.newContext({ baseURL: "http://127.0.0.1:3000", storageState: { cookies: [], origins: [] } });
+  const anonymous = await playwrightRequest.newContext({ baseURL: E2E_BASE_URL, storageState: { cookies: [], origins: [] } });
   expect((await anonymous.get(urls[0])).status()).toBe(401);
   await anonymous.dispose();
   await context.close();

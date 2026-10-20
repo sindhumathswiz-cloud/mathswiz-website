@@ -39,6 +39,7 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
   
   // Left Panel - Repository State
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
+  const [questionsTruncated, setQuestionsTruncated] = useState(false);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   
   // Filters
@@ -74,6 +75,7 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
       const res = await fetch(`/api/teacher/questions?${query.toString()}`);
       const data = await res.json();
       setAvailableQuestions(data.questions || []);
+      setQuestionsTruncated(!!data.truncated);
     } catch (error) {
       console.error('Failed to fetch questions:', error);
     } finally {
@@ -280,6 +282,11 @@ export function TestEngineCreator({ stats = { liveTests: 0, pendingAssignments: 
             <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-indigo-500 dark:text-brand" /></div>
           ) : (
             <div className="space-y-4">
+              {questionsTruncated && (
+                <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                  Showing the newest {availableQuestions.length} matching questions. Narrow the filters above to see the rest.
+                </p>
+              )}
               {availableQuestions.map((q) => (
                 <div key={q.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3 dark:bg-surface dark:border-white/10">
                   <div className="flex justify-between items-start">

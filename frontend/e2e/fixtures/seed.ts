@@ -14,10 +14,14 @@ dotenv.config({ path: ".env.local" });
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hash } from "bcryptjs";
+import { applyTestEnvironment, assertIsolatedTestDatabase } from "../test-database";
 import pg from "pg";
 import {
   E2E_TEACHER,
   E2E_STUDENT,
+  E2E_ADMIN,
+  E2E_BOOK_PREFIX,
+  E2E_READER_TAG,
   E2E_BATCH_CODE,
   E2E_BATCH_NAME,
   WEAK_TOPIC,
@@ -34,6 +38,11 @@ import {
   type FixtureQuestion,
 } from "./data";
 
+// Select the isolated test database before the connection below reads DATABASE_URL: this file deletes and
+// recreates data, and must never be able to run against the real database.
+applyTestEnvironment();
+assertIsolatedTestDatabase();
+
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter: adapter as any });
@@ -44,7 +53,7 @@ export async function closeSeedConnections() {
   await pool.end();
 }
 
-async function upsertUser(fixture: { mobileNumber: string; password: string; firstName: string; lastName: string }, role: "TEACHER" | "STUDENT") {
+async function upsertUser(fixture: { mobileNumber: string; password: string; firstName: string; lastName: string }, role: "TEACHER" | "STUDENT" | "ADMIN") {
   const hashed = await hash(fixture.password, 12);
   return prisma.user.upsert({
     where: { mobileNumber: fixture.mobileNumber },
@@ -138,6 +147,7 @@ async function upsertWrittenQuestion(createdById: string) {
 export async function runSeed() {
   const teacher = await upsertUser(E2E_TEACHER, "TEACHER");
   const student = await upsertUser(E2E_STUDENT, "STUDENT");
+  await upsertUser(E2E_ADMIN, "ADMIN");
 
   const batch = await prisma.batch.upsert({
     where: { code: E2E_BATCH_CODE },
@@ -150,6 +160,10 @@ export async function runSeed() {
     update: { status: "APPROVED" },
     create: { batchId: batch.id, studentId: student.id, status: "APPROVED" },
   });
+
+  // Books (and the questions filed under them) that the book-import spec creates.
+  await prisma.question.deleteMany({ where: { tags: { has: E2E_READER_TAG } } });
+  await prisma.book.deleteMany({ where: { title: { startsWith: E2E_BOOK_PREFIX } } });
 
   // Fresh-start the stateful/accumulating pieces a spec run creates, so
   // repeated local runs behave the same way every time.
@@ -172,6 +186,11 @@ export async function runSeed() {
   // second local run would inherit the miss from the first and assert a
   // now-false "missed 1x".
   await prisma.masteryEvent.deleteMany({
+    where: { userId: student.id, questionId: { in: [...LEARNING_PATH_QUESTIONS, ...MISTAKES_QUESTIONS].map((q) => q.id) } },
+  });
+  // The mistakes notebook now counts "missed N×" from the spaced-repetition card's lapses, which also persist
+  // across runs: clear the cards for the same questions for the same reason.
+  await prisma.spacedRepetitionCard.deleteMany({
     where: { userId: student.id, questionId: { in: [...LEARNING_PATH_QUESTIONS, ...MISTAKES_QUESTIONS].map((q) => q.id) } },
   });
   // Real submissions also each create their own practice-arena TestAttempt
@@ -197,12 +216,12 @@ export async function runSeed() {
   // support" list and the heatmap's at-risk list both surface this student.
   await prisma.studentProgress.upsert({
     where: { userId_topic: { userId: student.id, topic: WEAK_TOPIC } },
-    update: { masteryScore: 20 },
+    update: { masteryScore: 20, lastPracticedAt: new Date() }, // refreshed: mastery untouched for 30 days decays to 0
     create: { userId: student.id, topic: WEAK_TOPIC, masteryScore: 20 },
   });
   await prisma.studentProgress.upsert({
     where: { userId_topic: { userId: student.id, topic: HEATMAP_TOPIC } },
-    update: { masteryScore: 60 },
+    update: { masteryScore: 60, lastPracticedAt: new Date() },
     create: { userId: student.id, topic: HEATMAP_TOPIC, masteryScore: 60 },
   });
 

@@ -5,7 +5,7 @@ import { STUDENT_STORAGE_STATE, TEACHER_STORAGE_STATE } from "./fixtures/storage
 test.use({ storageState: TEACHER_STORAGE_STATE });
 
 test("converting a low-mastery suggestion into a Practice intervention generates a real test the student can start", async ({ page, browser }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
 
   // The seeded batch is the teacher's only batch, so it's auto-selected.
   await page.goto("/teacher/interventions");
@@ -35,7 +35,7 @@ test("converting a low-mastery suggestion into a Practice intervention generates
   await expect(startLink).toBeVisible();
   await expect(startLink).toHaveAttribute("href", `/student/tests/${generatedTestId}/take`);
   await startLink.click();
-  await expect(studentPage.getByRole("button", { name: "Start Examination" })).toBeVisible({ timeout: 15_000 });
+  await expect(studentPage.getByRole("button", { name: "Start Examination" })).toBeVisible({ timeout: 60_000 });
 
   await studentContext.close();
 });

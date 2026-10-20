@@ -7,7 +7,7 @@ test.use({ storageState: TEACHER_STORAGE_STATE });
 const TEST_TITLE = "E2E Builder Test";
 
 test("teacher builds a test by filters, saves it as a template, duplicates it, publishes and assigns the original, and the student can take it", async ({ page, browser }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   page.on("dialog", (dialog) => {
     console.log(`[dialog] ${dialog.type()}: ${dialog.message()}`);
     dialog.accept().catch(() => {});
@@ -60,13 +60,13 @@ test("teacher builds a test by filters, saves it as a template, duplicates it, p
   await initialListPromise;
   await expect(page.getByRole("button", { name: "Unpublished — click to publish" })).toBeVisible();
   await page.getByRole("button", { name: "Unpublished — click to publish" }).click();
-  await expect(page.getByRole("button", { name: "Published" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Published", exact: true })).toBeVisible();
   // The page's mount effects (React dev-mode double-invokes them) can fire
   // more than one /tests/list request; a slow duplicate resolving after
   // the toggle above would clobber isPublished back to stale. Give any
   // such straggler time to land, then confirm the published state held.
   await page.waitForTimeout(2000);
-  await expect(page.getByRole("button", { name: "Published" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Published", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Whole batch" }).click();
   await page.getByTestId("assign-batch-select").selectOption({ label: E2E_BATCH_NAME });

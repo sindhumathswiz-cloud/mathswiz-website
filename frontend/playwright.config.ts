@@ -1,4 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+import { applyTestEnvironment, E2E_BASE_URL, E2E_DIST_DIR, E2E_PORT } from "./e2e/test-database";
+
+// The suite wipes and recreates data on every run: it runs against its own database (see e2e/README.md), on its
+// own port and build folder, and stops here with instructions if that database is missing or looks like the real one.
+applyTestEnvironment();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -15,7 +20,7 @@ export default defineConfig({
   // data every spec below relies on (see e2e/fixtures/seed.ts).
   globalSetup: "./e2e/global-setup.ts",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: E2E_BASE_URL,
     trace: "retain-on-failure",
   },
   // Next.js dev mode compiles each route on its first hit, which can take
@@ -23,9 +28,18 @@ export default defineConfig({
   // mistaken for a real assertion failure.
   expect: { timeout: 10_000 },
   webServer: {
-    command: "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1",
-    url: "http://127.0.0.1:3000/api/health/live",
-    reuseExistingServer: !process.env.CI,
+    command: `node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port ${E2E_PORT}`,
+    url: `${E2E_BASE_URL}/api/health/live`,
+    // Never reuse a server that is already running: a dev server on port 3000 is connected to the real database.
+    reuseExistingServer: false,
+    env: {
+      DATABASE_URL: process.env.DATABASE_URL ?? "",
+      NEXTAUTH_URL: E2E_BASE_URL,
+      NEXT_DIST_DIR: E2E_DIST_DIR,
+      // The suite runs on the staging database, where importing books is allowed (lib/content-role).
+      CONTENT_ROLE: "staging",
+      PORT: String(E2E_PORT),
+    },
     timeout: 120_000,
   },
   projects: [

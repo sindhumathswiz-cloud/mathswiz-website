@@ -55,6 +55,7 @@ export default function TestCreatorStudio() {
   
   // Left Panel - Repository State
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
+  const [questionsTruncated, setQuestionsTruncated] = useState(false);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   
   // Filters
@@ -103,6 +104,7 @@ export default function TestCreatorStudio() {
       const res = await fetch(`/api/teacher/questions?${query.toString()}`);
       const data = await res.json();
       setAvailableQuestions(data.questions || []);
+      setQuestionsTruncated(!!data.truncated);
     } catch (error) {
       console.error('Failed to fetch questions:', error);
     } finally {
@@ -428,6 +430,11 @@ export default function TestCreatorStudio() {
             </div>
           ) : (
             <div className="space-y-4">
+              {questionsTruncated && (
+                <p role="status" data-testid="questions-truncated" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                  Showing the newest {availableQuestions.length} matching questions. Narrow the filters above to see the rest.
+                </p>
+              )}
               {availableQuestions.map((q, idx) => (
                 <div key={q.id} className="bg-white dark:bg-surface p-4 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col gap-3 hover:border-indigo-300 dark:hover:border-brand/40 transition-colors">
                   <div className="flex justify-between items-start">

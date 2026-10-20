@@ -7,6 +7,9 @@ import { resolveSourceClauses } from '@/lib/question-sources';
 
 export const dynamic = 'force-dynamic';
 
+const DEFAULT_QUESTION_LIMIT = 100;
+const MAX_QUESTION_LIMIT = 500;
+
 async function requirePremiumTeacherStrict(session: any) {
   if (!session || (session.user as any).role !== 'TEACHER') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -66,15 +69,22 @@ export async function GET(request: Request) {
       where.AND = await resolveSourceClauses(sourceFilter);
     }
 
-    const questions = await prisma.question.findMany({
+    // A bank of thousands cannot be listed in one response or one page: return a bounded page, newest first,
+    // and say when it was cut so the picker can ask the teacher to narrow the filters.
+    const requested = Number.parseInt(searchParams.get('limit') ?? '', 10);
+    const limit = Number.isFinite(requested) && requested > 0 ? Math.min(requested, MAX_QUESTION_LIMIT) : DEFAULT_QUESTION_LIMIT;
+    const rows = await prisma.question.findMany({
       where,
       include: {
         solution: { select: { content: true, isVerified: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: limit + 1,
     });
+    const truncated = rows.length > limit;
+    const questions = truncated ? rows.slice(0, limit) : rows;
 
-    return NextResponse.json({ questions });
+    return NextResponse.json({ questions, truncated, limit });
   } catch (error) {
     console.error('[GET /api/teacher/questions]', error);
     return NextResponse.json(

@@ -33,6 +33,27 @@ describe('GET /api/teacher/questions', () => {
     expect(question.findMany.mock.calls[0][0].where.AND).toBeUndefined();
   });
 
+  it('returns a bounded page and says when more matched', async () => {
+    question.findMany.mockResolvedValue(Array.from({ length: 101 }, (_, i) => ({ id: `q${i}` })));
+    const body = await (await get()).json();
+    expect(question.findMany.mock.calls[0][0].take).toBe(101); // one extra row, to know whether it was cut
+    expect(body.questions).toHaveLength(100);
+    expect(body.truncated).toBe(true);
+    expect(body.limit).toBe(100);
+
+    question.findMany.mockResolvedValue([{ id: 'q1' }]);
+    expect((await (await get()).json()).truncated).toBe(false);
+  });
+
+  it('honours a requested limit but never beyond the maximum', async () => {
+    await get('?limit=250');
+    expect(question.findMany.mock.calls[0][0].take).toBe(251);
+    await get('?limit=100000');
+    expect(question.findMany.mock.calls[1][0].take).toBe(501);
+    await get('?limit=abc');
+    expect(question.findMany.mock.calls[2][0].take).toBe(101);
+  });
+
   it('ANDs the book / chapter / exercise filter with the visibility scope instead of replacing it', async () => {
     await get('?bookId=b1&bookChapterId=c7&bookExerciseId=e1');
     expect(resolveSourceClauses).toHaveBeenCalledWith({ bookId: 'b1', bookChapterId: 'c7', bookExerciseId: 'e1' });
