@@ -23,6 +23,28 @@ describe("API authorization proxy", () => {
     await expect(response.json()).resolves.toEqual({ error: "Authentication required" });
   });
 
+  it("refuses imports and extraction on the live site, but not reads", async () => {
+    getToken.mockResolvedValue({ id: "admin-1", role: "ADMIN" });
+    const { proxy } = await import("./proxy");
+    const write = await proxy(new NextRequest("http://localhost/api/admin/books/b1/ingestions/r1/extract-questions", { method: "POST" }));
+    expect(write.status).toBe(409);
+    await expect(write.json()).resolves.toMatchObject({ code: "IMPORTS_ON_STAGING" });
+    const read = await proxy(new NextRequest("http://localhost/api/admin/books"));
+    expect(read.status).toBe(200);
+  });
+
+  it("allows imports and extraction on the staging site", async () => {
+    vi.stubEnv("CONTENT_ROLE", "staging");
+    try {
+      getToken.mockResolvedValue({ id: "admin-1", role: "ADMIN" });
+      const { proxy } = await import("./proxy");
+      const write = await proxy(new NextRequest("http://localhost/api/admin/books", { method: "POST" }));
+      expect(write.status).toBe(200);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("returns 403 for cross-role access", async () => {
     getToken.mockResolvedValue({ id: "student-1", role: "STUDENT" });
     const { proxy } = await import("./proxy");

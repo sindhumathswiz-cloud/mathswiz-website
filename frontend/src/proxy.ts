@@ -3,6 +3,7 @@ import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 import { authorizeApiPath } from "@/lib/api-authorization";
 import { checkRateLimit, type RateLimitTier } from "@/lib/rate-limit";
+import { contentRole, IMPORTS_ON_STAGING_MESSAGE, isStagingOnlyWrite } from "@/lib/content-role";
 
 const AI_PATHS = [
   "/api/doubts/",
@@ -41,6 +42,10 @@ export async function proxy(req: NextRequest) {
     }
     if (path === "/api/health" || path.startsWith("/api/health/")) {
       return NextResponse.next();
+    }
+    // Imports and extraction write to the staging database only; the live site refuses them (see lib/content-role).
+    if (contentRole() === "live" && isStagingOnlyWrite(path, req.method)) {
+      return NextResponse.json({ error: IMPORTS_ON_STAGING_MESSAGE, code: "IMPORTS_ON_STAGING" }, { status: 409 });
     }
   }
 

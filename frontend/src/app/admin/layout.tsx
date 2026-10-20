@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
+import { StagingSiteStrip } from '@/components/admin/ContentRoleNotice';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -8,6 +9,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <AdminSidebar />
             </Suspense>
             <main className="flex-1 h-screen overflow-y-auto custom-scrollbar">
+                <StagingSiteStrip />
                 {children}
             </main>
         </div>

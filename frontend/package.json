@@ -11,6 +11,12 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "e2e:db:push": "tsx scripts/e2e-db.ts push",
+    "dev:staging": "tsx scripts/dev-staging.ts",
+    "staging:setup": "tsx scripts/staging.ts setup",
+    "staging:push": "tsx scripts/staging.ts push",
+    "content:sync": "tsx scripts/staging.ts sync",
+    "content:sync:status": "tsx scripts/staging.ts status",
     "recovery:check": "tsx scripts/check-recovery-readiness.ts"
   },
   "dependencies": {

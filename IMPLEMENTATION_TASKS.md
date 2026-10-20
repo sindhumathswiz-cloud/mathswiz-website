@@ -250,3 +250,33 @@ Mathswiz's core experience is a continuous **study → practice → mock test �
 - [x] Photo answers (7 Oct): a student can attach up to three photos of handwritten working to a written answer; they are shrunk in the browser, checked on the server by their first bytes, stored in the database (`AnswerImage`) and shown only to that student, the teacher who marks the test, and admins. A photo alone counts as an answer. Moving them to object storage is the sensible step if volume grows
 - [x] Internal choice (7 Oct): `TestQuestion.choiceGroup` links alternatives ("Q3 OR Q4"); the builder has an OR control, the exam screen allows one answer per pair and says which, a pair counts as one question for marks, counts and skipped totals, only the answered one is scored (and queued for marking), and the printed paper numbers the pair once with "OR" between
 - [x] Learning-path end-to-end spec fixed (7 Oct): Practice Arena `next`, `submit` and `mistakes` were rate-limited as AI calls (10 a minute) though they only read and write the database, so a student answering quickly was throttled to about five questions a minute. Only `generate`, `hint` and `worksheet-solve` stay on the AI tier. The learning-path screen also no longer requests two quizzes or two guided questions on mount, and the spec now listens before reloading and tolerates the duplicated "Path complete!" text
+
+## Smartbook: import from page images, and compare with the book (2026-10-19)
+
+- [x] Import a book from page images (screenshots of an online reader, scans or photos), for books the school holds the rights to: choose images or a folder, set what to cut away (browser toolbar, reader frame) on a live preview, split two-page spreads into single pages, and the pages are built into one PDF in the browser and uploaded through the existing chunked upload and extraction pipeline. A small dependency-free PDF writer was checked against pypdf and pdfium
+- [x] Two-page "open book" reader (`/admin/question-bank/books/[id]/read`): pages in spreads with the cover alone as in print (switchable), zoom, and a list of the questions on the pages in view
+- [x] Compare and correct beside the original: pick a question and its starting line is marked on the page (found from the page's text layer), edit the question, options, answer and solution against the page, send selected page text into a field, and save (version history kept). Reachable from the Book Library ("Compare with questions") and from the question editor ("Open side by side with the book")
+- [x] End-to-end coverage with a new admin fixture: import screenshots, check the pages built, open the reader, edit and save. The shared sign-in helper now waits out a slow login and retries only the native-submit failure
+- [ ] Image-imported pages have no selectable text until it is built with OCR (paid Mathpix, behind the existing confirm), and extraction of their questions uses the vision route; run the first real book as a small trial and review the cost
+- [ ] Link each extracted question to its exercise during extraction (from the confirmed chapter manifest) instead of resolving exercises by page range
+- [ ] Teacher: practise or assign a test from one exercise of one book in a single step (the book, chapter and exercise selectors exist in the test builder)
+- [ ] Student: a reading view of a chapter with each exercise's questions practised inline, solutions revealed after an attempt, and progress per exercise
+
+## Exam-quality analysis (2026-10-19)
+
+- [x] Post-test report: cost of negative marking with break-even accuracy per section, accuracy by difficulty, whether quick answers (guesses) paid, and marks within reach (`src/lib/exam-analysis.ts`, `ExamQualityPanel.tsx`).
+
+## Staging database and publish-to-live (2026-10-20)
+
+Admins import, extract, correct and approve in a STAGING database (Supabase project Mathswiz-CI-Test); approved
+content is published to live. Design and rules: `src/lib/content-sync/` (plan.ts has the per-row three-way rules).
+
+- [x] Staging filled from live (4,364 questions; staff accounts only, no student data; e2e data never synced).
+- [x] `npm run dev:staging` (port 3200), `npm run content:sync [-- --apply]`, `/admin/content-sync` (preview, publish, settle conflicts, run history).
+- [x] Live site refuses imports and extraction unless `CONTENT_ROLE=staging` (`src/lib/content-role.ts`, `src/proxy.ts`).
+- [x] E2E suite runs on staging (port 3100, own build folder); refuses to start against live.
+- [x] The 42 e2e questions in live: removal script ready (`scripts/cleanup-e2e-questions.ts`, backup first).
+- [ ] Run the removal: `npx tsx scripts/cleanup-e2e-questions.ts --apply` (needs the owner's go-ahead in the session).
+- [ ] Register the every-6-hours Windows task for `scripts/content-sync-scheduled.cmd` (owner to run; see the script).
+- [ ] Deploy a staging copy of the app for admins if they should work away from this PC (DATABASE_URL = staging, LIVE_DATABASE_URL = live, CONTENT_ROLE=staging); extraction needs the local Python runtime today.
+- [ ] Rotate the live database password if not done since it was found in prisma/seed-*.ts (now removed; still in git history).

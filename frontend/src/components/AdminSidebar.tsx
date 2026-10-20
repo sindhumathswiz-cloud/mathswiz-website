@@ -22,6 +22,7 @@ import {
     LogOut,
     ChevronRight,
     Zap,
+    Send,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -83,6 +84,7 @@ export default function AdminSidebar() {
         { href: '/admin/flagged-questions', icon: <AlertTriangle size={18} />, label: 'Flagged Questions' },
         { href: '/admin/question-bank', icon: <BookOpen size={18} />, label: 'Question Bank' },
         { href: '/admin/ingestion', icon: <FileStack size={18} />, label: 'Book Ingestion' },
+        { href: '/admin/content-sync', icon: <Send size={18} />, label: 'Publish to Live' },
         { href: '/admin/curriculum', icon: <Library size={18} />, label: 'Curriculum Manager' },
         { href: '/admin/knowledge-base', icon: <Library size={18} />, label: 'Knowledge Base' },
         { href: '/admin/manage-website', icon: <Globe size={18} />, label: 'Manage Website' },

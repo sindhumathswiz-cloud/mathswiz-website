@@ -29,6 +29,10 @@ enum AccountStatus {
 
 model User {
   id                  String        @id @default(cuid())
+  // Present on the live database since before migrations were tracked; unused by the app today. Described here so
+  // the staging copy matches live exactly (the content sync requires identical columns).
+  otp       String?
+  otpExpiry DateTime?
   firstName           String?
   lastName            String?
   password            String? // Hashed password for standard login
@@ -1295,6 +1299,10 @@ model IngestionJob {
   progress       Float @default(0) // Percentage 0 to 100
 
   logs      Json? // Array of timestamped log strings for the live UI terminal
+  // Present on the live database since before migrations were tracked (filled on older jobs). Described here so the
+  // staging copy matches live exactly.
+  metadata  Json?
+  pdfId     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2012,4 +2020,34 @@ model RevisionItem {
   @@unique([chapterId, contentHash])
   @@index([chapterId, status, orderIndex])
   @@index([bookId, status])
+}
+
+// Staging <-> live content sync (src/lib/content-sync). Both tables live in the STAGING database; the live
+// database has them only so the two schemas stay identical.
+//
+// The fingerprint of each synced content row as of the last sync: lets a run tell which side changed since.
+model ContentSyncLedger {
+  tableName String
+  rowId     String
+  hash      String
+  syncedAt  DateTime @default(now())
+
+  @@id([tableName, rowId])
+}
+
+// One sync run: what it decided, what needs an admin (conflicts, blocked, held), and every row it overwrote or
+// deleted on either side, so a run can be undone by hand.
+model ContentSyncRun {
+  id          String    @id @default(cuid())
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  mode        String // DRY_RUN | APPLY
+  triggeredBy String
+  status      String // RUNNING | DONE | FAILED
+  summary     Json?
+  issues      Json?
+  backup      Json?
+  error       String?
+
+  @@index([startedAt])
 }
