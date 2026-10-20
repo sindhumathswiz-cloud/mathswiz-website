@@ -16,6 +16,7 @@ import { removePrivateImage } from './book-storage';
  *  - Kept: every Question (standing rule: question data is archived, never
  *    hard-deleted), the cropped question-images, the original PDF, and the
  *    ingestion run itself -- so a book can be re-rendered from the PDF.
+ *  - Not purged at all: a book published as a Smartbook (Book.smartbookPublishedAt), whose pages students read.
  *  - Kept: RevisionItem rows (definitions, theorems and formulas saved for
  *    revision sheets). They are the product of the extraction, not the buffer,
  *    which is why they are saved at all: the page text they came from goes in 60
@@ -110,7 +111,8 @@ async function purgeRun(run: { id: string; sourceDocumentId: string | null; book
 export async function purgeExpiredDrafts(options: { now?: Date; dryRun?: boolean; limit?: number } = {}): Promise<{ dryRun: boolean; due: Array<{ runId: string; bookTitle: string; expiresAt: Date }>; purged: PurgeOutcome[] }> {
   const now = options.now ?? new Date();
   const due = await prisma.bookIngestionRun.findMany({
-    where: { draftExpiresAt: { lte: now }, draftPurgedAt: null },
+    // A book published as a Smartbook is read page by page by students: its pages are the product, not a draft.
+    where: { draftExpiresAt: { lte: now }, draftPurgedAt: null, book: { smartbookPublishedAt: null } },
     orderBy: { draftExpiresAt: 'asc' },
     take: options.limit ?? 5,
     select: { id: true, sourceDocumentId: true, draftExpiresAt: true, book: { select: { title: true } } },

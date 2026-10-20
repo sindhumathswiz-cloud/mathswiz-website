@@ -24,6 +24,7 @@ import {
     BarChart3,
     Bot,
     Lock,
+    BookOpenText,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -87,6 +88,7 @@ export default function TeacherSidebar() {
         { href: dashboardHref('Question Bank'), icon: <BookOpen size={18} />, label: 'Question Bank', tab: 'Question Bank', premium: true },
         { href: dashboardHref('Test & Exam Engine'), icon: <ClipboardList size={18} />, label: 'Test & Exams', tab: 'Test & Exam Engine', premium: true },
         { href: '/teacher/homework', icon: <ClipboardCheck size={18} />, label: 'Written Answers', premium: true },
+        { href: '/teacher/smartbook', icon: <BookOpenText size={18} />, label: 'Smartbook', premium: true },
     ];
 
     const insightItems: TeacherNavItem[] = [

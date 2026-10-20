@@ -68,7 +68,8 @@ describe('draft-retention', () => {
       bookIngestionRun.findMany.mockResolvedValue([]);
       const { purgeExpiredDrafts } = await import('./draft-retention');
       await purgeExpiredDrafts({ now });
-      expect(bookIngestionRun.findMany.mock.calls[0][0].where).toEqual({ draftExpiresAt: { lte: now }, draftPurgedAt: null });
+      // ...and never a book published as a Smartbook, whose pages students read.
+      expect(bookIngestionRun.findMany.mock.calls[0][0].where).toEqual({ draftExpiresAt: { lte: now }, draftPurgedAt: null, book: { smartbookPublishedAt: null } });
     });
 
     it('a dry run reports what is due and changes nothing', async () => {

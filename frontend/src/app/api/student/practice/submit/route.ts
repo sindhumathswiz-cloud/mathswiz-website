@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { answersMatch } from '@/lib/exam-scoring';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
     // never depends on a client claim.
     const question = await prisma.question.findFirst({
       where: { id: questionId, status: { in: ['APPROVED', 'PENDING_REVIEW'] }, scope: 'PUBLIC' },
-      select: { id: true, correctAnswer: true, topic: true, difficulty: true },
+      select: { id: true, correctAnswer: true, topic: true, difficulty: true, type: true },
     });
     if (!question) {
       return NextResponse.json({ error: 'Question not found or unavailable' }, { status: 404 });
@@ -51,7 +52,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Question has no answer configured' }, { status: 422 });
     }
 
-    const isCorrect = !skipped && selectedOption === String(question.correctAnswer).trim();
+    // The exam's own rule: an exact match, except that numerical answers compare as numbers (0.5 = 0.50).
+    const isCorrect = !skipped && answersMatch(question.type, String(question.correctAnswer).trim(), selectedOption);
     const studentId = sessionUser.id;
     const now = new Date();
     const recentThreshold = new Date(now.getTime() - IDEMPOTENCY_WINDOW_MS);

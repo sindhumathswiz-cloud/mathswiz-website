@@ -189,7 +189,7 @@ const SECTION_PATTERNS: Array<{ re: RegExp; type: string }> = [
   { re: /\bexercise\b[\s.]*([0-9]+[0-9a-z.]*)?/i, type: 'EXERCISE' },
 ];
 
-const NON_QUESTION_SECTION_TYPES = new Set(['THEORY']);
+export const NON_QUESTION_SECTION_TYPES = new Set(['THEORY']);
 
 // A TOC row, two shapes:
 //  1. The Mathpix markdown-table shape from an OCR'd page ("\hline 10.

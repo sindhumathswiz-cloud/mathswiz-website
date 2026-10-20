@@ -1388,6 +1388,9 @@ model Book {
   description     String? @db.Text
   coverImageUrl   String?
   isActive        Boolean @default(true)
+  // Set when an admin publishes the book as a Smartbook: students of its class can read its pages beside its
+  // approved questions, and its pages are kept out of the 60-day draft clean-up (lib/draft-retention.ts).
+  smartbookPublishedAt DateTime?
 
   createdById String
   createdAt   DateTime @default(now())

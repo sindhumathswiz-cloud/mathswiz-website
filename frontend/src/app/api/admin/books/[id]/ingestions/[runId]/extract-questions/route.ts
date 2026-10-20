@@ -14,6 +14,8 @@ import { matchFiguresToQuestions } from '@/lib/figure-question-match';
 import { worstSeverity } from '@/lib/question-qa';
 import { snapToChapter } from '@/lib/chapter-classifier';
 import { loadConfirmedChapters, chapterForPage, sectionForPage, answerKeySectionForPage, solutionsSectionForPage } from '@/lib/book-manifest';
+import { exerciseForPage } from '@/lib/exercise-link';
+import { findOrCreateBookChapter } from '@/lib/book-chapters';
 
 export const runtime = 'nodejs';
 export const maxDuration = 240;
@@ -29,43 +31,6 @@ const MAX_BATCH_SIZE = 10;
 // every real case study observed so far (a 1-page passage + up to 2 pages of
 // sub-questions) with headroom to spare.
 const MAX_FRAGMENT_CHAIN_PAGES = 3;
-
-/**
- * Finds the BookChapter row for a detected topic name, or creates a
- * lightweight one on the fly (name + an auto-incrementing orderIndex; no
- * page range — that still needs a manual chapter-mapping pass, which is out
- * of scope for now). This is what turns the LLM's per-question "topic" guess
- * into a real `Question.bookChapterId` link instead of just free text.
- */
-export async function findOrCreateBookChapter(bookId: string, name: string, cache: Map<string, string>): Promise<string | null> {
-  const key = name.trim();
-  if (!key) return null;
-  if (cache.has(key)) return cache.get(key)!;
-
-  const existing = await prisma.bookChapter.findFirst({ where: { bookId, name: key }, select: { id: true } });
-  if (existing) {
-    cache.set(key, existing.id);
-    return existing.id;
-  }
-
-  const maxOrder = await prisma.bookChapter.aggregate({ where: { bookId }, _max: { orderIndex: true } });
-  const orderIndex = (maxOrder._max.orderIndex ?? 0) + 1;
-  try {
-    const created = await prisma.bookChapter.create({ data: { bookId, name: key, orderIndex } });
-    cache.set(key, created.id);
-    return created.id;
-  } catch {
-    // Unique constraint race — a concurrent extraction batch created this
-    // chapter (or claimed this orderIndex) first. Re-fetch by name rather
-    // than failing the whole page over a chapter that now exists.
-    const retried = await prisma.bookChapter.findFirst({ where: { bookId, name: key }, select: { id: true } });
-    if (retried) {
-      cache.set(key, retried.id);
-      return retried.id;
-    }
-    return null;
-  }
-}
 
 // Tags applied to a DRAFT question at extraction time based on
 // CanonicalQuestion.explanationType, so a question that has no real worked
@@ -599,6 +564,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             createdById: auth.user.id,
             bookId: id,
             bookChapterId,
+            // The exercise too, when the confirmed manifest puts the start page in exactly one (lib/exercise-link).
+            bookExerciseId: manifestChapter ? exerciseForPage(manifestChapter.exercises, sourcePageStart) : null,
             sourcePageStart,
             sourcePageEnd,
             sourceLocator: { ingestionRunId: run.id, documentPageIds: sourceDocumentPageIds, ocrProvider: pageRaw.provider } as Prisma.InputJsonValue,

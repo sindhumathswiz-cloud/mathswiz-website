@@ -576,6 +576,8 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       expect(question.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ topic: 'Vector Algebra', bookChapterId: 'ch-vec' }),
       }));
+      // ...and under the exercise whose pages contain it.
+      expect(question.create.mock.calls[0][0].data.bookExerciseId).toBe('sec-mcq');
       // No lightweight chapter was created from the discarded topic guess.
       expect(bookChapter.create).not.toHaveBeenCalled();
       expect(data.batch.manifestFiled).toBe(1);

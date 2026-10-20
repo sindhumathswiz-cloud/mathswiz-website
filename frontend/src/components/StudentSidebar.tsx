@@ -27,7 +27,8 @@ import {
     Video,
     TrendingUp,
     Zap,
-    BookMarked
+    BookMarked,
+    BookOpenText
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -96,6 +97,7 @@ export default function StudentSidebar({ active }: { active?: string }) {
         { href: '/student/interventions', icon: <TrendingUp size={18} />, label: 'Support Plans' },
         { href: '/student/mistakes', icon: <BookX size={18} />, label: 'My Mistakes' },
         { href: '/student/bookmarks', icon: <Bookmark size={18} />, label: 'Bookmarks' },
+        { href: '/student/smartbook', icon: <BookOpenText size={18} />, label: 'Smartbooks' },
         { href: '/student/revision', icon: <BookMarked size={18} />, label: 'Revision Sheets' },
         { href: '/student/flashcards', icon: <Layers size={18} />, label: 'Flashcards' },
         { href: '/student/planner', icon: <CalendarClock size={18} />, label: 'Revision Planner' },
