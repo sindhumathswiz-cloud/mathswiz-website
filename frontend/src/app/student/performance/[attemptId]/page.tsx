@@ -27,6 +27,7 @@ import MathRenderer from '@/components/MathRenderer';
 import { isWrittenType } from '@/lib/exam-view';
 import { decodeImageRefs } from '@/lib/answer-images';
 import QuestionTrustBadge from '@/components/QuestionTrustBadge';
+import ExamQualityPanel from './ExamQualityPanel';
 import toast from 'react-hot-toast';
 
 export default function PerformanceAnalytics() {
@@ -66,7 +67,7 @@ export default function PerformanceAnalytics() {
 
     if (!data) return <div className="min-h-screen bg-slate-50 dark:bg-background text-slate-900 dark:text-foreground p-8">Error loading data.</div>;
 
-    const { attempt, behavioral, rank, totalTakers, responseInsights, recommendedAction } = data;
+    const { attempt, behavioral, rank, totalTakers, responseInsights, recommendedAction, examAnalysis } = data;
     const insightByResponseId = new Map((responseInsights || []).map((ri: any) => [ri.responseId, ri]));
 
     const ERROR_TYPE_LABEL: Record<string, string> = {
@@ -178,6 +179,8 @@ export default function PerformanceAnalytics() {
                         </div>
                     </div>
                 )}
+
+                {examAnalysis && <ExamQualityPanel analysis={examAnalysis} />}
 
                 {/* Behavioral & Time Analytics */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

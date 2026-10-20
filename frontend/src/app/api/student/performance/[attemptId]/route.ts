@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
 import { classifyErrorType, deriveConfidence, COMMON_MISTAKE_MIN_COUNT } from '@/lib/response-insight';
 import { mistakesFromCards, isDueForReview } from '@/lib/mistake-queue';
+import { analyseAttempt } from '@/lib/exam-analysis';
 
 export const dynamic = 'force-dynamic';
 
@@ -152,7 +153,33 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
       recommendedAction = weakest ? { type: 'PRACTICE_WEAK_TOPIC', topic: weakest.topic } : { type: 'KEEP_GOING' };
     }
 
-    return NextResponse.json({ attempt, behavioral: stats, rank, totalTakers, responseInsights, recommendedAction });
+    // Exam-quality analysis (negative-marking cost, accuracy by difficulty, guesses, marks within reach): a pure
+    // re-reading of the marks stored at submission, so it only applies to attempts of a real test.
+    const insightByQuestion = new Map(responseInsights.map((ri) => [ri.questionId, ri.errorType]));
+    const examAnalysis = attempt.test ? analyseAttempt({
+      medianTime,
+      sections: attempt.test.sections.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        marksPerQuestion: s.marksPerQuestion,
+        negativeMarks: s.negativeMarks,
+        attemptLimit: s.attemptLimit ?? null,
+        questions: s.questions.map((tq: any) => ({ questionId: tq.questionId, choiceGroup: tq.choiceGroup ?? null })),
+      })),
+      responses: attempt.responses.map((r: any) => ({
+        questionId: r.questionId,
+        status: r.status,
+        isCorrect: r.isCorrect,
+        marksAwarded: r.marksAwarded,
+        timeSpent: r.timeSpent,
+        topic: r.question?.topic ?? null,
+        difficulty: r.question?.difficulty ?? null,
+        isWritten: isWrittenType(r.question?.type),
+        errorType: insightByQuestion.get(r.questionId) ?? null,
+      })),
+    }) : null;
+
+    return NextResponse.json({ attempt, behavioral: stats, rank, totalTakers, responseInsights, recommendedAction, examAnalysis });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

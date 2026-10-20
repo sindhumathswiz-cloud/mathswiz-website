@@ -93,4 +93,27 @@ describe('GET /api/student/performance/[attemptId] -- insights and recommended a
     const body = await (await call()).json();
     expect(body.recommendedAction).toEqual({ type: 'KEEP_GOING' });
   });
+
+  it('has no exam analysis for an attempt that is not of a test', async () => {
+    const body = await (await call()).json();
+    expect(body.examAnalysis).toBeNull();
+  });
+
+  it('adds the exam analysis from the marks stored at submission', async () => {
+    testAttempt.findFirst.mockResolvedValue({
+      ...baseAttempt,
+      test: { sections: [{ id: 's1', title: 'Section A', marksPerQuestion: 4, negativeMarks: 1, attemptLimit: null, questions: [{ questionId: 'q-1', choiceGroup: null }, { questionId: 'q-2', choiceGroup: null }] }] },
+      responses: [
+        { ...baseAttempt.responses[0], marksAwarded: 4, question: { topic: 'Algebra', difficulty: 'EASY', type: 'SINGLE_CHOICE' } },
+        { ...baseAttempt.responses[1], marksAwarded: -1, question: { topic: 'Geometry', difficulty: 'EASY', type: 'SINGLE_CHOICE' } },
+      ],
+    });
+    const body = await (await call()).json();
+
+    expect(body.examAnalysis.negativeMarksLost).toBe(1);
+    expect(body.examAnalysis.grossMarks).toBe(4);
+    expect(body.examAnalysis.sections[0]).toMatchObject({ attempted: 2, correct: 1, breakEven: 20 });
+    expect(body.examAnalysis.byDifficulty[0]).toMatchObject({ difficulty: 'EASY', attempted: 2, correct: 1, accuracy: 50 });
+    expect(body.examAnalysis.recoverable.total).toBe(5); // the wrong easy question: 4 not earned + 1 taken back
+  });
 });
