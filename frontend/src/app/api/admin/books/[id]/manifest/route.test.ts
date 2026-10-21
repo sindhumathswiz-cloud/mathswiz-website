@@ -6,7 +6,8 @@ const recordAuditLog = vi.fn();
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const tx = {
   bookChapter: { update: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
-  bookExercise: { deleteMany: vi.fn(), createMany: vi.fn() },
+  bookExercise: { findMany: vi.fn(), deleteMany: vi.fn(), update: vi.fn(), create: vi.fn() },
+  question: { findMany: vi.fn(), updateMany: vi.fn() },
   $executeRaw: vi.fn(),
 };
 const bookChapter = { findMany: vi.fn() };
@@ -56,8 +57,12 @@ describe('PUT /api/admin/books/[id]/manifest', () => {
     tx.bookChapter.update.mockImplementation(async ({ where }: any) => ({ id: where.id }));
     tx.bookChapter.create.mockImplementation(async ({ data }: any) => ({ id: `new-${data.orderIndex}` }));
     tx.bookChapter.deleteMany.mockResolvedValue({});
+    tx.bookExercise.findMany.mockResolvedValue([]);
     tx.bookExercise.deleteMany.mockResolvedValue({});
-    tx.bookExercise.createMany.mockResolvedValue({});
+    tx.bookExercise.update.mockImplementation(async ({ where }: any) => ({ id: where.id }));
+    tx.bookExercise.create.mockImplementation(async ({ data }: any) => ({ id: `sec-${data.chapterId}-${data.orderIndex}` }));
+    tx.question.findMany.mockResolvedValue([]);
+    tx.question.updateMany.mockResolvedValue({});
     tx.$executeRaw.mockResolvedValue(0);
   });
 
@@ -77,16 +82,61 @@ describe('PUT /api/admin/books/[id]/manifest', () => {
     expect((await badCov.json()).error).toMatch(/coverage/i);
   });
 
-  it('confirms only the chapters flagged confirmed and wipes+recreates their sections', async () => {
+  it('confirms only the chapters flagged confirmed and creates their new sections', async () => {
     const { PUT } = await import('./route');
     await PUT(put({ chapters: [chapter({ confirmed: true }), chapter({ name: 'Probability', startPage: 400, endPage: 450, printedStartPage: null, printedEndPage: null, confirmed: false, sections: [] })] }), { params });
     const created = tx.bookChapter.create.mock.calls.map((c) => c[0].data);
     expect(created[0]).toMatchObject({ name: 'Vector Algebra', manifestConfirmedById: 'admin-1' });
     expect(created[0].manifestConfirmedAt).toBeInstanceOf(Date);
     expect(created[1]).toMatchObject({ name: 'Probability', manifestConfirmedAt: null });
-    expect(tx.bookExercise.createMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [expect.objectContaining({ sectionType: 'MCQ', answerKeyStartPage: 360, answerKeyCoverage: 'SELECTED' })],
+    expect(tx.bookExercise.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ chapterId: 'new-0', orderIndex: 0, sectionType: 'MCQ', answerKeyStartPage: 360, answerKeyCoverage: 'SELECTED' }),
+    });
+  });
+
+  it('updates existing sections in place, deletes only removed ones, and files a confirmed chapter\'s questions by page', async () => {
+    bookChapter.findMany.mockResolvedValue([{ id: 'existing-vec', name: 'Vector Algebra', orderIndex: 0, manifestConfirmedAt: null, _count: { questions: 3 } }]);
+    tx.bookExercise.findMany.mockResolvedValue([
+      { id: 'sec-theory', sectionType: 'THEORY', startPage: 334 },
+      { id: 'sec-ncert', sectionType: 'NCERT_SELECTED', startPage: 337 },
+      { id: 'sec-stale', sectionType: 'LONG_ANSWER', startPage: 350 },
+    ]);
+    tx.question.findMany.mockResolvedValue([
+      { id: 'q-ncert', sourcePageStart: 338, bookExerciseId: 'sec-ncert' },
+      { id: 'q-mcq', sourcePageStart: 342, bookExerciseId: null },
+      { id: 'q-theory', sourcePageStart: 335, bookExerciseId: 'sec-ncert' },
+    ]);
+    const { PUT } = await import('./route');
+    const res = await PUT(put({ chapters: [chapter({ confirmed: true, sections: [
+      { sectionType: 'THEORY', startPage: 334, endPage: 336 },
+      { sectionType: 'NCERT_SELECTED', startPage: 337, endPage: 341, inlineAnswers: true },
+      { sectionType: 'MCQ', startPage: 342, endPage: 343, answerKeyStartPage: 343, answerKeyEndPage: 343 },
+    ] })] }), { params }) as Response;
+
+    expect(tx.bookExercise.update).toHaveBeenCalledWith({ where: { id: 'sec-theory' }, data: expect.objectContaining({ orderIndex: 0, endPage: 336 }) });
+    expect(tx.bookExercise.update).toHaveBeenCalledWith({ where: { id: 'sec-ncert' }, data: expect.objectContaining({ orderIndex: 1, endPage: 341 }) });
+    expect(tx.bookExercise.create).toHaveBeenCalledWith({ data: expect.objectContaining({ chapterId: 'existing-vec', orderIndex: 2, sectionType: 'MCQ' }) });
+    expect(tx.bookExercise.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['sec-stale'] } } });
+    // q-ncert is already right; q-mcq moves to the new MCQ section; q-theory is on a theory page, so it is unfiled.
+    expect(tx.question.updateMany).toHaveBeenCalledWith({ where: { id: { in: ['q-mcq'] } }, data: { bookExerciseId: 'sec-existing-vec-2' } });
+    expect(tx.question.updateMany).toHaveBeenCalledWith({ where: { id: { in: ['q-theory'] } }, data: { bookExerciseId: null } });
+    expect((await res.json()).relinkedCount).toBe(2);
+  });
+
+  it('keeps when and by whom an already-confirmed chapter was confirmed', async () => {
+    const confirmedOn = new Date('2026-09-10T17:20:32Z');
+    bookChapter.findMany.mockResolvedValue([{ id: 'existing-vec', name: 'Vector Algebra', orderIndex: 0, manifestConfirmedAt: confirmedOn, manifestConfirmedById: 'admin-original', _count: { questions: 0 } }]);
+    const { PUT } = await import('./route');
+    await PUT(put({ chapters: [chapter({ confirmed: true })] }), { params });
+    expect(tx.bookChapter.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'existing-vec' }, data: expect.objectContaining({ manifestConfirmedAt: confirmedOn, manifestConfirmedById: 'admin-original' }),
     }));
+  });
+
+  it('leaves the questions of an unconfirmed chapter where they are', async () => {
+    const { PUT } = await import('./route');
+    await PUT(put({ chapters: [chapter({ confirmed: false })] }), { params });
+    expect(tx.question.findMany).not.toHaveBeenCalled();
   });
 
   it('reuses an existing chapter by name, parks survivors in one statement, prunes only empty unconfirmed rows', async () => {
@@ -105,8 +155,8 @@ describe('PUT /api/admin/books/[id]/manifest', () => {
     expect(tx.bookChapter.create).not.toHaveBeenCalled();
     // Only the empty, unconfirmed junk row is deleted.
     expect(tx.bookChapter.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['junk-empty'] } } });
-    // The park + leftover shift each run as a single raw statement.
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+    // The chapter park, the one chapter's section park and the leftover shift each run as a single raw statement.
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(3);
     expect(recordAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: 'BOOK_MANIFEST_SAVED' }));
   });
 });
