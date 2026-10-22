@@ -41,6 +41,11 @@ export interface SyncTable {
   /** For gate 'question': the column holding the question id. */
   questionColumn?: string;
   /**
+   * A position that must be unique within a parent (@@unique([scope, column])). Rows written one at a time can
+   * meet a row that still holds its old position, so the rows of the parents written to are moved aside first.
+   */
+  uniquePosition?: { scope: string; column: string };
+  /**
    * Whether a row deleted on one side may be deleted on the other. Questions, books and their history are never
    * hard-deleted (they are archived instead), so only link and derived rows are.
    */
@@ -55,8 +60,8 @@ export const SYNC_TABLES: SyncTable[] = [
   { name: 'Flashcard', direction: 'down', gate: 'needed', foreignKeys: [{ column: 'folderId', table: 'KnowledgeFolder' }], deletable: true },
   { name: 'DocumentChunk', direction: 'down', gate: 'needed', foreignKeys: [{ column: 'folderId', table: 'KnowledgeFolder' }], deletable: true },
   { name: 'Book', direction: 'both', gate: 'needed', foreignKeys: [{ column: 'createdById', table: 'User' }], deletable: false },
-  { name: 'BookChapter', direction: 'both', gate: 'needed', foreignKeys: [{ column: 'bookId', table: 'Book' }], deletable: false },
-  { name: 'BookExercise', direction: 'both', gate: 'needed', foreignKeys: [{ column: 'chapterId', table: 'BookChapter' }], deletable: false },
+  { name: 'BookChapter', direction: 'both', gate: 'needed', foreignKeys: [{ column: 'bookId', table: 'Book' }], uniquePosition: { scope: 'bookId', column: 'orderIndex' }, deletable: false },
+  { name: 'BookExercise', direction: 'both', gate: 'needed', foreignKeys: [{ column: 'chapterId', table: 'BookChapter' }], uniquePosition: { scope: 'chapterId', column: 'orderIndex' }, deletable: false },
   { name: 'SourceDocument', direction: 'both', gate: 'needed', foreignKeys: [{ column: 'ingestedBy', table: 'User' }, { column: 'bookId', table: 'Book' }], deletable: false },
   { name: 'DocumentPage', direction: 'both', gate: 'parent', followsParent: 'documentId', foreignKeys: [{ column: 'documentId', table: 'SourceDocument' }], deletable: false },
   { name: 'SamplePaper', direction: 'both', gate: 'needed', foreignKeys: [{ column: 'ingestedBy', table: 'User' }], deletable: false },

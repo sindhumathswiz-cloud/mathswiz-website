@@ -96,6 +96,26 @@ async function upsert(client: pg.Client, table: string, rows: Row[]) {
   }
 }
 
+/**
+ * Upserts rows whose position is unique within a parent (chapters in a book, exercises in a chapter). A row can be
+ * written into a position another row still holds until that row is written too, so every row of the parents being
+ * written is first moved to a negative position, the rows are written, and any row not written is put back -- after
+ * the others, if a written row has taken its old position.
+ */
+export async function upsertKeepingPositions(client: Pick<pg.Client, 'query'>, table: string, rows: Row[], position: { scope: string; column: string }) {
+  if (rows.length === 0) return;
+  const scopes = [...new Set(rows.map((r) => r[position.scope]).filter((s): s is string => s != null))];
+  const t = `"${table}"`, s = `"${position.scope}"`, c = `"${position.column}"`;
+  await client.query(`update ${t} set ${c} = -1 - ${c} where ${s} = any($1) and ${c} >= 0`, [scopes]);
+  await upsert(client as pg.Client, table, rows);
+  await client.query(`update ${t} r set ${c} = -1 - r.${c} where r.${s} = any($1) and r.${c} < 0
+    and not exists (select 1 from ${t} o where o.${s} = r.${s} and o.${c} = -1 - r.${c})`, [scopes]);
+  await client.query(`update ${t} r set ${c} = m.top + n.rank from
+      (select ${s} as scope, max(${c}) as top from ${t} where ${s} = any($1) group by ${s}) m,
+      (select "id", ${s} as scope, row_number() over (partition by ${s} order by ${c} desc) as rank from ${t} where ${s} = any($1) and ${c} < 0) n
+    where r."id" = n."id" and m.scope = n.scope`, [scopes]);
+}
+
 async function remove(client: pg.Client, table: string, ids: string[]) {
   if (ids.length) await client.query(`delete from "${table}" where "id" = any($1)`, [ids]);
 }
@@ -106,7 +126,8 @@ async function write(client: pg.Client, plan: Plan, source: Snapshot, upsertActi
   for (const table of SYNC_TABLES) {
     const ids = plan.decisions.filter((d) => d.table === table.name && d.action === upsertAction).map((d) => d.id);
     const rows = parentsFirst(ids.map((id) => source[table.name].get(id)!), table.selfParent);
-    await upsert(client, table.name, rows);
+    if (table.uniquePosition) await upsertKeepingPositions(client, table.name, rows, table.uniquePosition);
+    else await upsert(client, table.name, rows);
     written += rows.length;
   }
   for (const table of [...SYNC_TABLES].reverse()) {
