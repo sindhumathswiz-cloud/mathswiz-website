@@ -60,6 +60,7 @@ For the given question, independently re-derive the correct answer from the ques
 
 Rules:
 - If your independent derivation matches the stored answer, and the explanation (if present) is a valid derivation, return a "verified" verdict.
+- A written question (prove, show, find, derive, evaluate) may have no separate stored answer: its answer is the final result of the stored explanation. Then verify the explanation itself -- a valid, complete derivation whose final result matches your own is "verified"; a missing stored answer is not by itself an issue when such an explanation is present.
 - If the stored answer is wrong, the explanation contains a genuine mathematical error, or the question is internally inconsistent, return an "issue" verdict with a specific category and evidence (show your own derivation as evidence).
 - If the question's content, options, or explanation are missing information you would need to verify it (a referenced diagram/figure not described in text, a missing premise, an incomplete statement), return an "issue" verdict with category "insufficient_information" -- do NOT guess or invent the missing premise.
 - Respond with ONLY strict JSON, no markdown fences: {"verdict": "verified"} or {"verdict": "issue", "category": "...", "evidence": "..."}`;
@@ -92,10 +93,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json().catch(() => ({}));
   const apply = body.apply === true;
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number(body.limit) || DEFAULT_LIMIT));
+  // Optionally only these questions (still only the ones the conditions below admit) -- e.g. the drafts that passed
+  // lib/approval-readiness, so a question without a worked solution is never approved on a verified answer alone.
+  const questionIds = Array.isArray(body.questionIds) ? body.questionIds.filter((q: unknown): q is string => typeof q === 'string') : null;
 
   const candidates = await prisma.question.findMany({
     where: {
       bookId: id,
+      ...(questionIds ? { id: { in: questionIds } } : {}),
       status: { in: ['DRAFT', 'REPORTED'] },
       verificationStatus: 'STRUCTURALLY_VALID',
       NOT: { tags: { hasSome: ['AI-Verified: Confirmed', 'AI-Verified: Flagged'] } },
@@ -115,7 +120,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       `Question type: ${q.type}`,
       `Content: ${q.content}`,
       q.options ? `Options: ${JSON.stringify(q.options)}` : null,
-      `Stored answer: ${q.correctAnswer ?? '(none)'}`,
+      `Stored answer: ${q.correctAnswer?.trim() ? q.correctAnswer : q.explanation ? '(none -- a written question; its answer is the final result of the explanation below)' : '(none)'}`,
       q.explanation ? `Stored explanation: ${q.explanation}` : 'Stored explanation: (none)',
     ].filter(Boolean).join('\n');
 

@@ -71,6 +71,19 @@ describe('POST /api/admin/books/[id]/verify-mathematics', () => {
     }));
   });
 
+  it('with questionIds, considers only those questions, still under the same conditions', async () => {
+    question.findMany.mockResolvedValue([]);
+    const { POST } = await import('./route');
+    await POST(post({ questionIds: ['q-1', 'q-2', 7] }), { params });
+
+    expect(question.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: { in: ['q-1', 'q-2'] }, status: { in: ['DRAFT', 'REPORTED'] }, verificationStatus: 'STRUCTURALLY_VALID' }),
+    }));
+    question.findMany.mockClear();
+    await POST(post({}), { params });
+    expect(question.findMany.mock.calls[0][0].where).not.toHaveProperty('id');
+  });
+
   it('reports a dry-run verified verdict without writing', async () => {
     question.findMany.mockResolvedValue([baseQuestion]);
     fetchFromLLM.mockResolvedValue('{"verdict":"verified"}');
