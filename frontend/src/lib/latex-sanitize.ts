@@ -6,8 +6,60 @@
  * plain Node script (e.g. scripts/sweep-approved-gates.ts) needs to import
  * question-qa.ts without a bundler in the loop to resolve the CSS import.
  */
+// A backslash command whose "\r", "\t", "\f", "\b" or "\v" was turned into a control character on its way through
+// JSON ("\right" stored as a carriage return + "ight"): the control character and the letters that follow it.
+const BROKEN_ESCAPES: Array<[RegExp, string]> = [
+    [/\r(?=(?:ight|ho|angle|ceil|floor|brace|brack)\b|ight[([{|.\\])/g, '\\r'],
+    [/\t(?=(?:imes|heta|an|anh|ext|extbf|extit|o|au|riangle|frac|ilde|op|herefore)\b|ext\{|frac\{)/g, '\\t'],
+    [/\f(?=(?:rac|orall)\b|rac\{)/g, '\\f'],
+    [/\x08(?=(?:eta|egin|ar|inom|ig|igg|mod|oldsymbol|ot|ox|ullet|ecause|eta)\b|egin\{|inom\{|oldsymbol\{|ar\{)/g, '\\b'],
+    [/\v(?=(?:ec|ee|arphi|ert|dots|arepsilon|arrho|artheta)\b|ec\{)/g, '\\v'],
+];
+
+/**
+ * Inline maths that closes and opens again with nothing between ("so $x = 1$$\begin{aligned}...$") reads as a
+ * display-math "$$" and pairs every later "$" wrongly. Only a "$$" met while an inline formula is open is split into
+ * "$ $"; a real "$$ ... $$" display block is left alone.
+ */
+function splitTouchingInlineMath(text: string): string {
+    return text.split('\n').map((line) => {
+        let inInline = false;
+        let inDisplay = false;
+        return line.replace(/\$\$|\$/g, (mark) => {
+            if (mark === '$$') {
+                if (inInline) return '$ $';
+                inDisplay = !inDisplay;
+                return mark;
+            }
+            if (!inDisplay) inInline = !inInline;
+            return mark;
+        });
+    }).join('\n');
+}
+
+/**
+ * Wraps a bare aligned/gathered/align environment in maths ("$$" in a replacement string is one "$") -- only outside
+ * any $...$ or $$...$$. (A bare matrix, array or cases environment is left to step 6c, which wraps the whole run of
+ * text it sits in, so "\frac{1}{24}\left[\begin{array}...\end{array}\right]" stays one formula.)
+ */
+function wrapBareEnvironments(text: string): string {
+    return text.split(/(\$\$[\s\S]*?\$\$|\$[^$]*?\$)/g).map((seg) => {
+        if (seg.startsWith('$')) return seg;
+        return seg
+            .replace(/\s*\\begin{aligned}([\s\S]*?)\\end{aligned}/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n')
+            .replace(/\s*\\begin{gathered}([\s\S]*?)\\end{gathered}/g, '\n$$\\begin{gathered}$1\\end{gathered}$$\n')
+            .replace(/\s*\\begin{align}([\s\S]*?)\\end{align}/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n')
+            .replace(/\s*\\begin{align\*}([\s\S]*?)\\end{align\*}/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
+    }).join('');
+}
+
 export function sanitizeLatex(text: string): string {
     let result = text;
+
+    // Step 0: Restore backslash commands a broken escape turned into control characters, and split inline formulas
+    // that touch ("$x$$y$"), before any step below reads the $ delimiters.
+    for (const [re, fix] of BROKEN_ESCAPES) result = result.replace(re, fix);
+    result = splitTouchingInlineMath(result);
 
     // Step 1: Convert Mathpix delimiters to remark-math compatible ones
     // \( ... \) → $ ... $   and   \[ ... \] → $$ ... $$
@@ -34,11 +86,12 @@ export function sanitizeLatex(text: string): string {
     // lookbehind/lookahead didn't recognize that as "already wrapped" and
     // injected a redundant $$...$$ around it, corrupting the delimiter
     // nesting ("(i)$\n$$\begin{aligned}...\end{aligned}$$\n$(ii)$...") and
-    // producing a KaTeX parse error / red error text.
-    result = result.replace(/(?<!\$)\s*\\begin{aligned}([\s\S]*?)\\end{aligned}(?!\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
-    result = result.replace(/(?<!\$)\s*\\begin{gathered}([\s\S]*?)\\end{gathered}(?!\$)/g, '\n$$\\begin{gathered}$1\\end{gathered}$$\n');
-    result = result.replace(/(?<!\$)\s*\\begin{align}([\s\S]*?)\\end{align}(?!\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
-    result = result.replace(/(?<!\$)\s*\\begin{align\*}([\s\S]*?)\\end{align\*}(?!\$)/g, '\n$$\\begin{aligned}$1\\end{aligned}$$\n');
+    // producing a KaTeX parse error / red error text. Deciding "enclosed" by
+    // the character right before \begin also missed the standard layout
+    // "$$\n\begin{aligned}...\end{aligned}\n$$" (a line break in between), and
+    // wrapped those blocks again; whether a block is enclosed is now read from
+    // the text's own $ / $$ runs.
+    result = wrapBareEnvironments(result);
 
     // Step 2c: Normalize display math. remark-math only treats $$...$$ as a
     // display block when the $$ are on their OWN lines — inline
@@ -80,7 +133,7 @@ export function sanitizeLatex(text: string): string {
     result = result.replace(/\\n/g, '\n');
 
     // Step 6c: Auto-wrap bare LaTeX commands not already inside $...$ or $$...$$
-    const LATEX_CMD = /\\(?:frac|dfrac|tfrac|cfrac|sqrt|int|sum|prod|lim|log|ln|sin|cos|tan|cot|sec|csc|sinh|cosh|tanh|coth|arcsin|arccos|arctan|deg|det|dim|exp|gcd|hom|inf|inj|ker|Pr|sup|liminf|limsup|min|max|arg|bmod|pmod|choose|binom|overset|underset|stackrel|implies|iff|to|mapsto|times|div|pm|mp|cdot|circ|bullet|cap|cup|vee|wedge|oplus|otimes|ominus|oslash|odot|bigcap|bigcup|bigvee|bigwedge|bigoplus|bigotimes|bigodot|leftarrow|rightarrow|Leftarrow|Rightarrow|leftrightarrow|Leftrightarrow|longleftarrow|longrightarrow|Longleftarrow|Longrightarrow|longleftrightarrow|Longleftrightarrow|uparrow|downarrow|Uparrow|Downarrow|updownarrow|Updownarrow|mapsto|longmapsto|hookleftarrow|hookrightarrow|le|ge|neq|approx|sim|cong|equiv|propto|prec|succ|preceq|succeq|subset|supset|subseteq|supseteq|setminus|neg|lnot|land|lor|forall|exists|nexists|top|bot|emptyset|varnothing|aleph|hbar|imath|jmath|ell|wp|Re|Im|partial|nabla|triangle|angle|measuredangle|sphericalangle|surd|prime|backprime|cancel|bcancel|xcancel|sout|vec|hat|bar|dot|ddot|tilde|check|breve|acute|grave|widehat|widetilde|overrightarrow|overleftarrow|overleftrightarrow|underrightarrow|underleftarrow|underleftrightarrow|overline|underline|underbrace|overbrace|boxed|operatorname|text|textbf|textit|mathrm|displaystyle|limits|left|right|bigl|bigr|Bigl|Bigr|biggl|biggr|Biggl|Biggr)\b/;
+    const LATEX_CMD = /\\(?:frac|dfrac|tfrac|cfrac|sqrt|int|sum|prod|lim|log|ln|sin|cos|tan|cot|sec|csc|sinh|cosh|tanh|coth|arcsin|arccos|arctan|deg|det|dim|exp|gcd|hom|inf|inj|ker|Pr|sup|liminf|limsup|min|max|arg|bmod|pmod|choose|binom|overset|underset|stackrel|implies|iff|to|mapsto|times|div|pm|mp|cdot|circ|bullet|cap|cup|vee|wedge|oplus|otimes|ominus|oslash|odot|bigcap|bigcup|bigvee|bigwedge|bigoplus|bigotimes|bigodot|leftarrow|rightarrow|Leftarrow|Rightarrow|leftrightarrow|Leftrightarrow|longleftarrow|longrightarrow|Longleftarrow|Longrightarrow|longleftrightarrow|Longleftrightarrow|uparrow|downarrow|Uparrow|Downarrow|updownarrow|Updownarrow|mapsto|longmapsto|hookleftarrow|hookrightarrow|le|ge|neq|approx|sim|cong|equiv|propto|prec|succ|preceq|succeq|subset|supset|subseteq|supseteq|setminus|neg|lnot|land|lor|forall|exists|nexists|top|bot|emptyset|varnothing|aleph|hbar|imath|jmath|ell|wp|Re|Im|partial|nabla|triangle|angle|measuredangle|sphericalangle|surd|prime|backprime|cancel|bcancel|xcancel|sout|vec|hat|bar|dot|ddot|tilde|check|breve|acute|grave|widehat|widetilde|overrightarrow|overleftarrow|overleftrightarrow|underrightarrow|underleftarrow|underleftrightarrow|overline|underline|underbrace|overbrace|boxed|operatorname|text|textbf|textit|mathrm|displaystyle|limits|left|right|begin|end|bigl|bigr|Bigl|Bigr|biggl|biggr|Biggl|Biggr)\b/;
     const segments = result.split(/(\$\$[\s\S]*?\$\$|\$[^$]*?\$)/g);
     result = segments.map(seg => {
       if (seg.startsWith('$')) return seg;
@@ -130,6 +183,16 @@ export function sanitizeLatex(text: string): string {
       }
       return seg;
     }).join('');
+
+    // Step 10: Inside an inline $...$ formula that spans lines, join a line that
+    // starts like a Markdown list item, quote or heading ("+ ", "- ", "* ",
+    // "1. ", "> ", "#") to the line before: Markdown reads it as one even in
+    // the middle of a formula ("...\\\n+ \vec{b} + \vec{c}"), which splits the
+    // formula, so it shows as raw text. TeX ignores the line break ("\\" row
+    // breaks stay); other lines and display $$ blocks are left as they are.
+    result = result.split(/(\$\$[\s\S]*?\$\$)/g).map((seg) =>
+      seg.startsWith('$$') ? seg : seg.replace(/\$[^$]+\$/g, (math) => math.replace(/[ \t]*\n[ \t]*(?=[-+*>#]\s|#|\d+[.)]\s)/g, ' '))
+    ).join('');
 
     return result;
 }
