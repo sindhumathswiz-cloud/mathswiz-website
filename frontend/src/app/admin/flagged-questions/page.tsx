@@ -23,11 +23,15 @@ interface QuestionFlagRow {
         subject: string | null;
         difficulty: string;
     };
-    flaggedBy: { id: string; firstName: string | null; lastName: string | null; email: string | null };
+    flaggedBy: { id: string; firstName: string | null; lastName: string | null; email: string | null; role?: string };
     resolvedBy: { id: string; firstName: string | null; lastName: string | null } | null;
 }
 
 const FILTERS = ['PENDING', 'CORRECTED', 'REJECTED', 'ALL'] as const;
+
+// A flag an admin or a review check raised: resolving it saves the correction but leaves the question's status
+// alone (it still goes through approval), and there is no student to notify.
+const fromStudent = (flag: QuestionFlagRow) => flag.flaggedBy.role === undefined || flag.flaggedBy.role === 'STUDENT';
 
 export default function FlaggedQuestionsPage() {
     const [flags, setFlags] = useState<QuestionFlagRow[]>([]);
@@ -84,7 +88,8 @@ export default function FlaggedQuestionsPage() {
             });
             const data = await res.json();
             if (data.success) {
-                toast.success(action === 'CORRECTED' ? 'Question corrected and student notified' : 'Flag rejected and student notified');
+                const notified = fromStudent(flag) ? ' and student notified' : '';
+                toast.success(action === 'CORRECTED' ? `Question corrected${notified}` : `Flag rejected${notified}`);
                 setExpandedId(null);
                 fetchFlags();
             } else {
@@ -114,7 +119,7 @@ export default function FlaggedQuestionsPage() {
                     <AlertTriangle className="w-7 h-7 text-amber-500" />
                     Flagged Questions
                 </h1>
-                <p className="text-slate-500 mt-1 dark:text-slate-400">Questions students reported as incorrect — correct them or reject the flag.</p>
+                <p className="text-slate-500 mt-1 dark:text-slate-400">Questions students reported as incorrect, and questions a review flagged for fixing — correct them or reject the flag.</p>
             </div>
 
             <div className="flex gap-2">
@@ -146,7 +151,7 @@ export default function FlaggedQuestionsPage() {
                             <div className="p-6">
                                 <div className="flex items-start justify-between gap-4 mb-4">
                                     <div className="flex items-center gap-3 text-xs font-bold text-slate-500 dark:text-slate-400">
-                                        <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{studentName(flag.flaggedBy)}</span>
+                                        <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{studentName(flag.flaggedBy)}{!fromStudent(flag) && ' (admin review)'}</span>
                                         <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{new Date(flag.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
                                         {flag.question.topic && <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-brand/10 text-indigo-700 dark:text-brand">{flag.question.topic}</span>}
                                     </div>
@@ -160,8 +165,8 @@ export default function FlaggedQuestionsPage() {
                                 <div className="mb-3 text-sm font-bold text-slate-900 dark:text-white"><MathRenderer content={flag.question.content} /></div>
 
                                 <div className="mb-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 p-4">
-                                    <p className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest mb-1">Student's reason</p>
-                                    <p className="text-sm text-rose-900 dark:text-rose-300">{flag.reason}</p>
+                                    <p className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest mb-1">{fromStudent(flag) ? "Student's reason" : 'Why it was flagged'}</p>
+                                    <p className="text-sm text-rose-900 dark:text-rose-300 whitespace-pre-line">{flag.reason}</p>
                                 </div>
 
                                 {flag.status !== 'PENDING' && (
@@ -200,6 +205,7 @@ export default function FlaggedQuestionsPage() {
                                             rows={3}
                                             className="w-full bg-white dark:bg-surface border dark:border-white/10 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
                                         />
+                                        <MathPreview text={editDraft.content} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -211,7 +217,7 @@ export default function FlaggedQuestionsPage() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Resolution note (sent to student)</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Resolution note{fromStudent(flag) ? ' (sent to student)' : ''}</label>
                                             <input
                                                 value={resolutionNote}
                                                 onChange={(e) => setResolutionNote(e.target.value)}
@@ -225,16 +231,17 @@ export default function FlaggedQuestionsPage() {
                                         <textarea
                                             value={editDraft.explanation}
                                             onChange={(e) => setEditDraft({ ...editDraft, explanation: e.target.value })}
-                                            rows={3}
+                                            rows={fromStudent(flag) ? 3 : 8}
                                             className="w-full bg-white dark:bg-surface border dark:border-white/10 rounded-xl p-3 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
                                         />
+                                        <MathPreview text={editDraft.explanation} />
                                     </div>
                                     <button
                                         onClick={() => resolve(flag, 'CORRECTED')}
                                         disabled={processingId === flag.id}
                                         className="flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm text-white bg-gradient-to-br from-emerald-600 to-emerald-700 hover:opacity-90 transition disabled:opacity-50"
                                     >
-                                        {processingId === flag.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Save Correction & Notify Student
+                                        {processingId === flag.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} {fromStudent(flag) ? 'Save Correction & Notify Student' : 'Save Correction'}
                                     </button>
                                 </div>
                             )}
@@ -242,6 +249,17 @@ export default function FlaggedQuestionsPage() {
                     ))}
                 </div>
             )}
+        </div>
+    );
+}
+
+/** How the text being edited will display to students, so a maths fix can be checked before it is saved. */
+function MathPreview({ text }: { text: string }) {
+    if (!text.trim()) return null;
+    return (
+        <div className="mt-2 rounded-xl border border-dashed dark:border-white/10 bg-white dark:bg-surface p-3">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Preview</p>
+            <div className="text-sm text-slate-800 dark:text-slate-200"><MathRenderer content={text} /></div>
         </div>
     );
 }

@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic';
  * Admin resolving a student's "flag as incorrect" report: either the
  * question genuinely had an error (CORRECTED -- optionally saving edited
  * content in the same request) or the flag was invalid (REJECTED, question
- * was fine as-is). Either way the question returns to APPROVED (it was
- * pulled to REPORTED when flagged) and the reporting student gets a
+ * was fine as-is). For a student's flag, either way the question returns to
+ * APPROVED (it was pulled to REPORTED when flagged) and the reporting student gets a
  * Notification -- see lib/mastery.ts-adjacent precedent in
  * api/teacher/interventions/[id]/route.ts for this same
  * transaction+notification pattern.
@@ -33,9 +33,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const resolution = typeof body?.resolution === 'string' ? body.resolution.trim().slice(0, 2000) : null;
     const questionUpdate = body?.questionUpdate;
 
-    const flag = await prisma.questionFlag.findUnique({ where: { id: flagId }, select: { id: true, questionId: true, flaggedById: true, status: true } });
+    const flag = await prisma.questionFlag.findUnique({ where: { id: flagId }, select: { id: true, questionId: true, flaggedById: true, status: true, flaggedBy: { select: { role: true } } } });
     if (!flag) return NextResponse.json({ error: 'Flag not found' }, { status: 404 });
     if (flag.status !== 'PENDING') return NextResponse.json({ error: 'This flag has already been resolved' }, { status: 400 });
+    // A flag an admin or a review check raised never pulled the question from the live pool, so resolving it does
+    // not approve the question (it still goes through the approval checks) and there is no student to notify.
+    const fromStudent = flag.flaggedBy?.role === 'STUDENT';
 
     const resolvedFlag = await prisma.$transaction(async (tx) => {
       const updated = await tx.questionFlag.update({
@@ -43,14 +46,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         data: { status: action, resolution, resolvedById: adminId, resolvedAt: new Date() },
       });
 
-      const questionData: Record<string, unknown> = { status: 'APPROVED' };
+      const questionData: Record<string, unknown> = fromStudent ? { status: 'APPROVED' } : {};
       if (action === 'CORRECTED' && questionUpdate && typeof questionUpdate === 'object') {
         if (typeof questionUpdate.content === 'string') questionData.content = questionUpdate.content;
         if (typeof questionUpdate.correctAnswer === 'string') questionData.correctAnswer = questionUpdate.correctAnswer;
         if (typeof questionUpdate.explanation === 'string') questionData.explanation = questionUpdate.explanation;
         if (Array.isArray(questionUpdate.options)) questionData.options = questionUpdate.options;
       }
-      await tx.question.update({ where: { id: flag.questionId }, data: questionData });
+      if (Object.keys(questionData).length) await tx.question.update({ where: { id: flag.questionId }, data: questionData });
+      if (!fromStudent) return updated;
 
       const message = action === 'CORRECTED'
         ? `The question you flagged was reviewed and corrected.${resolution ? ` Admin note: ${resolution}` : ''}`
