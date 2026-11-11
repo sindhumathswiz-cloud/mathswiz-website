@@ -63,10 +63,11 @@ const leadingNumber = (printed: string) => printed.match(/\d+/)?.[0] ?? null;
 
 /**
  * Every place question `n` could start: its number after the start of the text, a line break or a closing "$", then
- * a space or straight into maths ("2.$y = x ..."), but not a decimal ("2.5").
+ * a space or straight into maths ("2.$y = x ..."), but not a decimal ("2.5"); or, as NCERT Exemplar prints them,
+ * "Q. 42 If ..." / "Q.42 If ...".
  */
 function questionStarts(text: string, n: string): number[] {
-  const re = new RegExp(`(?:^|[\\n$])[ \\t]*(?:\\*\\*)?${n}\\.(?:\\s+(?=\\S)|(?=\\$))`, 'g');
+  const re = new RegExp(`(?:^|[\\n$])[ \\t]*(?:\\*\\*)?(?:Q\\.?\\s*${n}(?=\\s)|${n}\\.(?:\\s+(?=\\S)|(?=\\$)))`, 'g');
   const out: number[] = [];
   for (const m of text.matchAll(re)) out.push((m.index ?? 0) + (m[0].startsWith('$') ? 1 : 0));
   return out;
@@ -190,7 +191,7 @@ export function findCaseSubpartSolution(input: { pages: PageText[]; startPage: n
  */
 export function findInlineSolution(input: { pages: PageText[]; startPage: number; printedNumber: string; questionContent: string; footers?: Set<string> }): InlineSolutionResult {
   if (looksLikeSubpart(input.printedNumber)) return findCaseSubpartSolution(input);
-  const n = /^\s*\d+\s*\.?\s*$/.test(input.printedNumber) ? leadingNumber(input.printedNumber) : null;
+  const n = /^\s*(?:Q\.?\s*)?\d+\s*\.?\s*$/i.test(input.printedNumber) ? leadingNumber(input.printedNumber) : null;
   const s = n ? streamFrom(input.pages, input.startPage, input.footers ?? new Set()) : null;
   if (!n || !s) return { found: false, reason: n ? 'question_not_found' : 'unsupported_number' };
   const { text: stream, firstPageEnd, pageAt } = s;

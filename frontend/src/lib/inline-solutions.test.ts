@@ -78,6 +78,20 @@ describe('findInlineSolution', () => {
       .toEqual({ found: false, reason: 'question_not_found' });
   });
 
+  it('reads NCERT Exemplar\'s "Q. 42" numbering, with its "Thinking Process" before the solution', () => {
+    const exemplar = [{ pageNumber: 206, text: String.raw`199
+Straight Lines
+Q. 42 If a, b and c are in AP, then the straight lines ax+by+c=0 will always pass through ……… .
+Thinking Process
+If a, b and c are in AP, then 2b = a+c.
+Sol. Given line is ax + by + c = 0 …(i)
+So, (1, −2) lies on the line.
+Q. 43 The line which cuts off equal intercept from the axes` }];
+    const r = findInlineSolution({ pages: exemplar, startPage: 206, printedNumber: 'Q. 42', questionContent: 'If $a$, $b$ and $c$ are in AP, then the straight lines $ax + by + c = 0$ will always pass through ________.' });
+    expect(r).toMatchObject({ found: true, text: 'Given line is ax + by + c = 0 …(i)\nSo, (1, −2) lies on the line.' });
+    expect(findInlineSolution({ pages: exemplar, startPage: 206, printedNumber: '42', questionContent: 'If $a$, $b$ and $c$ are in AP, then the straight lines $ax + by + c = 0$ will always pass through.' })).toMatchObject({ found: true });
+  });
+
   it('says when no solution is printed under the question', () => {
     const none = [{ pageNumber: 10, text: '5. Prove that$x = 1$.\n6. Prove that$y = 2$.' }];
     expect(findInlineSolution({ pages: none, startPage: 10, printedNumber: '5', questionContent: 'Prove that $x = 1$.' })).toEqual({ found: false, reason: 'no_solution_printed' });

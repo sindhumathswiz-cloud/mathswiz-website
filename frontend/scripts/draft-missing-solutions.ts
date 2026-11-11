@@ -3,7 +3,7 @@
  * under the rules in src/lib/solution-draft.ts (two independent models must agree on an objective answer;
  * a solution must reach an existing answer; everything else is labelled as one model's draft).
  *
- *   npx tsx scripts/draft-missing-solutions.ts --run [--limit=30] [--concurrency=3]
+ *   npx tsx scripts/draft-missing-solutions.ts --run [--limit=30] [--concurrency=3] [--drafts-only]
  *        asks the models and writes draft-solutions-results.json. Touches nothing in the database.
  *        Resumable: questions already in the results file are skipped.
  *   npx tsx scripts/draft-missing-solutions.ts --apply
@@ -49,7 +49,7 @@ async function main() {
     const done: Result[] = existsSync(RESULTS) ? JSON.parse(readFileSync(RESULTS, 'utf8')) : [];
     const seen = new Set(done.filter((r) => !(r.transient && (r.attempts ?? 1) < 3)).map((r) => r.id));
     const rows = await prisma.question.findMany({
-      where: { status: { in: ['REPORTED', 'DRAFT'] }, createdAt: { lt: RECENT_CUTOFF } },
+      where: { status: { in: flag('drafts-only') ? ['DRAFT'] : ['REPORTED', 'DRAFT'] }, createdAt: { lt: RECENT_CUTOFF } },
       select: { id: true, status: true, type: true, content: true, options: true, correctAnswer: true, explanation: true },
       orderBy: [{ status: 'desc' }, { createdAt: 'asc' }],
     });
