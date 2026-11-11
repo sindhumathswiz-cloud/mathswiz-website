@@ -2,22 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, BookOpen, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, EyeOff, FilePlus2, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, EyeOff, FilePlus2, Loader2, Search, Trash2, X } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 import QuestionFigures from '@/components/QuestionFigures';
 import type { SourceBook } from '@/lib/question-source-filter';
+import QuestionFilterPanel, { filterLabelCls as labelCls } from './QuestionFilterPanel';
+import { DIFFICULTY_LABEL, EMPTY_FILTERS as EMPTY, STATUS_LABEL, TYPE_LABEL, filtersActive as anyFilter, fromParams, toParams, type Facets, type Filters } from './filters';
 
 /** Admins and teachers find questions by filters and pick them for a question paper or a practice sheet. */
 
-const TYPE_LABEL: Record<string, string> = {
-  SINGLE_CHOICE: 'Single choice', MULTIPLE_CHOICE: 'Multiple choice', INTEGER: 'Numerical', TRUE_FALSE: 'True / false',
-  SUBJECTIVE: 'Written', FILL_IN_BLANKS: 'Fill in the blanks', ASSERTION_REASONING: 'Assertion–reason', CASE_STUDY: 'Case study',
-  VERY_SHORT_ANSWER: 'Very short answer', SHORT_ANSWER: 'Short answer', LONG_ANSWER: 'Long answer',
-};
-const DIFFICULTY_LABEL: Record<string, string> = { EASY: 'Easy', MEDIUM: 'Medium', HARD: 'Hard' };
-const STATUS_LABEL: Record<string, string> = { APPROVED: 'Approved', PENDING_REVIEW: 'Pending review', DRAFT: 'Draft', REPORTED: 'Reported', ALL: 'Any status' };
-
-type Facet = { value: string; count: number };
 type BrowserQuestion = {
   id: string; content: string; options: unknown; correctAnswer: string | null; explanation: string | null;
   type: string; difficulty: string; class: string | null; topic: string | null; status: string; verificationStatus: string;
@@ -25,42 +18,6 @@ type BrowserQuestion = {
   book: { title: string; className: string } | null; bookChapter: { name: string; chapterNumber: string | null } | null;
 };
 type Picked = { id: string; preview: string; content?: string; type: string; source: string };
-type Filters = {
-  q: string; class: string; bookId: string; bookChapterId: string; bookExerciseId: string; topic: string;
-  types: string[]; difficulties: string[]; solution: string; status: string; mine: boolean; sort: 'book' | 'newest';
-};
-
-const EMPTY: Filters = { q: '', class: '', bookId: '', bookChapterId: '', bookExerciseId: '', topic: '', types: [], difficulties: [], solution: '', status: 'APPROVED', mine: false, sort: 'book' };
-
-const toParams = (f: Filters, page: number, pageSize: number) => {
-  const p = new URLSearchParams();
-  if (f.q.trim()) p.set('q', f.q.trim());
-  if (f.class) p.set('class', f.class);
-  if (f.bookId) p.set('bookId', f.bookId);
-  if (f.bookChapterId) p.set('bookChapterId', f.bookChapterId);
-  if (f.bookExerciseId) p.set('bookExerciseId', f.bookExerciseId);
-  if (f.topic) p.set('topic', f.topic);
-  if (f.types.length) p.set('types', f.types.join(','));
-  if (f.difficulties.length) p.set('difficulties', f.difficulties.join(','));
-  if (f.solution) p.set('solution', f.solution);
-  if (f.status !== 'APPROVED') p.set('status', f.status);
-  if (f.mine) p.set('mine', '1');
-  if (f.sort !== 'book') p.set('sort', f.sort);
-  if (page > 1) p.set('page', String(page));
-  if (pageSize !== 25) p.set('pageSize', String(pageSize));
-  return p;
-};
-const fromParams = (p: URLSearchParams): { filters: Filters; page: number; pageSize: number } => ({
-  filters: {
-    q: p.get('q') ?? '', class: p.get('class') ?? '', bookId: p.get('bookId') ?? '', bookChapterId: p.get('bookChapterId') ?? '',
-    bookExerciseId: p.get('bookExerciseId') ?? '', topic: p.get('topic') ?? '',
-    types: (p.get('types') ?? '').split(',').filter(Boolean), difficulties: (p.get('difficulties') ?? '').split(',').filter(Boolean),
-    solution: p.get('solution') ?? '', status: p.get('status') ?? 'APPROVED', mine: p.get('mine') === '1', sort: p.get('sort') === 'newest' ? 'newest' : 'book',
-  },
-  page: Math.max(1, Number.parseInt(p.get('page') ?? '1', 10) || 1),
-  pageSize: [25, 50, 100].includes(Number(p.get('pageSize'))) ? Number(p.get('pageSize')) : 25,
-});
-
 const plain = (s: string, n = 110) => {
   const t = s.replace(/\$+/g, '').replace(/\\[a-zA-Z]+/g, ' ').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
@@ -72,12 +29,6 @@ const sourceOf = (q: BrowserQuestion) => [
   q.printedNumber ? `Q ${q.printedNumber.replace(/^Q\.?\s*/i, '')}` : null,
 ].filter(Boolean).join(' · ');
 
-const chip = (on: boolean) => `inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-bold transition-colors ${on
-  ? 'border-indigo-600 bg-indigo-600 text-white dark:border-brand dark:bg-brand'
-  : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300 dark:border-white/10 dark:bg-surface dark:text-slate-300'}`;
-const selectCls = 'w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 dark:border-white/10 dark:bg-surface dark:text-slate-200';
-const labelCls = 'mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500';
-
 export default function QuestionBrowser({ role, books }: { role: 'ADMIN' | 'TEACHER'; books: SourceBook[] }) {
   const isAdmin = role === 'ADMIN';
   const storageKey = `question-browser-selection:${role}`;
@@ -88,7 +39,7 @@ export default function QuestionBrowser({ role, books }: { role: 'ADMIN' | 'TEAC
   const [ready, setReady] = useState(false);
   const [questions, setQuestions] = useState<BrowserQuestion[]>([]);
   const [total, setTotal] = useState(0);
-  const [facets, setFacets] = useState<{ types: Facet[]; difficulties: Facet[]; topics: Facet[] } | null>(null);
+  const [facets, setFacets] = useState<Facets | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shown, setShown] = useState<Set<string>>(new Set());
@@ -146,13 +97,9 @@ export default function QuestionBrowser({ role, books }: { role: 'ADMIN' | 'TEAC
   useEffect(() => { if (ready) void load(); }, [ready, load]);
 
   const update = (patch: Partial<Filters>) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
-  const toggleIn = (key: 'types' | 'difficulties', value: string) =>
-    update({ [key]: filters[key].includes(value) ? filters[key].filter((v) => v !== value) : [...filters[key], value] } as Partial<Filters>);
 
   const book = books.find((b) => b.id === filters.bookId);
   const chapter = book?.chapters.find((c) => c.id === filters.bookChapterId);
-  const classes = useMemo(() => [...new Set(['Class 11', 'Class 12', ...books.map((b) => b.className).filter(Boolean)])].sort(), [books]);
-  const visibleBooks = filters.class ? books.filter((b) => b.className === filters.class) : books;
 
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.id)), [picked]);
   const pick = (q: BrowserQuestion) => setPicked((list) => (list.some((p) => p.id === q.id)
@@ -170,7 +117,7 @@ export default function QuestionBrowser({ role, books }: { role: 'ADMIN' | 'TEAC
   });
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  const filtersActive = JSON.stringify({ ...filters, q: searchText }) !== JSON.stringify(EMPTY);
+  const filtersActive = anyFilter({ ...filters, q: searchText }) || filters.status !== EMPTY.status;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
@@ -189,107 +136,17 @@ export default function QuestionBrowser({ role, books }: { role: 'ADMIN' | 'TEAC
 
       <div className="grid gap-5 lg:grid-cols-[17rem_1fr]">
         {/* ---------------- filters ---------------- */}
-        <aside aria-label="Filters" className="space-y-4 self-start rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface lg:sticky lg:top-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-black text-slate-900 dark:text-white">Filters</h2>
-            {filtersActive && (
-              <button type="button" onClick={() => { setFilters(EMPTY); setSearchText(''); setPage(1); }} className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-brand">
-                <RotateCcw className="h-3.5 w-3.5" /> Clear all
-              </button>
-            )}
-          </div>
-
-          <label className="block">
-            <span className={labelCls}>Class</span>
-            <select id="qb-class" value={filters.class} onChange={(e) => update({ class: e.target.value, bookId: '', bookChapterId: '', bookExerciseId: '' })} className={selectCls}>
-              <option value="">All classes</option>
-              {classes.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className={labelCls}>Book</span>
-            <select id="qb-book" value={filters.bookId} onChange={(e) => update({ bookId: e.target.value, bookChapterId: '', bookExerciseId: '' })} className={selectCls}>
-              <option value="">All books</option>
-              {visibleBooks.map((b) => <option key={b.id} value={b.id}>{b.title} ({b.total})</option>)}
-            </select>
-          </label>
-          {book && (
-            <label className="block">
-              <span className={labelCls}>Chapter</span>
-              <select id="qb-chapter" value={filters.bookChapterId} onChange={(e) => update({ bookChapterId: e.target.value, bookExerciseId: '' })} className={selectCls}>
-                <option value="">All chapters</option>
-                {book.chapters.map((c) => <option key={c.id} value={c.id}>{c.chapterNumber ? `${c.chapterNumber}. ` : ''}{c.name} ({c.total})</option>)}
-              </select>
-            </label>
-          )}
-          {chapter && chapter.exercises.length > 0 && (
-            <label className="block">
-              <span className={labelCls}>Exercise</span>
-              <select id="qb-exercise" value={filters.bookExerciseId} onChange={(e) => update({ bookExerciseId: e.target.value })} className={selectCls}>
-                <option value="">All exercises</option>
-                {chapter.exercises.map((x) => <option key={x.id} value={x.id}>{x.label} ({x.total})</option>)}
-              </select>
-            </label>
-          )}
-
-          <label className="block">
-            <span className={labelCls}>Topic</span>
-            <select id="qb-topic" value={filters.topic} onChange={(e) => update({ topic: e.target.value })} className={selectCls}>
-              <option value="">All topics</option>
-              {filters.topic && !facets?.topics.some((t) => t.value === filters.topic) && <option value={filters.topic}>{filters.topic}</option>}
-              {(facets?.topics ?? []).map((t) => <option key={t.value} value={t.value}>{t.value} ({t.count})</option>)}
-            </select>
-          </label>
-
-          <fieldset>
-            <legend className={labelCls}>Question type</legend>
-            <div className="flex flex-wrap gap-1.5">
-              {(facets?.types ?? []).map((t) => (
-                <button key={t.value} type="button" aria-pressed={filters.types.includes(t.value)} onClick={() => toggleIn('types', t.value)} className={chip(filters.types.includes(t.value))}>
-                  {TYPE_LABEL[t.value] ?? t.value} <span className="tabular-nums opacity-70">{t.count}</span>
-                </button>
-              ))}
-              {filters.types.filter((v) => !facets?.types.some((t) => t.value === v)).map((v) => (
-                <button key={v} type="button" aria-pressed onClick={() => toggleIn('types', v)} className={chip(true)}>{TYPE_LABEL[v] ?? v} <span className="opacity-70">0</span></button>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend className={labelCls}>Difficulty</legend>
-            <div className="flex flex-wrap gap-1.5">
-              {['EASY', 'MEDIUM', 'HARD'].map((d) => {
-                const count = facets?.difficulties.find((x) => x.value === d)?.count ?? 0;
-                return (
-                  <button key={d} type="button" aria-pressed={filters.difficulties.includes(d)} onClick={() => toggleIn('difficulties', d)} className={chip(filters.difficulties.includes(d))}>
-                    {DIFFICULTY_LABEL[d]} <span className="tabular-nums opacity-70">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <label className="block">
-            <span className={labelCls}>Worked solution</span>
-            <select id="qb-solution" value={filters.solution} onChange={(e) => update({ solution: e.target.value })} className={selectCls}>
-              <option value="">With or without</option>
-              <option value="with">Has a worked solution</option>
-              <option value="without">No worked solution</option>
-            </select>
-          </label>
-
-          {isAdmin ? (
-            <label className="block">
-              <span className={labelCls}>Status</span>
-              <select id="qb-status" value={filters.status} onChange={(e) => update({ status: e.target.value })} className={selectCls}>
-                {['APPROVED', 'PENDING_REVIEW', 'DRAFT', 'REPORTED', 'ALL'].map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-              </select>
-            </label>
-          ) : (
-            <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
-              <input id="qb-mine" type="checkbox" checked={filters.mine} onChange={(e) => update({ mine: e.target.checked })} /> Only questions I wrote
-            </label>
-          )}
+        <aside aria-label="Filters" className="self-start rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-surface lg:sticky lg:top-4">
+          <QuestionFilterPanel
+            filters={filters}
+            onChange={update}
+            onReset={() => { setFilters(EMPTY); setSearchText(''); setPage(1); }}
+            active={filtersActive}
+            books={books}
+            facets={facets}
+            statusOptions={isAdmin ? ['APPROVED', 'PENDING_REVIEW', 'DRAFT', 'REPORTED', 'ALL'] : undefined}
+            showMine={!isAdmin}
+          />
         </aside>
 
         {/* ---------------- results ---------------- */}

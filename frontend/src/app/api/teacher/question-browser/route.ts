@@ -3,8 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { requirePremiumTeacher } from '@/lib/teacher-api-guard';
-import { resolveSourceClauses } from '@/lib/question-sources';
 import { browserOrder, browserWhere, parseBrowserFilters } from '@/lib/question-browser';
+import { browserFacets, browserSources } from '@/lib/question-browser-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +22,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const filters = parseBrowserFilters(params);
     const viewer = { userId: guard.userId, role: guard.role };
-    const sources = filters.bookId || filters.bookChapterId || filters.bookExerciseId
-      ? await resolveSourceClauses({ bookId: filters.bookId, bookChapterId: filters.bookChapterId, bookExerciseId: filters.bookExerciseId })
-      : [];
+    const sources = await browserSources(filters);
     const where = browserWhere(filters, viewer, sources);
 
     const [total, rows] = await Promise.all([
@@ -52,20 +50,7 @@ export async function GET(request: Request) {
       mine: createdById === guard.userId,
     }));
 
-    let facets: Record<string, Array<{ value: string; count: number }>> | undefined;
-    if (params.get('facets') === '1') {
-      const [types, difficulties, topics] = await Promise.all([
-        prisma.question.groupBy({ by: ['type'], where: browserWhere(filters, viewer, sources, 'types'), _count: { _all: true } }),
-        prisma.question.groupBy({ by: ['difficulty'], where: browserWhere(filters, viewer, sources, 'difficulties'), _count: { _all: true } }),
-        prisma.question.groupBy({ by: ['topic'], where: browserWhere(filters, viewer, sources, 'topic'), _count: { _all: true } }),
-      ]);
-      const byCount = (a: { count: number }, b: { count: number }) => b.count - a.count;
-      facets = {
-        types: types.map((t) => ({ value: t.type, count: t._count._all })).sort(byCount),
-        difficulties: difficulties.map((d) => ({ value: d.difficulty, count: d._count._all })),
-        topics: topics.filter((t) => t.topic).map((t) => ({ value: t.topic as string, count: t._count._all })).sort(byCount),
-      };
-    }
+    const facets = params.get('facets') === '1' ? await browserFacets(filters, viewer, sources) : undefined;
 
     return NextResponse.json({ questions, total, page: filters.page, pageSize: filters.pageSize, facets });
   } catch (error) {

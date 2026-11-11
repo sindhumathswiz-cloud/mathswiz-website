@@ -14,7 +14,9 @@ const mockPrisma = {
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
-    createMany: vi.fn()
+    createMany: vi.fn(),
+    count: vi.fn(),
+    groupBy: vi.fn()
   },
   tagTaxonomy: {
     findMany: vi.fn(),
@@ -39,6 +41,27 @@ describe('API Route - Questions', () => {
   });
 
   describe('GET /api/questions', () => {
+    it('gives an admin one filtered page with the total when asked for ?paged=1, and everything otherwise', async () => {
+      const { getServerSession } = await import('next-auth');
+      vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as never);
+      mockPrisma.question.findMany.mockResolvedValue([]);
+      mockPrisma.question.count.mockResolvedValue(2882);
+      mockPrisma.question.groupBy.mockResolvedValue([]);
+      const { GET } = await import('@/app/api/questions/route');
+
+      const paged = await (await GET(new Request('http://localhost/api/questions?paged=1&facets=1&status=DRAFT&types=CASE_STUDY&q=passage&page=3&pageSize=25&sort=newest'))).json();
+      const call = mockPrisma.question.findMany.mock.calls[0][0];
+      expect(call).toMatchObject({ skip: 50, take: 25, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }] });
+      expect(call.where.AND).toEqual(expect.arrayContaining([{ status: 'DRAFT' }, { type: { in: ['CASE_STUDY'] } }, { content: { contains: 'passage', mode: 'insensitive' } }]));
+      expect(paged).toMatchObject({ total: 2882, page: 3, pageSize: 25, facets: { types: [], difficulties: [], topics: [] } });
+
+      mockPrisma.question.findMany.mockClear();
+      const plain = await (await GET(new Request('http://localhost/api/questions?status=REPORTED'))).json();
+      expect(mockPrisma.question.findMany.mock.calls[0][0]).not.toHaveProperty('take');
+      expect(mockPrisma.question.findMany.mock.calls[0][0].where).toMatchObject({ status: 'REPORTED' });
+      expect(plain).not.toHaveProperty('total');
+    });
+
     it('should filter by scope for TEACHER role', async () => {
       const { getServerSession } = await import('next-auth');
       vi.mocked(getServerSession).mockResolvedValue({

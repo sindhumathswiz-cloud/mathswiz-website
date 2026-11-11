@@ -3,12 +3,19 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
+import type { Prisma } from '@prisma/client';
+import { parseBrowserFilters } from '@/lib/question-browser';
+import { browserFacets, browserSources, filteredWhere } from '@/lib/question-browser-server';
+
+const FLAG_STATUSES = ['PENDING', 'CORRECTED', 'REJECTED'] as const;
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Admin-facing list of flagged questions: student "flag as incorrect" reports, and flags an admin or a review check
- * raised (POST below).
+ * raised (POST below). Filtered like the question bank (lib/question-browser) and by who raised the flag
+ * (?raisedBy=student|review), one page at a time, with counts per flag status and, with ?facets=1, per question
+ * type, difficulty and topic.
  * Defaults to PENDING so the admin dashboard surfaces what needs action;
  * pass ?status=ALL (or CORRECTED/REJECTED) to see resolved history.
  */
@@ -19,23 +26,48 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const statusParam = new URL(request.url).searchParams.get('status');
-    const status = statusParam && statusParam !== 'ALL' ? statusParam : undefined;
+    const params = new URL(request.url).searchParams;
+    const statusParam = params.get('status');
+    const status = statusParam && (FLAG_STATUSES as readonly string[]).includes(statusParam) ? statusParam : undefined;
 
-    const flags = await prisma.questionFlag.findMany({
-      where: status ? { status: status as any } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-      include: {
-        question: {
-          select: { id: true, content: true, options: true, correctAnswer: true, explanation: true, type: true, status: true, topic: true, subject: true, difficulty: true },
+    // The same question filters as the question bank (any question status), plus who raised the flag.
+    const filters = { ...parseBrowserFilters(params), status: 'ALL' };
+    const viewer = { userId: session.user.id, role: 'ADMIN' };
+    const sources = await browserSources(filters);
+    const raisedBy = params.get('raisedBy');
+    const raiser: Prisma.QuestionFlagWhereInput = raisedBy === 'student' ? { flaggedBy: { role: 'STUDENT' } }
+      : raisedBy === 'review' ? { flaggedBy: { role: { not: 'STUDENT' } } } : {};
+    const where: Prisma.QuestionFlagWhereInput = { ...(status ? { status: status as Prisma.EnumQuestionFlagStatusFilter['equals'] } : {}), ...raiser, question: filteredWhere(filters, viewer, sources) };
+
+    const [total, flags, byStatus, facets] = await Promise.all([
+      prisma.questionFlag.count({ where }),
+      prisma.questionFlag.findMany({
+        where,
+        orderBy: params.get('sort') === 'book'
+          ? [{ question: { book: { title: 'asc' } } }, { question: { sourcePageStart: 'asc' } }, { createdAt: 'desc' }]
+          : { createdAt: 'desc' },
+        skip: (filters.page - 1) * filters.pageSize,
+        take: filters.pageSize,
+        include: {
+          question: {
+            select: {
+              id: true, content: true, options: true, correctAnswer: true, explanation: true, type: true, status: true, topic: true, subject: true, difficulty: true,
+              printedNumber: true, sourcePageStart: true, book: { select: { title: true } }, bookChapter: { select: { name: true, chapterNumber: true } },
+            },
+          },
+          flaggedBy: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+          resolvedBy: { select: { id: true, firstName: true, lastName: true } },
         },
-        flaggedBy: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
-        resolvedBy: { select: { id: true, firstName: true, lastName: true } },
-      },
-    });
+      }),
+      // How many flags each status tab would show with the other filters kept.
+      prisma.questionFlag.groupBy({ by: ['status'], where: { ...raiser, question: filteredWhere(filters, viewer, sources) }, _count: { _all: true } }),
+      params.get('facets') === '1'
+        ? browserFacets(filters, viewer, sources, [{ flags: { some: { ...(status ? { status: status as Prisma.EnumQuestionFlagStatusFilter['equals'] } : {}), ...raiser } } }])
+        : Promise.resolve(undefined),
+    ]);
+    const statusCounts = Object.fromEntries(byStatus.map((s) => [s.status, s._count._all]));
 
-    return NextResponse.json({ flags });
+    return NextResponse.json({ flags, total, page: filters.page, pageSize: filters.pageSize, statusCounts, facets });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to load flagged questions' }, { status: 500 });
   }

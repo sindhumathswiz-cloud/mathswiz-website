@@ -7,8 +7,8 @@ const recordAuditLog = vi.fn();
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 
 const mockPrisma = {
-  question: { findUnique: vi.fn(), update: vi.fn() },
-  questionFlag: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  question: { findUnique: vi.fn(), update: vi.fn(), groupBy: vi.fn() },
+  questionFlag: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn(), findMany: vi.fn(), groupBy: vi.fn() },
   notification: { create: vi.fn() },
   $transaction: vi.fn(),
 };
@@ -24,6 +24,40 @@ beforeEach(async () => {
   vi.mocked(getServerSession).mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } } as never);
   mockPrisma.$transaction.mockImplementation(async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma));
   mockPrisma.questionFlag.update.mockResolvedValue({ id: 'f-1' });
+});
+
+describe('GET /api/admin/question-flags', () => {
+  it('filters flags by status, who raised them and the question filters, one page at a time, with counts per status', async () => {
+    const { GET } = await import('./route');
+    mockPrisma.questionFlag.count.mockResolvedValue(26);
+    mockPrisma.questionFlag.findMany.mockResolvedValue([{ id: 'f-1' }]);
+    mockPrisma.questionFlag.groupBy.mockResolvedValue([{ status: 'PENDING', _count: { _all: 26 } }]);
+    mockPrisma.question.groupBy.mockResolvedValue([]);
+    const res = await GET(new Request('http://localhost/api/admin/question-flags?status=PENDING&raisedBy=review&q=matrix&types=SHORT_ANSWER&page=2&facets=1'));
+    const data = await res.json();
+    expect(data).toMatchObject({ total: 26, page: 2, statusCounts: { PENDING: 26 }, facets: { types: [] } });
+    const call = mockPrisma.questionFlag.findMany.mock.calls[0][0];
+    expect(call).toMatchObject({ skip: 25, take: 25, where: { status: 'PENDING', flaggedBy: { role: { not: 'STUDENT' } } } });
+    // The question filters apply to the flagged question, whatever its own status (archived ones aside).
+    expect(call.where.question.AND).toEqual(expect.arrayContaining([
+      { status: { not: 'ARCHIVED' } }, { content: { contains: 'matrix', mode: 'insensitive' } }, { type: { in: ['SHORT_ANSWER'] } },
+    ]));
+    expect(call.where.question.AND).not.toContainEqual({ status: 'APPROVED' });
+    // The status counts keep every filter but the status.
+    expect(mockPrisma.questionFlag.groupBy.mock.calls[0][0].where).not.toHaveProperty('status');
+  });
+
+  it('narrows to flags raised by students, and is for admins only', async () => {
+    const { GET } = await import('./route');
+    mockPrisma.questionFlag.count.mockResolvedValue(0);
+    mockPrisma.questionFlag.findMany.mockResolvedValue([]);
+    mockPrisma.questionFlag.groupBy.mockResolvedValue([]);
+    await GET(new Request('http://localhost/api/admin/question-flags?raisedBy=student'));
+    expect(mockPrisma.questionFlag.findMany.mock.calls[0][0].where).toMatchObject({ flaggedBy: { role: 'STUDENT' } });
+    const { getServerSession } = await import('next-auth');
+    vi.mocked(getServerSession).mockResolvedValue({ user: { id: 't1', role: 'TEACHER' } } as never);
+    expect((await GET(new Request('http://localhost/api/admin/question-flags'))).status).toBe(401);
+  });
 });
 
 describe('POST /api/admin/question-flags', () => {

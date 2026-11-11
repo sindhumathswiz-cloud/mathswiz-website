@@ -6,6 +6,8 @@ import { deriveProvenance, provenanceApprovalError } from "@/lib/question-proven
 import { structuralApprovalError } from "@/lib/question-qa";
 import { figureApprovalError } from "@/lib/question-figures";
 import { isPremiumSubscription } from "@/lib/subscription";
+import { browserOrder, parseBrowserFilters } from "@/lib/question-browser";
+import { browserFacets, browserSources, filteredWhere } from "@/lib/question-browser-server";
 
 export const dynamic = 'force-dynamic';
 
@@ -71,8 +73,23 @@ export async function GET(req: Request) {
             filter.scope = 'PUBLIC';
         }
 
+        // ?paged=1 (admins): one page of questions matching the shared filters (lib/question-browser), with the
+        // total and, with ?facets=1, counts per type, difficulty and topic. Without it, every question, as before.
+        const paged = searchParams.get("paged") === "1" && (session?.user as any)?.role === 'ADMIN';
+        const browser = paged ? parseBrowserFilters(searchParams) : null;
+        const viewer = { userId: (session?.user as any)?.id ?? '', role: 'ADMIN' };
+        const sources = browser ? await browserSources(browser) : [];
+        const pagedWhere = browser ? filteredWhere(browser, viewer, sources) : null;
+        const [total, facets] = browser && pagedWhere
+            ? await Promise.all([
+                prisma.question.count({ where: pagedWhere }),
+                searchParams.get("facets") === "1" ? browserFacets(browser, viewer, sources) : Promise.resolve(undefined),
+            ])
+            : [undefined, undefined];
+
         const questions = await prisma.question.findMany({
-            where: filter,
+            where: pagedWhere ?? filter,
+            ...(browser ? { skip: (browser.page - 1) * browser.pageSize, take: browser.pageSize } : {}),
             include: {
                 createdBy: {
                     select: {
@@ -92,9 +109,7 @@ export async function GET(req: Request) {
                 bookChapter: { select: { id: true, chapterNumber: true, name: true } },
                 bookExercise: { select: { id: true, code: true, title: true } },
             },
-            orderBy: {
-                createdAt: 'desc'
-            }
+            orderBy: browser ? browserOrder(browser.sort) : { createdAt: 'desc' },
         });
 
         // Merge taxonomy tag names into each question's tags array
@@ -152,7 +167,9 @@ export async function GET(req: Request) {
             };
         });
 
-        return NextResponse.json({ questions: enriched });
+        return NextResponse.json(browser
+            ? { questions: enriched, total, page: browser.page, pageSize: browser.pageSize, facets }
+            : { questions: enriched });
     } catch (error) {
         console.error("Failed to fetch questions:", error);
         return NextResponse.json({ error: "Failed to fetch questions" }, { status: 500 });

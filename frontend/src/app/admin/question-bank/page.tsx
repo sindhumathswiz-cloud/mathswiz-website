@@ -9,6 +9,9 @@ import MathRenderer from '@/components/MathRenderer';
 import TaxonomyCascadeSelector from '@/components/admin/TaxonomyCascadeSelector';
 import PageSnipTool from './PageSnipTool';
 import SourcePageViewer from './SourcePageViewer';
+import QuestionFilterPanel from '@/components/question-browser/QuestionFilterPanel';
+import { EMPTY_FILTERS, filtersActive, fromParams, toParams, type Facets, type Filters } from '@/components/question-browser/filters';
+import type { SourceBook } from '@/lib/question-source-filter';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 
@@ -63,11 +66,32 @@ function LatexInline({ content }: { content: string }) {
     );
 }
 
+// The shared question filters (components/question-browser), applied on the server one page at a time. The status
+// is chosen with the tabs; newest first by default, as this page always listed them.
+const BANK_DEFAULTS: Filters = { ...EMPTY_FILTERS, status: 'PENDING_REVIEW', sort: 'newest' };
+const STATUS_TABS: Array<[string, string, string]> = [
+    ['PENDING_REVIEW', 'Pending Review', 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white'],
+    ['REPORTED', 'Reported', 'bg-red-600 text-white'],
+    ['DRAFT', 'Drafts', 'bg-amber-500 text-white'],
+    ['APPROVED', 'Approved', 'bg-emerald-600 text-white'],
+    ['ALL', 'All Questions', 'bg-gray-800 dark:bg-white/10 text-white'],
+];
+
 export default function AdminQuestionBank() {
     const { data: session } = useSession();
     const [questions, setQuestions] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<'PENDING_REVIEW' | 'REPORTED' | 'APPROVED' | 'ALL'>('PENDING_REVIEW');
+    const [filters, setFilters] = useState<Filters>(BANK_DEFAULTS);
+    const [searchText, setSearchText] = useState('');
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(25);
+    const [total, setTotal] = useState(0);
+    const [facets, setFacets] = useState<Facets | null>(null);
+    const [books, setBooks] = useState<SourceBook[]>([]);
+    const [ready, setReady] = useState(false);
+    const filterStatus = filters.status;
+    const updateFilters = (patch: Partial<Filters>) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); setSelectedIds([]); };
+    const setFilterStatus = (status: string) => updateFilters({ status });
     const [selectedQuestion, setSelectedQuestion] = useState<any | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -194,10 +218,18 @@ export default function AdminQuestionBank() {
     const fetchQuestions = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch('/api/questions');
+            const params = toParams(filters, page, pageSize, BANK_DEFAULTS);
+            window.history.replaceState(null, '', `${window.location.pathname}${params.toString() ? `?${params}` : ''}`);
+            params.set('paged', '1');
+            params.set('facets', '1');
+            params.set('status', filters.status);
+            params.set('sort', filters.sort);
+            const res = await fetch(`/api/questions?${params}`);
             const data = await res.json();
             if (data.questions) {
                 setQuestions(data.questions);
+                setTotal(data.total ?? data.questions.length);
+                setFacets(data.facets ?? null);
             }
         } catch (error) {
             console.error("Failed to fetch questions:", error);
@@ -206,9 +238,27 @@ export default function AdminQuestionBank() {
         }
     };
 
+    // Filters come from the address (a reload or a shared link keeps them); the book tree for the selectors from the server.
     useEffect(() => {
-        fetchQuestions();
+        const initial = fromParams(new URLSearchParams(window.location.search), BANK_DEFAULTS);
+        setFilters(initial.filters);
+        setSearchText(initial.filters.q);
+        setPage(initial.page);
+        setPageSize(initial.pageSize);
+        fetch('/api/teacher/question-sources').then((r) => r.json()).then((d) => setBooks(d.books ?? [])).catch(() => {});
+        setReady(true);
     }, []);
+    useEffect(() => {
+        if (ready) fetchQuestions();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ready, filters, page, pageSize]);
+    // Typing in the search box waits for a pause before searching.
+    useEffect(() => {
+        if (!ready || searchText === filters.q) return;
+        const t = setTimeout(() => updateFilters({ q: searchText }), 400);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchText, ready]);
 
     const handleBulkApprove = async () => {
         if (selectedIds.length === 0) return;
@@ -221,6 +271,7 @@ export default function AdminQuestionBank() {
                 })
             ));
             setQuestions(prev => prev.filter(q => !selectedIds.includes(q.id)));
+            setTotal(t => Math.max(0, t - selectedIds.length));
             setSelectedIds([]);
             setSelectedQuestion(null);
             alert(`Successfully approved ${selectedIds.length} questions.`);
@@ -230,7 +281,9 @@ export default function AdminQuestionBank() {
         }
     };
 
-    const filteredQuestions = questions.filter(q => filterStatus === 'ALL' ? true : q.status === filterStatus);
+    // Filtered and paged on the server.
+    const filteredQuestions = questions;
+    const pages = Math.max(1, Math.ceil(total / pageSize));
 
     const handleQAAction = async (id: string, action: 'APPROVE' | 'REJECT' | 'DELETE') => {
         try {
@@ -246,10 +299,9 @@ export default function AdminQuestionBank() {
                 });
                 
                 // Instant update for smooth UX
-                if (filterStatus === 'PENDING_REVIEW' && newStatus === 'APPROVED') {
+                if ((filterStatus === 'PENDING_REVIEW' || filterStatus === 'REPORTED' || filterStatus === 'DRAFT') && newStatus === 'APPROVED') {
                     setQuestions(prev => prev.filter(q => q.id !== id));
-                } else if (filterStatus === 'REPORTED' && newStatus === 'APPROVED') {
-                    setQuestions(prev => prev.filter(q => q.id !== id));
+                    setTotal(t => Math.max(0, t - 1));
                 } else {
                     fetchQuestions();
                 }
@@ -310,31 +362,17 @@ export default function AdminQuestionBank() {
                         <div className="p-6 border-b border-gray-100 flex flex-wrap gap-4 items-center bg-gray-50 dark:border-white/10 dark:bg-surface-muted">
                             <h2 className="font-display text-xl font-bold text-gray-900 flex items-center gap-2 mr-4 dark:text-white"><Database className="w-5 h-5 text-indigo-600 dark:text-brand" /> Question Ledger</h2>
 
-                            <div className="flex rounded-lg overflow-hidden border border-gray-300 shadow-sm dark:border-white/10">
-                                <button
-                                    onClick={() => setFilterStatus('PENDING_REVIEW')}
-                                    className={`px-4 py-2 text-sm font-bold ${filterStatus === 'PENDING_REVIEW' ? 'bg-gradient-to-br from-indigo-600 to-violet-600 dark:from-brand dark:to-brand-violet text-white' : 'bg-white dark:bg-surface text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                                >
-                                    Pending Review
-                                </button>
-                                <button
-                                    onClick={() => setFilterStatus('REPORTED')}
-                                    className={`px-4 py-2 text-sm font-bold border-l border-r border-gray-300 dark:border-white/10 ${filterStatus === 'REPORTED' ? 'bg-red-600 text-white' : 'bg-white dark:bg-surface text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                                >
-                                    Reported
-                                </button>
-                                <button
-                                    onClick={() => setFilterStatus('APPROVED')}
-                                    className={`px-4 py-2 text-sm font-bold border-r border-gray-300 dark:border-white/10 ${filterStatus === 'APPROVED' ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-surface text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                                >
-                                    Approved
-                                </button>
-                                <button
-                                    onClick={() => setFilterStatus('ALL')}
-                                    className={`px-4 py-2 text-sm font-bold ${filterStatus === 'ALL' ? 'bg-gray-800 dark:bg-white/10 text-white' : 'bg-white dark:bg-surface text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                                >
-                                    All Questions
-                                </button>
+                            <div className="flex flex-wrap rounded-lg overflow-hidden border border-gray-300 shadow-sm dark:border-white/10">
+                                {STATUS_TABS.map(([value, label, on], i) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => setFilterStatus(value)}
+                                        aria-pressed={filterStatus === value}
+                                        className={`px-4 py-2 text-sm font-bold ${i > 0 ? 'border-l border-gray-300 dark:border-white/10' : ''} ${filterStatus === value ? on : 'bg-white dark:bg-surface text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
                             </div>
 
                             {filterStatus === 'PENDING_REVIEW' && selectedIds.length > 0 && (
@@ -347,6 +385,47 @@ export default function AdminQuestionBank() {
                             )}
                         </div>
 
+                        <div className="space-y-4 border-b border-gray-100 p-6 dark:border-white/10">
+                            <label className="relative block">
+                                <span className="sr-only">Search the question text</span>
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    id="qb-search"
+                                    type="search"
+                                    value={searchText}
+                                    onChange={(e) => setSearchText(e.target.value)}
+                                    placeholder="Search the question text or paste a question id"
+                                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:border-white/10 dark:bg-surface dark:text-white"
+                                />
+                            </label>
+                            <QuestionFilterPanel
+                                layout="bar"
+                                filters={filters}
+                                onChange={updateFilters}
+                                onReset={() => { setFilters({ ...BANK_DEFAULTS, status: filters.status }); setSearchText(''); setPage(1); }}
+                                active={filtersActive({ ...filters, q: searchText }, BANK_DEFAULTS)}
+                                books={books}
+                                facets={facets}
+                            />
+                            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                                <p data-testid="qb-count" className="font-bold text-slate-600 dark:text-slate-300">
+                                    {isLoading ? 'Loading…' : total === 0 ? 'No questions match' : `${((page - 1) * pageSize + 1).toLocaleString('en-IN')}–${Math.min(page * pageSize, total).toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')} questions`}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <select id="qb-sort" aria-label="Order" value={filters.sort} onChange={(e) => updateFilters({ sort: e.target.value as Filters['sort'] })} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-white/10 dark:bg-surface dark:text-slate-200">
+                                        <option value="newest">Newest first</option>
+                                        <option value="book">Book order</option>
+                                    </select>
+                                    <select id="qb-page-size" aria-label="Per page" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-white/10 dark:bg-surface dark:text-slate-200">
+                                        {[25, 50, 100].map((n) => <option key={n} value={n}>{n} a page</option>)}
+                                    </select>
+                                    <button type="button" disabled={page <= 1 || isLoading} onClick={() => setPage((n) => n - 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-bold disabled:opacity-40 dark:border-white/10 dark:bg-surface dark:text-slate-200">Previous</button>
+                                    <span className="font-bold tabular-nums text-slate-600 dark:text-slate-300">{page} / {pages}</span>
+                                    <button type="button" disabled={page >= pages || isLoading} onClick={() => setPage((n) => n + 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-bold disabled:opacity-40 dark:border-white/10 dark:bg-surface dark:text-slate-200">Next</button>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* List */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-gray-200 min-h-[600px]">
                             {/* Left Pane: Table/List */}
@@ -357,7 +436,7 @@ export default function AdminQuestionBank() {
                                     <div className="p-12 text-center flex flex-col items-center justify-center h-full">
                                         <CheckCircle className="w-12 h-12 text-emerald-300 mb-4" />
                                         <h3 className="font-display text-lg font-bold text-gray-500 mb-2 dark:text-slate-400">QA Queue Clear!</h3>
-                                        <p className="text-sm text-gray-400 dark:text-slate-500">No questions matching this status.</p>
+                                        <p className="text-sm text-gray-400 dark:text-slate-500">No questions match this status and these filters.</p>
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-gray-100">
@@ -371,7 +450,7 @@ export default function AdminQuestionBank() {
                                                 }}
                                                 className="w-4 h-4 accent-indigo-600"
                                             />
-                                            <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Select All Pending</span>
+                                            <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Select all on this page</span>
                                         </div>
                                         {filteredQuestions.map((q) => (
                                             <div
