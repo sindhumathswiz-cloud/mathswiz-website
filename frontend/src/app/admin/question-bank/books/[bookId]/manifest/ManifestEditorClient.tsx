@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Circle, Eye, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ChevronRight, Circle, Eye, Loader2, Play, Plus, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 
 const SECTION_TYPES = [
   '', 'THEORY', 'SOLVED_EXAMPLES', 'NCERT_SELECTED', 'MCQ', 'ASSERTION_REASON', 'CASE_STUDY',
@@ -28,6 +28,8 @@ type SectionRow = {
 };
 
 type ChapterRow = {
+  /** This row's identity in the editor, kept while it has no id yet (a chapter not saved before). */
+  key: string;
   id?: string;
   chapterNumber: string;
   name: string;
@@ -38,10 +40,15 @@ type ChapterRow = {
   printedEndPage: string;
   confirmed: boolean;
   questionsInRange: number;
+  /** Extraction progress as saved on the server, so it shows again after a reload; null for a chapter without a range. */
+  extraction: Extraction | null;
   sections: SectionRow[];
 };
 
+type Extraction = { pages: number; done: number; failed: number; nextPage: number | null; drafts: number };
+
 const s = (v: unknown): string => (v == null || v === '' ? '' : String(v));
+const newKey = () => `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 const toInt = (v: string): number | null => {
   const n = parseInt(v, 10);
   return Number.isInteger(n) ? n : null;
@@ -68,6 +75,7 @@ function toSectionRow(x: any): SectionRow {
 }
 function toChapterRow(x: any): ChapterRow {
   return {
+    key: x.key ?? x.id ?? newKey(),
     id: x.id,
     chapterNumber: s(x.chapterNumber),
     name: s(x.name),
@@ -78,6 +86,7 @@ function toChapterRow(x: any): ChapterRow {
     printedEndPage: s(x.printedEndPage),
     confirmed: x.confirmed === true,
     questionsInRange: typeof x.questionsInRange === 'number' ? x.questionsInRange : 0,
+    extraction: x.extraction ?? null,
     sections: (x.sections ?? []).map(toSectionRow),
   };
 }
@@ -90,9 +99,63 @@ const blankSection = (): SectionRow => ({
   hasSolutions: false, solutionsStartPage: '', solutionsEndPage: '', solutionCoverage: 'ALL',
 });
 const blankChapter = (): ChapterRow => ({
-  chapterNumber: '', name: '', topic: '', startPage: '', endPage: '',
-  printedStartPage: '', printedEndPage: '', confirmed: false, questionsInRange: 0, sections: [],
+  key: newKey(), chapterNumber: '', name: '', topic: '', startPage: '', endPage: '',
+  printedStartPage: '', printedEndPage: '', confirmed: false, questionsInRange: 0, extraction: null, sections: [],
 });
+
+const buildPayload = (rows: ChapterRow[]) => ({
+  chapters: rows.map((c) => ({
+    id: c.id,
+    chapterNumber: c.chapterNumber || null,
+    name: c.name,
+    topic: c.topic || null,
+    startPage: toInt(c.startPage),
+    endPage: toInt(c.endPage),
+    printedStartPage: toInt(c.printedStartPage),
+    printedEndPage: toInt(c.printedEndPage),
+    confirmed: c.confirmed,
+    sections: c.sections.map((sec) => ({
+      sectionType: sec.sectionType || null,
+      title: sec.title || null,
+      startPage: toInt(sec.startPage),
+      endPage: toInt(sec.endPage),
+      inlineAnswers: sec.noAnswers ? false : sec.inlineAnswers,
+      noAnswers: sec.noAnswers,
+      answerKeyStartPage: !sec.noAnswers && sec.hasAnswerKey ? toInt(sec.answerKeyStartPage) : null,
+      answerKeyEndPage: !sec.noAnswers && sec.hasAnswerKey ? toInt(sec.answerKeyEndPage) : null,
+      answerKeyCoverage: sec.answerKeyCoverage,
+      solutionsStartPage: !sec.noAnswers && sec.hasSolutions ? toInt(sec.solutionsStartPage) : null,
+      solutionsEndPage: !sec.noAnswers && sec.hasSolutions ? toInt(sec.solutionsEndPage) : null,
+      solutionCoverage: sec.solutionCoverage,
+    })),
+  })),
+});
+
+// Edits are saved as they are made (autosave below). Until the server has them -- a dropped connection, a reload
+// mid-save, or a row it cannot take yet (a new chapter with no name, a range still being typed) -- they are also
+// kept in this browser, and put back when the manifest is opened again.
+type Backup = { savedAt: string; chapters: ChapterRow[] };
+const backupKey = (bookId: string) => `manifest-draft:${bookId}`;
+function readBackup(bookId: string): Backup | null {
+  try {
+    const raw = window.localStorage.getItem(backupKey(bookId));
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && Array.isArray(parsed.chapters) ? parsed : null;
+  } catch { return null; }
+}
+function writeBackup(bookId: string, chapters: ChapterRow[]) {
+  try { window.localStorage.setItem(backupKey(bookId), JSON.stringify({ savedAt: new Date().toISOString(), chapters })); } catch { /* storage unavailable */ }
+}
+function clearBackup(bookId: string) {
+  try { window.localStorage.removeItem(backupKey(bookId)); } catch { /* storage unavailable */ }
+}
+
+/** Which chapters are minimised, remembered in this browser per book. */
+const collapsedKey = (bookId: string) => `manifest-collapsed:${bookId}`;
+const rowKey = (c: ChapterRow) => c.id ?? c.key;
+const fullyExtracted = (c: ChapterRow) => !!c.extraction && c.extraction.done > 0 && c.extraction.nextPage == null;
+
+type AutosaveState = { state: 'saved' | 'pending' | 'saving' | 'failed' | 'paused'; detail?: string };
 
 export default function ManifestEditorClient({ bookId }: { bookId: string }) {
   const [book, setBook] = useState<{ title: string; className: string } | null>(null);
@@ -106,6 +169,23 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
   const [preview, setPreview] = useState<{ range: string; pages: Array<{ pageNumber: number; rawText: string | null }> } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [extractProgress, setExtractProgress] = useState<Record<number, string>>({});
+  const [editVersion, setEditVersion] = useState(0);
+  const [autosave, setAutosave] = useState<AutosaveState>({ state: 'saved' });
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const chaptersRef = useRef(chapters);
+  const editVersionRef = useRef(editVersion);
+  const pausedRef = useRef(false);
+  const savingRef = useRef(false);
+  const againRef = useRef(false);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => { chaptersRef.current = chapters; }, [chapters]);
+  useEffect(() => { editVersionRef.current = editVersion; }, [editVersion]);
+
+  /** Every change the admin makes goes through here, so it is saved. */
+  const edit = (update: (prev: ChapterRow[]) => ChapterRow[]) => {
+    setChapters(update);
+    setEditVersion((v) => v + 1);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -116,7 +196,21 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
       setBook(data.book);
       setRunId(data.run?.id ?? null);
       setTotalPages(data.run?.totalPages ?? null);
-      setChapters((data.chapters ?? []).map(toChapterRow));
+      const serverRows: ChapterRow[] = (data.chapters ?? []).map(toChapterRow);
+      const backup = readBackup(bookId);
+      if (backup) {
+        // Changes this browser had not got saved: put them back (with the server's latest counts) and save them now.
+        const fresh = new Map(serverRows.filter((c) => c.id).map((c) => [c.id as string, c]));
+        setChapters(backup.chapters.map((c) => {
+          const f = c.id ? fresh.get(c.id) : undefined;
+          // Already editor rows: kept as they are (not converted again from the server's format).
+          return { ...c, key: c.key ?? c.id ?? newKey(), questionsInRange: f?.questionsInRange ?? 0, extraction: f?.extraction ?? null };
+        }));
+        setMessage({ kind: 'info', text: `Put back the changes made in this browser at ${new Date(backup.savedAt).toLocaleString()} that had not been saved yet. Saving them now.` });
+        setEditVersion((v) => v + 1);
+      } else {
+        setChapters(serverRows);
+      }
     } catch (e) {
       setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'Failed to load' });
     } finally {
@@ -125,48 +219,96 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
   }, [bookId]);
   useEffect(() => { void load(); }, [load]);
 
-  // Merge fresh per-chapter question counts without disturbing unsaved edits.
+  // Merge fresh per-chapter question counts and extraction progress without disturbing unsaved edits.
   const refreshCounts = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/books/${bookId}/manifest`);
       const data = await res.json();
       if (!res.ok) return;
       /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-      const byId = new Map((data.chapters ?? []).map((c: any) => [c.id, c.questionsInRange ?? 0]));
-      setChapters((prev) => prev.map((c) => (c.id && byId.has(c.id) ? { ...c, questionsInRange: byId.get(c.id) as number } : c)));
+      const byId = new Map<string, any>((data.chapters ?? []).map((c: any) => [c.id, c]));
+      setChapters((prev) => prev.map((c) => {
+        const fresh = c.id ? byId.get(c.id) : undefined;
+        return fresh ? { ...c, questionsInRange: fresh.questionsInRange ?? 0, extraction: fresh.extraction ?? null } : c;
+      }));
     } catch { /* best effort */ }
   }, [bookId]);
 
-  const buildPayload = (rows: ChapterRow[]) => ({
-    chapters: rows.map((c) => ({
-      id: c.id,
-      chapterNumber: c.chapterNumber || null,
-      name: c.name,
-      topic: c.topic || null,
-      startPage: toInt(c.startPage),
-      endPage: toInt(c.endPage),
-      printedStartPage: toInt(c.printedStartPage),
-      printedEndPage: toInt(c.printedEndPage),
-      confirmed: c.confirmed,
-      sections: c.sections.map((sec) => ({
-        sectionType: sec.sectionType || null,
-        title: sec.title || null,
-        startPage: toInt(sec.startPage),
-        endPage: toInt(sec.endPage),
-        inlineAnswers: sec.noAnswers ? false : sec.inlineAnswers,
-        noAnswers: sec.noAnswers,
-        answerKeyStartPage: !sec.noAnswers && sec.hasAnswerKey ? toInt(sec.answerKeyStartPage) : null,
-        answerKeyEndPage: !sec.noAnswers && sec.hasAnswerKey ? toInt(sec.answerKeyEndPage) : null,
-        answerKeyCoverage: sec.answerKeyCoverage,
-        solutionsStartPage: !sec.noAnswers && sec.hasSolutions ? toInt(sec.solutionsStartPage) : null,
-        solutionsEndPage: !sec.noAnswers && sec.hasSolutions ? toInt(sec.solutionsEndPage) : null,
-        solutionCoverage: sec.solutionCoverage,
-      })),
-    })),
-  });
+  // Saves the whole manifest a moment after each edit. One save at a time; an edit made during a save is saved
+  // right after it. A new chapter is sent once it has a name (the server needs one) and kept in this browser until then.
+  const autosaveNow = useCallback(async () => {
+    if (pausedRef.current) return;
+    if (savingRef.current) { againRef.current = true; return; }
+    savingRef.current = true;
+    if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; }
+    const version = editVersionRef.current;
+    const rows = chaptersRef.current;
+    const sendable = rows.filter((c) => c.id || c.name.trim());
+    setAutosave({ state: 'saving' });
+    try {
+      const res = await fetch(`/api/admin/books/${bookId}/manifest`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload(sendable)),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save');
+      const ids: string[] = Array.isArray(data.chapterIds) ? data.chapterIds : [];
+      const idByKey = new Map(sendable.map((c, i) => [c.key, ids[i]]));
+      setChapters((prev) => prev.map((c) => (!c.id && idByKey.get(c.key) ? { ...c, id: idByKey.get(c.key) } : c)));
+      const waiting = rows.length - sendable.length;
+      if (waiting > 0) {
+        setAutosave({ state: 'failed', detail: `${waiting} new chapter${waiting === 1 ? ' has' : 's have'} no name yet; kept in this browser until named` });
+      } else {
+        if (version === editVersionRef.current) clearBackup(bookId);
+        setAutosave({ state: 'saved', detail: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+      }
+    } catch (e) {
+      setAutosave({ state: 'failed', detail: e instanceof Error ? e.message : 'Could not save' });
+      // Tried again on its own (a dropped connection usually comes back); an edit or reconnecting tries sooner.
+      retryRef.current = setTimeout(() => void autosaveNow(), 10_000);
+    } finally {
+      savingRef.current = false;
+      if (againRef.current) { againRef.current = false; void autosaveNow(); }
+    }
+  }, [bookId]);
+
+  useEffect(() => {
+    const onOnline = () => { if (readBackup(bookId)) void autosaveNow(); };
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      if (retryRef.current) clearTimeout(retryRef.current);
+    };
+  }, [bookId, autosaveNow]);
+
+  useEffect(() => {
+    if (editVersion === 0 || pausedRef.current) return;
+    writeBackup(bookId, chaptersRef.current);
+    setAutosave({ state: 'pending' });
+    const timer = setTimeout(() => void autosaveNow(), 2000);
+    return () => clearTimeout(timer);
+  }, [editVersion, bookId, autosaveNow]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(collapsedKey(bookId));
+      if (raw) setCollapsed(new Set(JSON.parse(raw)));
+    } catch { /* storage unavailable */ }
+  }, [bookId]);
+  const rememberCollapsed = (next: Set<string>) => {
+    setCollapsed(next);
+    try { window.localStorage.setItem(collapsedKey(bookId), JSON.stringify([...next])); } catch { /* storage unavailable */ }
+  };
+  const toggleCollapsed = (c: ChapterRow) => {
+    const next = new Set(collapsed);
+    if (next.has(rowKey(c))) next.delete(rowKey(c)); else next.add(rowKey(c));
+    rememberCollapsed(next);
+  };
 
   const save = async (rows: ChapterRow[], successText: string) => {
     setBusy('save');
+    while (savingRef.current) await new Promise((resolve) => setTimeout(resolve, 200));
+    savingRef.current = true;
     setMessage(null);
     try {
       const res = await fetch(`/api/admin/books/${bookId}/manifest`, {
@@ -176,12 +318,17 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not save');
       setMessage({ kind: 'success', text: successText });
+      clearBackup(bookId);
+      pausedRef.current = false;
+      setAutosave({ state: 'saved', detail: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+      savingRef.current = false;
       await load();
       return true;
     } catch (e) {
       setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'Could not save' });
       return false;
     } finally {
+      savingRef.current = false;
       setBusy(null);
     }
   };
@@ -196,12 +343,16 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
       setRunId(data.runId ?? runId);
       setTotalPages(data.totalPages ?? totalPages);
       setPageOffset(String(data.pageOffset ?? 0));
+      // A proposal replaces the whole manifest with unconfirmed chapters, so it is not saved on its own: autosave
+      // waits until the admin saves it (Save draft) or reloads to discard it.
+      pausedRef.current = true;
+      setAutosave({ state: 'paused' });
       setChapters((data.proposal?.chapters ?? []).map((c: unknown) => ({ ...toChapterRow(c), confirmed: false })));
       setMessage({
         kind: 'info',
         text: data.tocFound
-          ? `Proposed ${data.proposal.chapters.length} chapters from the table of contents (book→PDF offset +${data.pageOffset}). Check the offset and every range, then confirm chapters one at a time. Nothing is saved yet.`
-          : `No table of contents found — proposed ${data.proposal.chapters.length} chapters from running headers. Review carefully. Nothing is saved yet.`,
+          ? `Proposed ${data.proposal.chapters.length} chapters from the table of contents (book→PDF offset +${data.pageOffset}). Check the offset and every range, then confirm chapters one at a time. Nothing is saved until you press Save draft; reload to discard it.`
+          : `No table of contents found — proposed ${data.proposal.chapters.length} chapters from running headers. Review carefully. Nothing is saved until you press Save draft; reload to discard it.`,
       });
     } catch (e) {
       setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'Auto-detect failed' });
@@ -212,7 +363,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
 
   const reapplyOffset = () => {
     const off = toInt(pageOffset) ?? 0;
-    setChapters((prev) => prev.map((c) => {
+    edit((prev) => prev.map((c) => {
       const ps = toInt(c.printedStartPage);
       const pe = toInt(c.printedEndPage);
       return {
@@ -221,7 +372,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         endPage: pe != null ? String(pe + off) : c.endPage,
       };
     }));
-    setMessage({ kind: 'info', text: `Re-applied offset +${off} to every chapter that has printed page numbers. Save to persist.` });
+    setMessage({ kind: 'info', text: `Re-applied offset +${off} to every chapter that has printed page numbers.` });
   };
 
   const refile = async () => {
@@ -293,6 +444,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         failures += data.batch?.failures?.length ?? 0;
         for (const p of data.batch?.emptySectionPages ?? []) emptySectionPages.add(p);
         alreadyExtracted = data.alreadyExtracted ?? alreadyExtracted;
+        void refreshCounts();
         if (data.complete || data.nextStartPage == null) break;
         cursor = data.nextStartPage;
         if (cursor > end) break;
@@ -320,7 +472,7 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
       }
     } catch (e) {
       setExtractProgress((p) => ({ ...p, [index]: `stopped — ${saved} saved` }));
-      setMessage({ kind: 'error', text: `${chapter.name}: ${e instanceof Error ? e.message : 'extraction failed'}. Completed pages were kept.` });
+      setMessage({ kind: 'error', text: `${chapter.name}: ${e instanceof Error ? e.message : 'extraction failed'}. The questions from every page finished before the break are saved as drafts and stay listed here after a reload; use "Continue extraction" to carry on from the next page.` });
     } finally {
       setBusy(null);
       await refreshCounts();
@@ -347,13 +499,13 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
   };
 
   const patchChapter = (i: number, patch: Partial<ChapterRow>) =>
-    setChapters((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
+    edit((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
   const patchSection = (ci: number, si: number, patch: Partial<SectionRow>) =>
-    setChapters((prev) => prev.map((c, idx) => (idx === ci ? { ...c, sections: c.sections.map((sec, j) => (j === si ? { ...sec, ...patch } : sec)) } : c)));
-  const addChapter = () => setChapters((p) => [...p, blankChapter()]);
-  const removeChapter = (i: number) => setChapters((p) => p.filter((_, idx) => idx !== i));
-  const addSection = (ci: number) => setChapters((p) => p.map((c, idx) => (idx === ci ? { ...c, sections: [...c.sections, blankSection()] } : c)));
-  const removeSection = (ci: number, si: number) => setChapters((p) => p.map((c, idx) => (idx === ci ? { ...c, sections: c.sections.filter((_, j) => j !== si) } : c)));
+    edit((prev) => prev.map((c, idx) => (idx === ci ? { ...c, sections: c.sections.map((sec, j) => (j === si ? { ...sec, ...patch } : sec)) } : c)));
+  const addChapter = () => edit((p) => [...p, blankChapter()]);
+  const removeChapter = (i: number) => edit((p) => p.filter((_, idx) => idx !== i));
+  const addSection = (ci: number) => edit((p) => p.map((c, idx) => (idx === ci ? { ...c, sections: [...c.sections, blankSection()] } : c)));
+  const removeSection = (ci: number, si: number) => edit((p) => p.map((c, idx) => (idx === ci ? { ...c, sections: c.sections.filter((_, j) => j !== si) } : c)));
 
   const toggleChapterConfirm = async (i: number) => {
     const next = chapters.map((c, idx) => (idx === i ? { ...c, confirmed: !c.confirmed } : c));
@@ -378,6 +530,13 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">
           {chapters.length === 0 ? 'No chapters yet — run Auto-detect.' : `${confirmedCount} of ${chapters.length} chapters confirmed`}
         </p>
+        <p data-testid="manifest-autosave" role="status" className={`mt-1 text-xs font-bold ${autosave.state === 'failed' ? 'text-rose-600 dark:text-rose-400' : autosave.state === 'paused' ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}>
+          {autosave.state === 'saving' ? 'Saving…'
+            : autosave.state === 'pending' ? 'Unsaved changes — saving in a moment…'
+            : autosave.state === 'failed' ? `Not saved yet: ${autosave.detail}. Your changes are kept in this browser and saved as soon as they can be.`
+            : autosave.state === 'paused' ? 'Auto-detected chapters are not saved until you press Save draft.'
+            : autosave.detail ? `All changes saved at ${autosave.detail}` : 'Changes are saved as you type.'}
+        </p>
       </header>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -401,6 +560,18 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         <button onClick={() => void refile()} disabled={anyBusy || confirmedCount === 0} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
           {busy === 'refile' ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Re-file existing questions
         </button>
+        {chapters.some(fullyExtracted) && (
+          <button onClick={() => rememberCollapsed(new Set([...collapsed, ...chapters.filter(fullyExtracted).map(rowKey)]))}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
+            <ChevronRight className="h-4 w-4" /> Minimise extracted chapters
+          </button>
+        )}
+        {collapsed.size > 0 && (
+          <button onClick={() => rememberCollapsed(new Set())}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 dark:bg-surface dark:border-white/10 dark:text-slate-300 hover:dark:bg-surface-muted">
+            <ChevronDown className="h-4 w-4" /> Expand all
+          </button>
+        )}
       </div>
 
       {message && (
@@ -415,9 +586,26 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
         <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
       ) : (
         <div className="space-y-5">
-          {chapters.map((chapter, ci) => (
-            <section key={ci} className={`rounded-2xl border bg-white dark:bg-surface p-5 ${chapter.confirmed ? 'border-emerald-300 dark:border-emerald-500/30' : 'border-slate-200 dark:border-white/10'}`}>
-              <div className="flex flex-wrap items-end gap-3">
+          {chapters.map((chapter, ci) => {
+            const isCollapsed = collapsed.has(rowKey(chapter));
+            return (
+            <section key={chapter.key} data-testid={`manifest-chapter-${ci}`} className={`rounded-2xl border bg-white dark:bg-surface p-5 ${chapter.confirmed ? 'border-emerald-300 dark:border-emerald-500/30' : 'border-slate-200 dark:border-white/10'}`}>
+              {isCollapsed ? (
+                <button type="button" onClick={() => toggleCollapsed(chapter)} aria-expanded={false}
+                  className="flex w-full items-center gap-2 text-left">
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span className="text-sm font-black text-slate-900 dark:text-white">{chapter.chapterNumber ? `${chapter.chapterNumber}. ` : ''}{chapter.name || 'Untitled chapter'}</span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    PDF pp. {chapter.startPage || '?'}–{chapter.endPage || '?'} · {chapter.sections.length} section{chapter.sections.length === 1 ? '' : 's'}
+                  </span>
+                </button>
+              ) : (
+              <div className="flex items-start gap-2">
+              <button type="button" onClick={() => toggleCollapsed(chapter)} aria-expanded aria-label={`Minimise ${chapter.name || 'this chapter'}`} title="Minimise"
+                className="mt-6 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200">
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              <div className="flex flex-1 flex-wrap items-end gap-3">
                 <Field label="Ch #" width="w-14"><input value={chapter.chapterNumber} onChange={(e) => patchChapter(ci, { chapterNumber: e.target.value })} className={inputCls} /></Field>
                 <Field label="Chapter name" width="flex-1 min-w-48"><input value={chapter.name} onChange={(e) => patchChapter(ci, { name: e.target.value })} className={inputCls} /></Field>
                 <Field label="Topic" width="w-44"><input value={chapter.topic} onChange={(e) => patchChapter(ci, { topic: e.target.value })} placeholder="= name" className={inputCls} /></Field>
@@ -433,6 +621,8 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                   onView={() => void viewPages(chapter.startPage, chapter.endPage)} />
                 <button onClick={() => removeChapter(ci)} className="mb-1 rounded-lg border border-slate-200 p-2 text-slate-400 hover:border-rose-200 hover:text-rose-600 dark:border-white/10 dark:text-slate-500 hover:dark:text-rose-400 hover:dark:border-rose-500/20" aria-label="Remove chapter"><Trash2 className="h-4 w-4" /></button>
               </div>
+              </div>
+              )}
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button onClick={() => void toggleChapterConfirm(ci)} disabled={anyBusy}
@@ -443,11 +633,21 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                 <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600 dark:bg-white/5 dark:text-slate-400" title="Questions currently in this chapter's PDF page range">
                   {chapter.questionsInRange} question{chapter.questionsInRange === 1 ? '' : 's'} in range
                 </span>
+                {chapter.extraction && (chapter.extraction.done > 0 || chapter.extraction.drafts > 0) && (
+                  <span data-testid={`extraction-progress-${ci}`} className="inline-flex items-center rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-700 dark:bg-brand/10 dark:text-brand" title="Saved on the server: shown again after a reload">
+                    {chapter.extraction.done} of {chapter.extraction.pages} pages extracted
+                    {chapter.extraction.failed > 0 && ` · ${chapter.extraction.failed} failed`}
+                    {` · ${chapter.extraction.drafts} draft${chapter.extraction.drafts === 1 ? '' : 's'} saved`}
+                  </span>
+                )}
                 {chapter.confirmed && (
                   <>
                     <button onClick={() => void extractChapter(ci)} disabled={anyBusy}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 disabled:opacity-50 dark:text-brand dark:bg-brand/10">
-                      {busy === `extract-${ci}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} Extract this chapter
+                      {busy === `extract-${ci}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                      {chapter.extraction && chapter.extraction.done > 0 && chapter.extraction.nextPage != null
+                        ? `Continue extraction from page ${chapter.extraction.nextPage} (${chapter.extraction.pages - chapter.extraction.done} left)`
+                        : 'Extract this chapter'}
                     </button>
                     <button onClick={() => void extractChapter(ci, true)} disabled={anyBusy}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:bg-surface dark:border-white/10 dark:text-slate-400 hover:dark:bg-surface-muted">
@@ -455,9 +655,16 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                     </button>
                   </>
                 )}
+                {chapter.extraction && chapter.extraction.drafts > 0 && chapter.startPage && (
+                  <Link href={`/admin/question-bank/books/${bookId}/read?page=${chapter.startPage}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-black text-indigo-700 hover:bg-indigo-50 dark:text-brand dark:hover:bg-white/5">
+                    <BookOpen className="h-3.5 w-3.5" /> Review the drafts beside the pages
+                  </Link>
+                )}
                 {extractProgress[ci] && <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{extractProgress[ci]}</span>}
               </div>
 
+              {!isCollapsed && (
               <div className="mt-4 space-y-3 border-l-2 border-slate-100 pl-4 dark:border-white/10">
                 {chapter.sections.map((section, si) => (
                   <div key={si} className="rounded-xl bg-slate-50 p-3 dark:bg-surface-muted">
@@ -525,8 +732,10 @@ export default function ManifestEditorClient({ bookId }: { bookId: string }) {
                 ))}
                 <button onClick={() => addSection(ci)} className="inline-flex items-center gap-1.5 text-xs font-black text-indigo-600 dark:text-brand"><Plus className="h-3.5 w-3.5" /> Add section</button>
               </div>
+              )}
             </section>
-          ))}
+            );
+          })}
         </div>
       )}
 

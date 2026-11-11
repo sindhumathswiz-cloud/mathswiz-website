@@ -13,11 +13,12 @@ const tx = {
 const bookChapter = { findMany: vi.fn() };
 const book = { findUnique: vi.fn() };
 const question = { count: vi.fn() };
+const documentPage = { findMany: vi.fn().mockResolvedValue([]) };
 const $transaction = vi.fn(async (cb: (client: typeof tx) => unknown) => cb(tx));
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 vi.mock('@/lib/auth-server', () => ({ getAuthenticatedUser }));
-vi.mock('@/lib/prisma', () => ({ default: { book, bookChapter, question, $transaction } }));
+vi.mock('@/lib/prisma', () => ({ default: { book, bookChapter, question, documentPage, $transaction } }));
 vi.mock('@/lib/audit-log', () => ({ recordAuditLog, requestAuditContext: () => ({}) }));
 
 const params = Promise.resolve({ id: 'book-1' });
@@ -45,6 +46,27 @@ describe('GET /api/admin/books/[id]/manifest', () => {
     expect(data.chapters[0].confirmed).toBe(true);
     expect(data.chapters[0].questionsInRange).toBe(24);
     expect(data.chapters[1].questionsInRange).toBe(0);
+  });
+
+  it("reports each chapter's extraction progress from the saved pages and drafts, so it shows again after a reload", async () => {
+    book.findUnique.mockResolvedValue({
+      id: 'book-1', title: 'Xam Idea', className: 'Class 12',
+      chapters: [
+        { id: 'ch1', chapterNumber: '10', name: 'Vector Algebra', orderIndex: 0, topic: null, startPage: 334, endPage: 337, printedStartPage: null, printedEndPage: null, manifestConfirmedAt: new Date(), exercises: [] },
+        { id: 'ch2', chapterNumber: '11', name: 'Probability', orderIndex: 1, topic: null, startPage: null, endPage: null, printedStartPage: null, printedEndPage: null, manifestConfirmedAt: null, exercises: [] },
+      ],
+      ingestionRuns: [{ id: 'run-1', totalPages: 534, sourceDocumentId: 'doc-1' }],
+    });
+    documentPage.findMany.mockResolvedValue([
+      { pageNumber: 334, status: 'COMPLETED' }, { pageNumber: 335, status: 'COMPLETED' }, { pageNumber: 336, status: 'PENDING' },
+    ]);
+    question.count.mockResolvedValue(7);
+    const { GET } = await import('./route');
+    const data = await (await GET(new Request('http://x'), { params }) as Response).json();
+    expect(documentPage.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { documentId: 'doc-1', pageNumber: { gte: 334, lte: 337 } } }));
+    expect(question.count).toHaveBeenCalledWith({ where: { bookId: 'book-1', status: 'DRAFT', sourcePageStart: { gte: 334, lte: 337 } } });
+    expect(data.chapters[0].extraction).toEqual({ pages: 4, done: 2, failed: 0, nextPage: 336, drafts: 7 });
+    expect(data.chapters[1].extraction).toBeNull();
   });
 });
 
@@ -84,7 +106,9 @@ describe('PUT /api/admin/books/[id]/manifest', () => {
 
   it('confirms only the chapters flagged confirmed and creates their new sections', async () => {
     const { PUT } = await import('./route');
-    await PUT(put({ chapters: [chapter({ confirmed: true }), chapter({ name: 'Probability', startPage: 400, endPage: 450, printedStartPage: null, printedEndPage: null, confirmed: false, sections: [] })] }), { params });
+    const res = await PUT(put({ chapters: [chapter({ confirmed: true }), chapter({ name: 'Probability', startPage: 400, endPage: 450, printedStartPage: null, printedEndPage: null, confirmed: false, sections: [] })] }), { params }) as Response;
+    // The new chapters' ids come back in order, so the editor's next autosave updates them rather than adding them again.
+    expect((await res.json()).chapterIds).toEqual(['new-0', 'new-1']);
     const created = tx.bookChapter.create.mock.calls.map((c) => c[0].data);
     expect(created[0]).toMatchObject({ name: 'Vector Algebra', manifestConfirmedById: 'admin-1' });
     expect(created[0].manifestConfirmedAt).toBeInstanceOf(Date);

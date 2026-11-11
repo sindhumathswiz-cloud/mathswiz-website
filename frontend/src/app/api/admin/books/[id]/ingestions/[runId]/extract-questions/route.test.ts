@@ -281,6 +281,26 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       }));
     });
 
+    it('saves a held passage with the run straight away, so a request that dies mid-batch does not lose it', async () => {
+      documentPage.findMany.mockResolvedValue([
+        { id: 'page-24', pageNumber: 24, nativeText: null, pageImagePath: '/p24.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
+        { id: 'page-25', pageNumber: 25, nativeText: null, pageImagePath: '/p25.png', processedImagePath: null, layoutData: { requiresVisionSegmentation: true } },
+      ]);
+      getPageRawText.mockResolvedValueOnce({ provider: 'MATHPIX_OCR', rawText: CASE_STUDY_PASSAGE, ocrConfidence: 0.9 });
+      structurePageQuestions.mockResolvedValueOnce([]);
+      // The connection to the database drops while page 25 is being saved: the request fails before the batch ends.
+      documentPage.update.mockResolvedValueOnce({}).mockRejectedValue(new Error('Connection terminated unexpectedly'));
+      getPageRawText.mockResolvedValueOnce({ provider: 'MATHPIX_OCR', rawText: CASE_STUDY_SUBQUESTIONS, ocrConfidence: 0.92 });
+      structurePageQuestions.mockResolvedValueOnce([]);
+
+      const { POST } = await import('./route');
+      await expect(POST(post({ startPage: 24, batchSize: 5 }), { params })).rejects.toThrow('Connection terminated');
+
+      expect(bookIngestionRun.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: { providerConfig: expect.objectContaining({ pendingCaseStudyFragment: expect.objectContaining({ startPage: 24, lastPage: 24, text: CASE_STUDY_PASSAGE }) }) },
+      }));
+    });
+
     it('resumes a fragment carried over from providerConfig into a fresh request', async () => {
       bookIngestionRun.findFirst.mockResolvedValue({
         id: 'run-1', sourceDocumentId: 'doc-1', totalPages: 2, extractedQuestions: 0, reviewRequired: 0,

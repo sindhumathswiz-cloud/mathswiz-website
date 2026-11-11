@@ -5,6 +5,8 @@ import { getAuthenticatedUser } from '@/lib/auth-server';
 import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { matchSections } from '@/lib/manifest-sections';
 import { exerciseForPage } from '@/lib/exercise-link';
+import type { ConfirmedChapter } from '@/lib/book-manifest';
+import { chapterExtractionProgress, extractablePages } from '@/lib/chapter-extraction-progress';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -76,7 +78,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           exercises: { orderBy: { orderIndex: 'asc' }, select: SECTION_SELECT },
         },
       },
-      ingestionRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, totalPages: true } },
+      ingestionRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, totalPages: true, sourceDocumentId: true } },
     },
   });
   if (!book) return NextResponse.json({ error: 'Book not found' }, { status: 404 });
@@ -89,6 +91,25 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   ));
   const countByChapter = new Map(ranged.map((c, i) => [c.id, counts[i]]));
 
+  // Extraction progress per chapter, from what is saved (pages marked done, draft questions), so it shows again
+  // after a reload or a dropped connection and extraction can continue where it stopped.
+  const run = book.ingestionRuns[0];
+  const confirmed = book.chapters.filter((c) => c.manifestConfirmedAt != null) as unknown as ConfirmedChapter[];
+  const pagesByChapter = new Map(ranged.map((c) => [c.id, extractablePages(c, confirmed)]));
+  const allPages = [...pagesByChapter.values()].flat();
+  const statusByPage = new Map<number, string>();
+  if (run?.sourceDocumentId && allPages.length) {
+    const pageRows = await prisma.documentPage.findMany({
+      where: { documentId: run.sourceDocumentId, pageNumber: { gte: Math.min(...allPages), lte: Math.max(...allPages) } },
+      select: { pageNumber: true, status: true },
+    });
+    for (const r of pageRows) statusByPage.set(r.pageNumber, r.status);
+  }
+  const drafts = await Promise.all(ranged.map((c) =>
+    prisma.question.count({ where: { bookId: id, status: 'DRAFT', sourcePageStart: { gte: c.startPage as number, lte: c.endPage as number } } }),
+  ));
+  const draftsByChapter = new Map(ranged.map((c, i) => [c.id, drafts[i]]));
+
   return NextResponse.json({
     book: { id: book.id, title: book.title, className: book.className },
     run: book.ingestionRuns[0] ?? null,
@@ -98,6 +119,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       exercises: undefined,
       confirmed: chapter.manifestConfirmedAt != null,
       questionsInRange: countByChapter.get(chapter.id) ?? 0,
+      extraction: pagesByChapter.has(chapter.id)
+        ? { ...chapterExtractionProgress(pagesByChapter.get(chapter.id)!, statusByPage), drafts: draftsByChapter.get(chapter.id) ?? 0 }
+        : null,
     })),
   });
 }
@@ -224,6 +248,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const now = new Date();
   let confirmedCount = 0;
   let relinkedCount = 0;
+  // Each incoming chapter's id once saved, in order: the editor keeps it so its next autosave updates the same row.
+  const savedChapterIds: string[] = [];
 
   const existing = await prisma.bookChapter.findMany({
     where: { bookId: id },
@@ -275,6 +301,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       const chapterId = targetId
         ? (await tx.bookChapter.update({ where: { id: targetId }, data: { orderIndex: index, ...data } })).id
         : (await tx.bookChapter.create({ data: { bookId: id, orderIndex: index, ...data } })).id;
+      savedChapterIds.push(chapterId);
 
       // Sections: update in place where one already exists (lib/manifest-sections), so questions filed under it and
       // Smartbook links keep its id; create the new ones; delete only the ones no longer there. Survivors are parked
@@ -345,5 +372,5 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     ...requestAuditContext(request),
   });
 
-  return NextResponse.json({ success: true, chapterCount: incoming.length, confirmedCount, relinkedCount });
+  return NextResponse.json({ success: true, chapterCount: incoming.length, confirmedCount, relinkedCount, chapterIds: savedChapterIds });
 }

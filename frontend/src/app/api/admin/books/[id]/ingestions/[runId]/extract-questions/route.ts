@@ -372,6 +372,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (pendingFragment && pendingFragment.lastPage + 1 !== pages[0]?.pageNumber) {
     pendingFragment = null;
   }
+  // The held fragment is saved with the run as soon as it changes, not only when the batch ends: the pages it came
+  // from are already marked COMPLETED, so if the connection breaks or the server restarts mid-batch, a fragment held
+  // only in memory would be lost and the question it starts never extracted. Saved this way, the next run picks it up.
+  const runConfig = run.providerConfig && typeof run.providerConfig === 'object' && !Array.isArray(run.providerConfig)
+    ? (run.providerConfig as Record<string, unknown>)
+    : {};
+  const savePendingFragment = (fragment: PendingCaseStudyFragment | null) =>
+    prisma.bookIngestionRun.update({ where: { id: run.id }, data: { providerConfig: { ...runConfig, pendingCaseStudyFragment: fragment } as unknown as Prisma.InputJsonValue } });
 
   for (const page of pages) {
     const layout = page.layoutData && typeof page.layoutData === 'object' && !Array.isArray(page.layoutData)
@@ -429,6 +437,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           chainLength,
           pageFigureIds: [...(stitching ? pendingFragment!.pageFigureIds : []), ...thisPageFigureIds.filter((x): x is string => x != null)],
         };
+        await savePendingFragment(pendingFragment);
         await prisma.documentPage.update({
           where: { id: page.id },
           data: {
@@ -625,6 +634,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           errorMessage: null,
         },
       });
+      // The fragment's question is saved and its last page marked done: nothing is held any more.
+      if (stitching) await savePendingFragment(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Question extraction failed';
       failures.push(`Page ${page.pageNumber}: ${message}`);
