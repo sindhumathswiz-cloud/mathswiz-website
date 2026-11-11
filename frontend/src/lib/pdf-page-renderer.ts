@@ -52,14 +52,23 @@ function runRenderScript(safeInput: string, outputDirectory: string, start: numb
       clearTimeout(timer);
       if (code !== 0) return reject(new Error(stderr.trim() || `Page rendering exited with code ${code}`));
       try {
-        const result = JSON.parse(stdout);
-        if (!Array.isArray(result.pages)) throw new Error('Invalid page renderer response');
-        resolve(result.pages as RenderedPage[]);
+        resolve(parseRenderOutput(stdout));
       } catch (error) {
         reject(error);
       }
     });
   });
+}
+
+/**
+ * The script's JSON, with every NUL character removed from every string. Some PDFs carry NULs in their embedded
+ * text; Postgres refuses them in a text column ("invalid byte sequence for encoding UTF8: 0x00"), so one such page
+ * failed its whole batch, and every retry of it, when the page text, text layer and layout were saved.
+ */
+export function parseRenderOutput(stdout: string): RenderedPage[] {
+  const result = JSON.parse(stdout, (_key, value) => (typeof value === 'string' ? value.replace(/\u0000/g, '') : value));
+  if (!Array.isArray(result.pages)) throw new Error('Invalid page renderer response');
+  return result.pages as RenderedPage[];
 }
 
 /**
