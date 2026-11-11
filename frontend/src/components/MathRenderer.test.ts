@@ -48,4 +48,12 @@ describe('sanitizeLatex', () => {
     expect(result).not.toContain('$$');
     expect(result).toBe('(i)$\\begin{aligned}\nA \\times B & = \\{ 1,3,5 \\} \\times \\{ 2,3 \\}\n\\\\\\end{aligned}$(ii)$c = d$');
   });
+
+  it('removes document-only layout commands and normalizes tabular environments', () => {
+    const result = sanitizeLatex('\\pagebreak $$\\begin{tabular}{cc}x & y\\\\\\hline 1 & 2\\end{tabular}$$');
+    expect(result).not.toContain('pagebreak');
+    expect(result).not.toContain('tabular');
+    expect(result).not.toContain('hline');
+    expect(result).toContain('\\begin{array}{cc}');
+  });
 });

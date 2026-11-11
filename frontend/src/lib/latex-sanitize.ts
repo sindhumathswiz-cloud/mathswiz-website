@@ -22,19 +22,28 @@ const BROKEN_ESCAPES: Array<[RegExp, string]> = [
  * "$ $"; a real "$$ ... $$" display block is left alone.
  */
 function splitTouchingInlineMath(text: string): string {
-    return text.split('\n').map((line) => {
-        let inInline = false;
-        let inDisplay = false;
-        return line.replace(/\$\$|\$/g, (mark) => {
-            if (mark === '$$') {
-                if (inInline) return '$ $';
-                inDisplay = !inDisplay;
-                return mark;
-            }
-            if (!inDisplay) inInline = !inInline;
-            return mark;
-        });
-    }).join('\n');
+    // Tracked over the whole text, not line by line: an inline formula can span lines
+    // ("$\begin{aligned} ... \n ... \end{aligned}$Putting"), and starting each line afresh misreads its closing "$".
+    // A run of three or four marks is two delimiters written together: "$)$$$=\frac..$$" closes the inline formula
+    // and opens a display one, "...$$$$..." closes one display formula and opens the next. A display formula closed
+    // with "$$$" opens an inline one only when its closing "$" follows in the same paragraph; otherwise the third mark
+    // is a stray ("\end{aligned}$$$Probability distribution\n\n|$X$|...") and is dropped.
+    let inInline = false;
+    let inDisplay = false;
+    const single = () => { if (!inDisplay) inInline = !inInline; return '$'; };
+    const double = () => { if (inInline) return '$ $'; inDisplay = !inDisplay; return '$$'; };
+    const closesInParagraph = (from: number) => {
+        const next = text.slice(from).search(/(?<!\\)\$/);
+        return next >= 0 && !/\n\s*\n/.test(text.slice(from, from + next));
+    };
+    return text.replace(/(?<!\\)\$+/g, (run, offset: number) => {
+        if (run.length === 1) return single();
+        if (run.length === 2) return double();
+        if (run.length === 3 && inDisplay) return closesInParagraph(offset + 3) ? `${double()} ${single()}` : double();
+        if (run.length === 3) return `${single()} ${double()}`;
+        if (run.length === 4) return `${double()}\n${double()}`;
+        return run;
+    });
 }
 
 /**
@@ -65,6 +74,17 @@ export function sanitizeLatex(text: string): string {
     // \( ... \) → $ ... $   and   \[ ... \] → $$ ... $$
     result = result.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
     result = result.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+
+    // These are document-layout commands, not mathematical content.  They
+    // occur in imported textbook solutions and are not supported by KaTeX.
+    result = result.replace(/\\pagebreak\b/g, '');
+
+    // KaTeX supports `array`, but not LaTeX's document-level `tabular`.
+    // Preserve the column specification while dropping horizontal rules that
+    // have no useful equivalent in an inline solution renderer.
+    result = result.replace(/\\begin\{tabular\}/g, '\\begin{array}');
+    result = result.replace(/\\end\{tabular\}/g, '\\end{array}');
+    result = result.replace(/\\hline\b/g, '');
 
     // Step 2: Replace pmatrix with bmatrix (KaTeX supports bmatrix)
     result = result.replace(/\\begin{pmatrix}/g, '\\begin{bmatrix}');

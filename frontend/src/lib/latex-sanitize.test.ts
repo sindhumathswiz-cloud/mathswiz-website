@@ -50,6 +50,34 @@ $$`;
     expect(count(display, '$$')).toBe(2);
   });
 
+  it('reads "$$$" as an inline formula closing and a display one opening', () => {
+    const out = sanitizeLatex(String.raw`Required probability$=P($processed by Sonia$) \times P($committed error$)$$$=\frac{20}{100} \times \frac{4}{100}=0.008$$ So option (c).`);
+    expect(out).toContain('$$\n=\\frac{20}{100} \\times \\frac{4}{100}=0.008\n$$');
+    expect(renders(out)).toBe(true);
+  });
+
+  it('drops a stray "$" left after a display formula closed with "$$$", so a following table still reads', () => {
+    const src = String.raw`and$$\begin{aligned} & P(X=14)=\frac{2}{15} \end{aligned}$$$Probability distribution
+
+|$X$| 14 |
+| :--- | :--- |
+|$P(X)$|$\frac{2}{15}$|
+
+Now,$$\begin{aligned} & \sum X P(X)=\frac{263}{15} \end{aligned}$$$`;
+    const out = sanitizeLatex(src);
+    expect(out).not.toMatch(/\$\$\s*\$/);
+    expect(out).toContain('|$X$|');
+    expect(renders(out)).toBe(true);
+  });
+
+  it('reads an inline formula that spans lines correctly before a later display formula', () => {
+    const src = String.raw`So $\begin{aligned} x & = 1 \\
+& = 2 \end{aligned}$Putting$y=1$and$x=0$, we get$$0 e^{0}-e^{0}=C$$Therefore done.`;
+    const out = sanitizeLatex(src);
+    expect(out).toContain('$$\n0 e^{0}-e^{0}=C\n$$');
+    expect(renders(out)).toBe(true);
+  });
+
   it('keeps an inline formula that spans lines on one line, so a line starting "+ " is not read as a list', () => {
     const src = 'Since$\\begin{array}{l}\n| \\vec{a} | ^ { 2 } \\\\\n+ \\vec { b } + \\vec { c } = \\sqrt { 3 } x\n\\end{array}$so done.';
     const out = sanitizeLatex(src);
