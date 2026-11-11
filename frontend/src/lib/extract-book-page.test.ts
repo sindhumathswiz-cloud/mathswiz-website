@@ -68,6 +68,29 @@ describe('extractQuestionsFromPage', () => {
     expect(result.questions[0].contentHash).toBe('hash:Solve for x');
   });
 
+  it("gives a page read from its own text the figures its layout marked, on the rendered page image, with no OCR", async () => {
+    const { getPageRawText } = await import('./extract-book-page');
+    const fetchSpy = vi.fn();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    const result = await getPageRawText({
+      pageNumber: 34,
+      nativeText: '12. The graph of the function f(x) = |x - 2| is '.repeat(2),
+      pageImagePath: '/private/page-34.png',
+      processedImagePath: '/private/page-34-processed.jpg',
+      requiresVisionSegmentation: false,
+      width: 1000,
+      height: 1000,
+      layoutData: { regions: [{ kind: 'GRAPH_REGION_CANDIDATE', x: 0.1, y: 0.5, width: 0.2, height: 0.2 }] },
+      textLayer: { lines: [{ x: 0.1, y: 0.45, w: 0.5, h: 0.02, text: '12. The graph of the function f(x) = |x - 2| is' }] },
+    });
+    expect(result.provider).toBe('NATIVE_TEXT');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.diagramRegions).toEqual([{ x: 90, y: 490, width: 220, height: 220, type: 'graph' }]);
+    expect(result.textLines).toEqual([{ top: 450, bottom: 470, text: '12. The graph of the function f(x) = |x - 2| is' }]);
+    // Cropped from the rendered image the layout was measured on, not the processed copy.
+    expect(result.ocrImagePath).toBe('/private/page-34.png');
+  });
+
   it('reuses what Mathpix already read from the page instead of paying for it again', async () => {
     const { getPageRawText } = await import('./extract-book-page');
     const fetchSpy = vi.fn<MathpixFetch>();

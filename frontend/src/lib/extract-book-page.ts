@@ -7,6 +7,7 @@ import { computeContentHash } from './question-classifier';
 import { parseDiagramRegions, parseOcrTextLines, type DiagramRegion, type OcrTextLine } from './diagram-regions';
 import { layerFromMathpixLines, type PageTextLayer } from './page-text-layer';
 import type { CanonicalQuestion } from './extract-normalizer';
+import { nativeFigureRegions, nativeTextLines } from './native-page-figures';
 
 /**
  * Turns one already-rendered book page into canonical, QA-checked questions —
@@ -52,6 +53,10 @@ export interface PageForExtraction {
   storedProvider?: string | null;
   storedConfidence?: number | null;
   reocr?: boolean;
+  // Saved while the page was rendered: its layout (with graph and figure regions) and its text layer. A page read
+  // from its own text gets its figures from these, since no image goes to Mathpix (lib/native-page-figures).
+  layoutData?: unknown;
+  textLayer?: unknown;
 }
 
 /** Shorter stored text than this is not trusted as a page's OCR (an empty or failed earlier read). */
@@ -61,19 +66,18 @@ export interface PageRawText {
   provider: PageOcrProvider;
   rawText: string;
   ocrConfidence: number | null;
-  // Non-text regions (diagrams/charts/figures/graphs) Mathpix's line_data
-  // flagged on this page, in the pixel space of ocrImagePath — [] when this
-  // page used the native text layer (no image was OCR'd, so there's nothing
-  // to detect regions in) or when OCR found none.
+  // Non-text regions (diagrams/charts/figures/graphs) on this page, in the pixel space of ocrImagePath: the ones
+  // Mathpix's line_data flagged, or for a NATIVE_TEXT page the graph and figure regions the layout check marked while
+  // rendering. [] when there are none.
   diagramRegions: DiagramRegion[];
   // The OCR'd text lines with their vertical positions, same pixel space as
   // diagramRegions — lets a caller attach each figure to the right question
-  // on a multi-question page (figure-question-match.ts). [] for NATIVE_TEXT.
+  // on a multi-question page (figure-question-match.ts). For NATIVE_TEXT, the page's text-layer lines.
   textLines: OcrTextLine[];
   // The page image these diagramRegions' coordinates are relative to — the
   // same file a caller must pass to lib/page-image-crop.ts's
-  // cropPageRegion to actually cut one out. null when provider is
-  // NATIVE_TEXT (no image was OCR'd).
+  // cropPageRegion to actually cut one out: the OCR'd image, or the rendered
+  // page image for a NATIVE_TEXT page with figures. null when there is none.
   ocrImagePath: string | null;
   // Positioned text for the page-faithful viewer, from the same OCR call (no
   // extra spend). null for NATIVE_TEXT pages -- their layer is built from the
@@ -170,14 +174,15 @@ export async function getPageRawText(page: PageForExtraction): Promise<PageRawTe
   const trustNativeText = !page.requiresVisionSegmentation && nativeText.length >= MIN_NATIVE_TEXT_CHARS;
 
   if (trustNativeText) {
-    // A trustworthy native text layer means we never looked at the page
-    // image, so there's no OCR line data to detect figures in — a page
-    // with a diagram AND enough surrounding native text to pass the trust
-    // threshold above will not get its diagram captured. Acceptable
-    // trade-off for now: re-running OCR on every text-trustworthy page
-    // just to catch this would multiply Mathpix cost across the whole
-    // book for a comparatively rare page shape.
-    return { provider: 'NATIVE_TEXT', rawText: nativeText, ocrConfidence: null, diagramRegions: [], textLines: [], ocrImagePath: null, textLayer: null };
+    // A trustworthy native text layer means no image goes to Mathpix, so the figures come from the layout check that
+    // ran while the page was rendered, cropped from the rendered page image (lib/native-page-figures). No OCR cost.
+    const regions = page.pageImagePath ? nativeFigureRegions(page.layoutData, page.width, page.height) : [];
+    return {
+      provider: 'NATIVE_TEXT', rawText: nativeText, ocrConfidence: null, textLayer: null,
+      diagramRegions: regions,
+      textLines: regions.length ? nativeTextLines(page.textLayer, page.height) : [],
+      ocrImagePath: regions.length ? page.pageImagePath : null,
+    };
   }
 
   const stored = (page.storedText || '').trim();

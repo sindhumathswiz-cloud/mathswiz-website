@@ -11,7 +11,7 @@ const bookIngestionRun = { findFirst: vi.fn(), update: vi.fn() };
 const book = { findUnique: vi.fn() };
 const documentPage = { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn() };
 const question = { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() };
-const pageFigure = { create: vi.fn(), updateMany: vi.fn() };
+const pageFigure = { create: vi.fn(), updateMany: vi.fn(), count: vi.fn() };
 const bookChapter = { findFirst: vi.fn(), aggregate: vi.fn(), create: vi.fn() };
 const loadConfirmedChapters = vi.fn();
 
@@ -450,6 +450,33 @@ describe('POST /api/admin/books/[id]/ingestions/[runId]/extract-questions', () =
       expect(pageFigure.updateMany).toHaveBeenCalledWith({ where: { id: { in: ['pf-page-1-0'] } }, data: { questionId: 'q-a1', matchedAutomatically: true } });
       expect(pageFigure.updateMany).toHaveBeenCalledWith({ where: { id: { in: ['pf-page-1-1'] } }, data: { questionId: 'q-a2', matchedAutomatically: true } });
       expect(data.batch.figuresMatchedToQuestion).toBe(2);
+    });
+
+    it('crops the figures of a page read from its own text from the rendered page, once, and files them under its question', async () => {
+      const nativePage = () => {
+        documentPage.findMany.mockResolvedValue([{ id: 'page-34', pageNumber: 34, nativeText: 'x'.repeat(80), pageImagePath: '/private/p34.png', processedImagePath: null, layoutData: {}, width: 1163, height: 1500 }]);
+        getPageRawText.mockResolvedValueOnce({
+          provider: 'NATIVE_TEXT', rawText: '12. The graph of the function f(x) = |x - 2| is', ocrConfidence: null,
+          diagramRegions: [{ x: 174, y: 905, width: 189, height: 380, type: 'graph' }], textLines: [], ocrImagePath: '/private/p34.png', textLayer: null,
+        });
+        structurePageQuestions.mockResolvedValueOnce([{ question: { questionContent: 'The graph of the function $f(x) = |x - 2|$ is', type: 'SINGLE_CHOICE', difficulty: 'EASY', options: ['a', 'b', 'c', 'd'], correctAnswer: 'A', explanation: '', tags: [], topic: '', method: '', printedNumber: '12', explanationType: 'NONE' }, contentHash: 'h-graph', qaIssues: [] }]);
+      };
+      const { POST } = await import('./route');
+
+      nativePage();
+      pageFigure.count.mockResolvedValueOnce(0);
+      question.create.mockResolvedValueOnce({ id: 'q-graph' });
+      await POST(post({ startPage: 34, batchSize: 5 }), { params });
+      expect(cropPageRegion).toHaveBeenCalledWith('book-1', 'run-1', '/private/p34.png', 'pf-page-34-0.jpg', { x: 174, y: 905, width: 189, height: 380, type: 'graph' });
+      expect(pageFigure.updateMany).toHaveBeenCalledWith({ where: { id: { in: ['pf-page-34-0'] } }, data: { questionId: 'q-graph', matchedAutomatically: true } });
+
+      // Extracted again: the page already has its figures, so no second copy is cropped or filed.
+      vi.clearAllMocks();
+      nativePage();
+      pageFigure.count.mockResolvedValueOnce(1);
+      await POST(post({ startPage: 34, batchSize: 5, force: true }), { params });
+      expect(cropPageRegion).not.toHaveBeenCalled();
+      expect(pageFigure.create).not.toHaveBeenCalled();
     });
 
     it('stitches a figure captured on the passage page onto the resolved case-study question', async () => {

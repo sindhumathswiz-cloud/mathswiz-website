@@ -264,7 +264,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
     orderBy: { pageNumber: 'asc' },
     take: batchSize,
-    select: { id: true, pageNumber: true, nativeText: true, pageImagePath: true, processedImagePath: true, layoutData: true, width: true, height: true, rawMarkdown: true, ocrProvider: true, ocrConfidence: true },
+    select: { id: true, pageNumber: true, nativeText: true, pageImagePath: true, processedImagePath: true, layoutData: true, textLayer: true, width: true, height: true, rawMarkdown: true, ocrProvider: true, ocrConfidence: true },
   });
 
   if (pages.length === 0) {
@@ -398,6 +398,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         storedProvider: page.ocrProvider,
         storedConfidence: page.ocrConfidence,
         reocr,
+        layoutData: page.layoutData,
+        textLayer: page.textLayer,
       });
 
       const stitching = pendingFragment && pendingFragment.lastPage + 1 === page.pageNumber;
@@ -409,7 +411,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       // figures on it. Captured (cropped + saved as unassigned PageFigure
       // rows) immediately, before we know how many questions this page
       // produces or whether it joins a fragment -- see capturePageFigures.
-      const pageRegions: DiagramRegion[] = pageRaw.diagramRegions ?? [];
+      // A page read from its own text gets the same figures from its layout on every run: crop them once, so a
+      // re-extraction does not file a second copy of each.
+      const alreadyCropped = pageRaw.provider === 'NATIVE_TEXT' && (pageRaw.diagramRegions?.length ?? 0) > 0
+        && (await prisma.pageFigure.count({ where: { documentPageId: page.id } })) > 0;
+      const pageRegions: DiagramRegion[] = alreadyCropped ? [] : pageRaw.diagramRegions ?? [];
       const thisPageFigureIds: Array<string | null> = (pageRegions.length > 0 && pageRaw.ocrImagePath)
         ? await capturePageFigures(id, run.id, page.id, page.pageNumber, pageRaw.ocrImagePath, pageRegions)
         : [];
