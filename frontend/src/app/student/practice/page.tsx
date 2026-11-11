@@ -27,6 +27,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import QuestionTags from '@/components/QuestionTags';
 import QuestionTrustBadge from '@/components/QuestionTrustBadge';
 import toast from 'react-hot-toast';
@@ -648,7 +649,7 @@ function PracticeArenaInner() {
                                 <span className="px-3 py-1 bg-indigo-50 text-indigo-700 dark:bg-brand/10 dark:text-brand text-[10px] font-black uppercase rounded-full tracking-widest">{question.subject} &bull; {question.topic}</span>
                             </div>
                             <div className="text-xl font-bold text-slate-900 dark:text-white leading-relaxed mb-4">
-                                <MathRenderer content={question.content} />
+                                <MathRenderer content={question.content} /><QuestionFigures questionId={question.id} />
                             </div>
                             <QuestionTags tags={question.tags} className="mb-10" />
 

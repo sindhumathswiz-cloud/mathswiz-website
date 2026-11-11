@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import { readJsonResponse } from '@/lib/http-json';
 
 type Item = {
@@ -73,7 +74,7 @@ export default function BookmarkListClient({ listId }: { listId: string }) {
                   {item.question.topic && <span className="rounded-full bg-slate-100 dark:bg-white/5 px-2.5 py-1 text-slate-500 dark:text-slate-400">{item.question.topic}</span>}
                   <span className="rounded-full bg-slate-100 dark:bg-white/5 px-2.5 py-1 text-slate-500 dark:text-slate-400">{item.question.difficulty}</span>
                 </div>
-                <div className="mb-3 text-sm text-slate-800 dark:text-slate-200"><MathRenderer content={item.question.content} /></div>
+                <div className="mb-3 text-sm text-slate-800 dark:text-slate-200"><MathRenderer content={item.question.content} /><QuestionFigures questionId={item.question.id} /></div>
                 {item.note && <p className="mb-3 text-xs italic text-slate-500 dark:text-slate-400">"{item.note}"</p>}
                 <button
                   type="button"

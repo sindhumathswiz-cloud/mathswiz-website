@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import { requireTeacherPremium, requireTeacherSession } from '@/lib/teacher-guard';
 import { buildExamSections, examMaxFromSections, instructionRows } from '@/lib/exam-view';
 import { findExamPattern, markingLabel } from '@/lib/exam-patterns';
@@ -103,7 +104,7 @@ export default async function PrintPaperPage({ params, searchParams }: { params:
                       <div className="flex gap-3">
                       <span className="w-8 shrink-0 text-sm font-black">{printed.orBefore ? '' : printed.number}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="text-[15px] leading-relaxed"><MathRenderer content={question.content} /></div>
+                        <div className="text-[15px] leading-relaxed"><MathRenderer content={question.content} /><QuestionFigures questionId={question.id} /></div>
                         <span className="mt-1 block text-right text-xs font-bold text-slate-500">[{built.marksPerQuestion} mark{built.marksPerQuestion === 1 ? '' : 's'}]</span>
                         {shape === 'CHOICE' && options.length > 0 && (
                           <ol className="mt-2 grid grid-cols-1 gap-x-8 gap-y-1 text-sm sm:grid-cols-2">

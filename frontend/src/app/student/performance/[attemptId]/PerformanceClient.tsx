@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, CheckCircle, XCircle, Clock, Target, AlertTriangle, Zap, Bot, MinusCircle } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -293,7 +294,7 @@ export default function PerformanceClient({
                                         </div>
 
                                         <div className="mb-6 font-medium text-gray-800 dark:text-slate-300 text-sm overflow-x-auto custom-scrollbar">
-                                            <MathRenderer content={r.question?.content || 'Question content missing'} />
+                                            <MathRenderer content={r.question?.content || 'Question content missing'} /><QuestionFigures questionId={r.questionId} />
                                         </div>
 
                                         {!isSkipped && (

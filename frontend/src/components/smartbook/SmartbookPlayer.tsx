@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, ArrowLeft, ArrowRight, Bookmark, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Eye, Loader2, MessageSquareQuote, Pin, SkipForward, X, XCircle, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import { parseQuestionOptions } from '@/lib/arena-answer';
 
 /**
@@ -227,7 +228,7 @@ export default function SmartbookPlayer(props: SmartbookPlayerProps) {
               <span className="rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-700 dark:bg-brand/10 dark:text-brand">Question {q.printedNumber || index + 1} · {index + 1} of {questions.length}</span>
               {q.sourcePageStart != null && <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:bg-white/5 dark:text-slate-400">Page {q.sourcePageStart}</span>}
             </div>
-            <div className="mb-8 text-lg font-bold leading-relaxed text-slate-900 dark:text-white md:text-xl"><MathRenderer content={q.content} /></div>
+            <div className="mb-8 text-lg font-bold leading-relaxed text-slate-900 dark:text-white md:text-xl"><MathRenderer content={q.content} /><QuestionFigures questionId={q.id} /></div>
 
             {kind === 'choice' && (
               <div className="grid grid-cols-1 gap-3" role="radiogroup" aria-label="Options">

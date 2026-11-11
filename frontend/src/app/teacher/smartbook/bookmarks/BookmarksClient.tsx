@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Bookmark, Loader2 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import TeacherQuestionTools from '@/components/smartbook/TeacherQuestionTools';
 import { parseQuestionOptions } from '@/lib/arena-answer';
 
@@ -62,7 +63,7 @@ export default function BookmarksClient() {
                 <p className="mb-2 text-xs font-bold text-slate-500">
                   {[q.book?.title, q.bookChapter?.name ?? q.topic, q.printedNumber ? `Q${q.printedNumber}` : null, q.sourcePageStart != null ? `p. ${q.sourcePageStart}` : null].filter(Boolean).join(' · ')}
                 </p>
-                <div className="text-sm text-slate-900 dark:text-white"><MathRenderer content={q.content} /></div>
+                <div className="text-sm text-slate-900 dark:text-white"><MathRenderer content={q.content} /><QuestionFigures questionId={q.id} /></div>
                 {options.length > 0 && (
                   <ol className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
                     {options.map((opt, i) => (

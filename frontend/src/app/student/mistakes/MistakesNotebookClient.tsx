@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, BookX, Loader2, Pin, RotateCcw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import { readJsonResponse } from '@/lib/http-json';
 
 type Entry = {
@@ -107,7 +108,7 @@ export default function MistakesNotebookClient() {
                   )}
                   {entry.question.topic && <span className="rounded-full bg-slate-100 dark:bg-white/5 px-2.5 py-1 text-slate-500 dark:text-slate-400">{entry.question.topic}</span>}
                 </div>
-                <div className="mb-3 text-sm text-slate-800 dark:text-slate-200"><MathRenderer content={entry.question.content} /></div>
+                <div className="mb-3 text-sm text-slate-800 dark:text-slate-200"><MathRenderer content={entry.question.content} /><QuestionFigures questionId={entry.questionId} /></div>
                 {entry.note && <p className="mb-3 text-xs italic text-slate-500 dark:text-slate-400">"{entry.note}"</p>}
                 <div className="flex items-center gap-3">
                   <Link href={`/student/practice?mode=mistakes${entry.question.topic ? `&topic=${encodeURIComponent(entry.question.topic)}` : ''}`} className="text-xs font-black text-indigo-700 dark:text-brand hover:underline">

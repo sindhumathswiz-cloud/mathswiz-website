@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import QuestionTags from '@/components/QuestionTags';
 import ExamInstructions from '@/components/exam/ExamInstructions';
 import ExamPalette from '@/components/exam/ExamPalette';
@@ -558,7 +559,7 @@ export default function TestTakingUI() {
                     <div className="p-5 sm:p-10 overflow-y-auto flex-1 custom-scrollbar">
                         <AnimatePresence mode="wait">
                             <motion.div key={currentQ.id} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.15 }} className="max-w-3xl mx-auto">
-                                <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-relaxed mb-4"><MathRenderer content={currentQ.content} /></div>
+                                <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-relaxed mb-4"><MathRenderer content={currentQ.content} /><QuestionFigures questionId={currentQ.id} /></div>
                                 <QuestionTags tags={currentQ.tags} className="mb-8" />
 
                                 {written ? (

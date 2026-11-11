@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ChevronRight, Flame, Loader2, TrendingDown } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 
 type Batch = { id: string; name: string };
 type TopicHeat = { topic: string; avgMastery: number; studentCount: number };
@@ -102,7 +103,7 @@ export default function TeacherHeatmapPage() {
                 <div className="space-y-4">
                   {wrongAnswers.slice(0, 10).map((q) => (
                     <div key={q.questionId} className="border dark:border-white/10 rounded-xl p-4">
-                      <div className="text-sm mb-2 dark:text-slate-200"><MathRenderer content={q.content} /></div>
+                      <div className="text-sm mb-2 dark:text-slate-200"><MathRenderer content={q.content} /><QuestionFigures questionId={q.questionId} /></div>
                       <div className="flex flex-wrap gap-2 text-xs font-bold">
                         {q.wrongOptionBreakdown.map((o) => (
                           <span key={o.option} className="bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 px-2 py-1 rounded-lg">

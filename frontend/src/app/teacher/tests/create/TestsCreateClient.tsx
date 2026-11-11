@@ -7,6 +7,7 @@ import {
   Printer, Save, Sparkles, X, Loader2, Filter
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import QuestionSourceSelector, { NO_SOURCE, type SourceSelection } from '@/components/teacher/QuestionSourceSelector';
 import { attemptRuleLabel, EXAM_PATTERNS, examMaxMarks, findExamPattern, sectionsFromPattern } from '@/lib/exam-patterns';
 import { normalizeChoiceGroups, slotCountOf, toggleAlternative } from '@/lib/choice-groups';
@@ -451,7 +452,7 @@ export default function TestCreatorStudio() {
                   </div>
 
                   <div className="text-sm dark:text-slate-200">
-                     <MathRenderer content={q.content} />
+                     <MathRenderer content={q.content} /><QuestionFigures questionId={q.id} />
                   </div>
 
                   {/* Options Preview if exists */}
@@ -621,7 +622,7 @@ export default function TestCreatorStudio() {
                               
                               <div className="flex justify-between items-start gap-4">
                                 <div className="text-sm flex-1 text-slate-900 dark:text-white">
-                                  <MathRenderer content={q.content} />
+                                  <MathRenderer content={q.content} /><QuestionFigures questionId={q.id} />
                                 </div>
                                 <button onClick={() => removeQuestionFromTest(section.id, q.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-rose-400 shrink-0 print:hidden opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-4 h-4" /></button>
                               </div>

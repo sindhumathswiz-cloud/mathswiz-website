@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import { parseQuestionOptions } from '@/lib/arena-answer';
 import { readJsonResponse } from '@/lib/http-json';
 
@@ -60,7 +61,7 @@ export default function LearningPathQuestionCard({
 
   return (
     <div className="rounded-3xl border bg-white p-6 md:p-8">
-      <div className="mb-6 text-lg font-bold text-slate-900"><MathRenderer content={question.content} /></div>
+      <div className="mb-6 text-lg font-bold text-slate-900"><MathRenderer content={question.content} /><QuestionFigures questionId={question.id} /></div>
       {options.length === 0 && (
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-bold text-amber-800">
           This question has an invalid or incomplete option list. You can skip it safely.

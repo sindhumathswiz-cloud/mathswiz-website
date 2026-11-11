@@ -24,6 +24,7 @@ import {
     PartyPopper
 } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
+import QuestionFigures from '@/components/QuestionFigures';
 import { isWrittenType } from '@/lib/exam-view';
 import { decodeImageRefs } from '@/lib/answer-images';
 import QuestionTrustBadge from '@/components/QuestionTrustBadge';
@@ -305,7 +306,7 @@ export default function PerformanceAnalytics() {
                                             </div>
                                         )}
                                         <div className="prose prose-slate dark:prose-invert max-w-none">
-                                            <MathRenderer content={r.question.content} />
+                                            <MathRenderer content={r.question.content} /><QuestionFigures questionId={r.questionId} />
                                         </div>
 
                                         {isWrittenType(r.question.type) && (
