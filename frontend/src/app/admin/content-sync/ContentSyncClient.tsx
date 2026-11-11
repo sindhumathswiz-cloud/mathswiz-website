@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CheckCircle2, Clock, Eye, Loader2, Lock, Send, ShieldAlert } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import type { Change } from '@/lib/content-sync/changes';
+import SyncChanges from './SyncChanges';
 
 type Action = 'in-sync' | 'promote' | 'replicate' | 'delete-live' | 'delete-staging' | 'conflict' | 'held' | 'blocked' | 'kept' | 'excluded' | 'forget';
-interface Issue { table: string; id: string; action: Action; reason?: string }
+interface Issue { table: string; id: string; action: Action; reason?: string; label?: string }
 interface Report {
   runId: string;
   applied: boolean;
@@ -14,6 +16,8 @@ interface Report {
   written: { live: number; staging: number; seeded: number };
   issues: Issue[];
   issuesTruncated: boolean;
+  changes: Change[];
+  changesTruncated: boolean;
 }
 interface Run { id: string; startedAt: string; mode: string; triggeredBy: string; status: string; summary: { written?: { live: number; staging: number } } | null; error: string | null }
 interface Status { role: 'live' | 'staging'; ready: boolean; reason: string | null; runs: Run[] }
@@ -172,6 +176,8 @@ export default function ContentSyncClient() {
                 ))}
               </dl>
 
+              <SyncChanges key={report.runId} changes={report.changes ?? []} applied={report.applied} truncated={report.changesTruncated} />
+
               <div className="rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface">
                 <div role="tablist" aria-label="Items that need attention" className="flex flex-wrap gap-1 border-b border-slate-200 p-2 dark:border-white/10">
                   {ISSUE_TABS.map((t) => (
@@ -208,6 +214,7 @@ export default function ContentSyncClient() {
                               <td className="px-5 py-3 align-top">
                                 <span className="font-bold text-slate-900 dark:text-white">{issue.table}</span>
                                 <span className="ml-2 font-mono text-xs text-slate-500 dark:text-slate-400">{issue.id}</span>
+                                {issue.label && <span className="mt-0.5 block max-w-xl text-slate-700 dark:text-slate-300">{issue.label}</span>}
                               </td>
                               <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{issue.reason}</td>
                               {tab === 'conflict' && (

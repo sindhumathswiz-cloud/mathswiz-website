@@ -11,6 +11,7 @@
  */
 import pg from 'pg';
 import { problemsWithTestDatabase } from '@/lib/test-database-guard';
+import { describeChanges, labelOf, type Change } from './changes';
 import { ledgerKey, parentsFirst, planSync, rowHash, summarise, type Decision, type Exclusions, type Plan, type Row, type Snapshot } from './plan';
 import { PROMOTABLE_STATUSES, SEED_ONLY_TABLES, SYNC_TABLES } from './tables';
 
@@ -36,8 +37,10 @@ export interface SyncReport {
   runId: string | null;
   applied: boolean;
   summary: ReturnType<typeof summarise>;
-  /** Conflicts, blocked and held rows, for an admin to look at. */
-  issues: Decision[];
+  /** Conflicts, blocked and held rows, for an admin to look at, named by what they are (a question's text). */
+  issues: Array<Decision & { label?: string }>;
+  /** Every row promoted to live or copied down, described for a person (changes.ts). */
+  changes: Change[];
   written: { live: number; staging: number; seeded: number };
 }
 
@@ -237,7 +240,14 @@ export async function runContentSync(options: SyncOptions): Promise<SyncReport> 
       }
     }
     const summary = summarise(plan);
-    const issues = plan.decisions.filter((d) => d.action === 'conflict' || d.action === 'blocked' || d.action === 'held');
+    const issues = plan.decisions
+      .filter((d) => d.action === 'conflict' || d.action === 'blocked' || d.action === 'held')
+      .map((d) => {
+        const row = stagingSnap[d.table]?.get(d.id) ?? liveSnap[d.table]?.get(d.id);
+        const label = row ? labelOf(d.table, row) : '';
+        return label ? { ...d, label } : d;
+      });
+    const changes = describeChanges(plan, stagingSnap, liveSnap);
     const written = { live: 0, staging: 0, seeded: 0 };
 
     let backup: Record<string, unknown> | null = null;
@@ -270,7 +280,7 @@ export async function runContentSync(options: SyncOptions): Promise<SyncReport> 
       `update "ContentSyncRun" set "status" = 'DONE', "finishedAt" = now(), "summary" = $2, "issues" = $3, "backup" = $4 where "id" = $1`,
       [runId, JSON.stringify({ tables: summary, written }), JSON.stringify(issues), backup ? JSON.stringify(backup) : null],
     );
-    return { runId, applied: options.apply, summary, issues, written };
+    return { runId, applied: options.apply, summary, issues, changes, written };
   } catch (error) {
     if (runId) {
       await staging.query(`update "ContentSyncRun" set "status" = 'FAILED', "finishedAt" = now(), "error" = $2 where "id" = $1`, [runId, (error as Error).message]).catch(() => {});

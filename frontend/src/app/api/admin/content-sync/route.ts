@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 const MAX_ISSUES = 500;
+const MAX_CHANGES = 3000;
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
       written: report.written,
       issues: report.issues.slice(0, MAX_ISSUES),
       issuesTruncated: report.issues.length > MAX_ISSUES,
+      changes: report.changes.slice(0, MAX_CHANGES),
+      changesTruncated: report.changes.length > MAX_CHANGES,
     });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });

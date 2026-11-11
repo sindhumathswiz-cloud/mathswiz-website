@@ -24,7 +24,7 @@ describe('/api/admin/content-sync', () => {
     vi.clearAllMocks();
     getServerSession.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     contentSyncRun.findMany.mockResolvedValue([]);
-    runContentSync.mockResolvedValue({ runId: 'r1', applied: false, summary: { Question: { 'in-sync': 3, promote: 2 }, Book: { promote: 1 } }, issues: [], written: { live: 0, staging: 0, seeded: 0 } });
+    runContentSync.mockResolvedValue({ runId: 'r1', applied: false, summary: { Question: { 'in-sync': 3, promote: 2 }, Book: { promote: 1 } }, issues: [], changes: [], written: { live: 0, staging: 0, seeded: 0 } });
   });
   afterEach(() => vi.unstubAllEnvs());
 
