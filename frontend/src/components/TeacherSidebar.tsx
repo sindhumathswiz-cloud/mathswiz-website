@@ -25,6 +25,7 @@ import {
     Bot,
     Lock,
     BookOpenText,
+    Search,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -86,6 +87,7 @@ export default function TeacherSidebar() {
         { href: dashboardHref('User Directory'), icon: <Users size={18} />, label: 'Batch Management', tab: 'User Directory' },
         { href: dashboardHref('Live Classes'), icon: <Video size={18} />, label: 'Live Classes', tab: 'Live Classes', premium: true },
         { href: dashboardHref('Question Bank'), icon: <BookOpen size={18} />, label: 'Question Bank', tab: 'Question Bank', premium: true },
+        { href: '/teacher/question-bank/browse', icon: <Search size={18} />, label: 'Find Questions', premium: true },
         { href: dashboardHref('Test & Exam Engine'), icon: <ClipboardList size={18} />, label: 'Test & Exams', tab: 'Test & Exam Engine', premium: true },
         { href: '/teacher/homework', icon: <ClipboardCheck size={18} />, label: 'Written Answers', premium: true },
         { href: '/teacher/smartbook', icon: <BookOpenText size={18} />, label: 'Smartbook', premium: true },
