@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answersMatch, countedQuestionIds, isAnswered } from './exam-scoring';
+import { answersMatch, countedQuestionIds, isAnswered, isAutoScored } from './exam-scoring';
 
 describe('isAnswered', () => {
   it('is false for nothing, null, and a blank or whitespace-only box', () => {
@@ -97,5 +97,14 @@ describe('internal choice and photo answers', () => {
     expect(isAnswered({ subjectiveImages: [] })).toBe(false);
     expect(isAnswered({ subjectiveImages: null, subjectiveText: '  ' })).toBe(false);
     expect(isAnswered({ subjectiveText: 'working', subjectiveImages: ['img1'] })).toBe(true);
+  });
+});
+
+describe('isAutoScored', () => {
+  it('scores choice and numerical questions, and a case-study sub-part only when it has options', () => {
+    expect(['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'INTEGER', 'TRUE_FALSE', 'ASSERTION_REASONING'].every((t) => isAutoScored(t))).toBe(true);
+    expect(isAutoScored('CASE_STUDY', ['1', '2', '3', '4'])).toBe(true);
+    expect(isAutoScored('CASE_STUDY', [])).toBe(false);
+    expect(isAutoScored('LONG_ANSWER', ['1', '2'])).toBe(false);
   });
 });

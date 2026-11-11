@@ -6,6 +6,7 @@
  */
 
 import { slotKeyOf, hasChoiceGroups, type GroupedQuestion } from './choice-groups';
+import { parseQuestionOptions } from './arena-answer';
 
 export interface AnswerLike {
   selectedOption?: string | number | null;
@@ -37,6 +38,15 @@ export function isAnswered(response: AnswerLike | null | undefined): boolean {
 
 /** Question types the server can score by comparing with the stored answer. */
 export const AUTO_SCORED_TYPES = ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'INTEGER', 'TRUE_FALSE', 'ASSERTION_REASONING'];
+
+/**
+ * A case study that comes with options is one of its sub-parts (the shared passage, then a question with options
+ * below it), answered by choosing like any multiple-choice question. Without options it is written, for a teacher.
+ */
+export const isChoiceCaseStudy = (type: string, options?: unknown) => type === 'CASE_STUDY' && parseQuestionOptions(options).length >= 2;
+
+/** Whether the server scores this question by comparing with the stored answer. */
+export const isAutoScored = (type: string, options?: unknown) => AUTO_SCORED_TYPES.includes(type) || isChoiceCaseStudy(type, options);
 
 const NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 

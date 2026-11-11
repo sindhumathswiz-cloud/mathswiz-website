@@ -1,4 +1,4 @@
-import { isAnswered } from './exam-scoring';
+import { isAnswered, isChoiceCaseStudy } from './exam-scoring';
 import { attemptRuleLabel, examMaxMarks, markingLabel } from './exam-patterns';
 import { slotCountOf, slotKeyOf } from './choice-groups';
 
@@ -190,14 +190,21 @@ export function examMaxFromSections(sections: ExamSection[]): number {
   return examMaxMarks(sections.map(section => ({ questionCount: section.slotCount, attemptLimit: section.attemptLimit, marksPerQuestion: section.marksPerQuestion })));
 }
 
-// Answered in words and marked by a teacher. A case study is one box for its sub-parts.
+// Answered in words and marked by a teacher. A case study is one box for its sub-parts -- unless it comes with
+// options: then it is a single sub-part answered by choosing (exam-scoring isChoiceCaseStudy).
 const WRITTEN_TYPES = ['SUBJECTIVE', 'SHORT_ANSWER', 'LONG_ANSWER', 'VERY_SHORT_ANSWER', 'CASE_STUDY'];
-export const isWrittenType = (type: string) => WRITTEN_TYPES.includes(type);
+export const isWrittenType = (type: string, options?: unknown) => WRITTEN_TYPES.includes(type) && !isChoiceCaseStudy(type, options);
 /** For database filters: written questions have no stored answer, so right/wrong statistics must leave them out. */
 export const WRITTEN_QUESTION_TYPES = WRITTEN_TYPES;
+/** For database filters: questions with an answer to be right or wrong against -- every type but the written ones,
+ *  and case studies that come with options (case-study options are always stored as a list, empty when written). */
+export const SCORED_QUESTION_WHERE = {
+  OR: [{ type: { notIn: WRITTEN_TYPES } }, { type: 'CASE_STUDY', NOT: { options: { equals: [] } } }],
+};
 export const isNumericalType = (type: string) => type === 'INTEGER';
 
-export function questionTypeLabel(type: string): string {
+export function questionTypeLabel(type: string, options?: unknown): string {
+  if (isChoiceCaseStudy(type, options)) return 'Case study · single correct';
   if (isNumericalType(type)) return 'Numerical value';
   if (type === 'MULTIPLE_CHOICE') return 'Multiple choice';
   if (type === 'TRUE_FALSE') return 'True / false';

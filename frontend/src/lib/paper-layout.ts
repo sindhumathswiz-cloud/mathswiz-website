@@ -7,8 +7,8 @@ import { isNumericalType, isWrittenType } from './exam-view';
 
 export type PaperQuestionShape = 'CHOICE' | 'NUMERICAL' | 'WRITTEN';
 
-export function paperShapeOf(type: string): PaperQuestionShape {
-  if (isWrittenType(type)) return 'WRITTEN';
+export function paperShapeOf(type: string, options?: unknown): PaperQuestionShape {
+  if (isWrittenType(type, options)) return 'WRITTEN';
   if (isNumericalType(type)) return 'NUMERICAL';
   return 'CHOICE';
 }
@@ -56,13 +56,13 @@ function safeParse(text: string): unknown {
 export interface KeyLine { section: string; number: string; answer: string }
 
 /** The teacher's answer key, one line per question; written answers say they are teacher-marked. */
-export function answerKeyLines(sections: Array<{ title: string; questions: Array<{ type: string; correctAnswer: string | null; choiceGroup?: string | null }> }>): KeyLine[] {
+export function answerKeyLines(sections: Array<{ title: string; questions: Array<{ type: string; options?: unknown; correctAnswer: string | null; choiceGroup?: string | null }> }>): KeyLine[] {
   return sections.flatMap(section => {
     const numbering = printedNumbering(section.questions);
     return section.questions.map((question, index) => ({
       section: section.title,
       number: `${numbering[index].number}${numbering[index].orBefore ? ' (OR)' : ''}`,
-      answer: paperShapeOf(question.type) === 'WRITTEN' ? 'Marked by the teacher' : (question.correctAnswer ?? '').toString().trim() || 'Not recorded',
+      answer: paperShapeOf(question.type, question.options) === 'WRITTEN' ? 'Marked by the teacher' : (question.correctAnswer ?? '').toString().trim() || 'Not recorded',
     }));
   });
 }

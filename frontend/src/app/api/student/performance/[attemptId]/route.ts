@@ -59,7 +59,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
     };
 
     attempt.responses.forEach((r: any) => {
-      if (r.status === 'SKIPPED' || r.status === 'OVER_LIMIT' || isWrittenType(r.question?.type)) return;
+      if (r.status === 'SKIPPED' || r.status === 'OVER_LIMIT' || isWrittenType(r.question?.type, r.question?.options)) return;
       
       const isOvertime = r.timeSpent > medianTime * 1.5;
       const isTooFast = r.timeSpent < medianTime * 0.5;
@@ -96,7 +96,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
     // option -- one groupBy for the whole attempt rather than one query per
     // response.
     const wrongQuestionIds = [...new Set(
-      attempt.responses.filter((r: any) => r.isCorrect === false && r.selectedOption != null && r.status !== 'OVER_LIMIT' && !isWrittenType(r.question?.type)).map((r: any) => r.questionId)
+      attempt.responses.filter((r: any) => r.isCorrect === false && r.selectedOption != null && r.status !== 'OVER_LIMIT' && !isWrittenType(r.question?.type, r.question?.options)).map((r: any) => r.questionId)
     )];
     const commonMistakeGroups = wrongQuestionIds.length > 0 ? await prisma.testResponse.groupBy({
       by: ['questionId', 'selectedOption'],
@@ -109,7 +109,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
       commonMistakeCount.set(`${g.questionId}:${g.selectedOption}`, g._count._all);
     }
 
-    const responseInsights = attempt.responses.filter((r: any) => r.status !== 'OVER_LIMIT' && !isWrittenType(r.question?.type)).map((r: any) => {
+    const responseInsights = attempt.responses.filter((r: any) => r.status !== 'OVER_LIMIT' && !isWrittenType(r.question?.type, r.question?.options)).map((r: any) => {
       const isSkipped = r.status === 'SKIPPED';
       const isCommonMistake = !isSkipped && !r.isCorrect && r.selectedOption != null &&
         (commonMistakeCount.get(`${r.questionId}:${r.selectedOption}`) ?? 0) >= COMMON_MISTAKE_MIN_COUNT;
@@ -174,7 +174,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
         timeSpent: r.timeSpent,
         topic: r.question?.topic ?? null,
         difficulty: r.question?.difficulty ?? null,
-        isWritten: isWrittenType(r.question?.type),
+        isWritten: isWrittenType(r.question?.type, r.question?.options),
         errorType: insightByQuestion.get(r.questionId) ?? null,
       })),
     }) : null;

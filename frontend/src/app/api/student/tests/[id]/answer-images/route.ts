@@ -44,9 +44,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const placement = await prisma.testQuestion.findFirst({
       where: { questionId, section: { testId: id } },
-      select: { question: { select: { type: true } } },
+      select: { question: { select: { type: true, options: true } } },
     });
-    if (!placement || !isWrittenType(placement.question.type)) {
+    if (!placement || !isWrittenType(placement.question.type, placement.question.options)) {
       return NextResponse.json({ error: 'Photos can only be added to written-answer questions' }, { status: 400 });
     }
 

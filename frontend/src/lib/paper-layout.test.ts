@@ -6,6 +6,12 @@ describe('paper layout', () => {
     expect(['SINGLE_CHOICE', 'ASSERTION_REASONING', 'TRUE_FALSE'].map(paperShapeOf)).toEqual(['CHOICE', 'CHOICE', 'CHOICE']);
     expect(paperShapeOf('INTEGER')).toBe('NUMERICAL');
     expect(['SHORT_ANSWER', 'LONG_ANSWER', 'CASE_STUDY'].map(paperShapeOf)).toEqual(['WRITTEN', 'WRITTEN', 'WRITTEN']);
+    // A case-study sub-part with options prints its options, and its answer goes in the key.
+    expect(paperShapeOf('CASE_STUDY', ['a', 'b', 'c', 'd'])).toBe('CHOICE');
+    expect(answerKeyLines([{ title: 'E', questions: [
+      { type: 'CASE_STUDY', options: ['a', 'b', 'c', 'd'], correctAnswer: 'C' },
+      { type: 'CASE_STUDY', options: [], correctAnswer: null },
+    ] }]).map((l) => l.answer)).toEqual(['C', 'Marked by the teacher']);
   });
 
   it('gives a written answer room in proportion to its marks, within limits', () => {

@@ -95,7 +95,7 @@ export default async function PrintPaperPage({ params, searchParams }: { params:
               </p>
               <ol className="space-y-6">
                 {section.questions.map(({ question }, index) => {
-                  const shape = paperShapeOf(question.type);
+                  const shape = paperShapeOf(question.type, question.options);
                   const options = optionList(question.options);
                   const printed = numbering[index];
                   return (

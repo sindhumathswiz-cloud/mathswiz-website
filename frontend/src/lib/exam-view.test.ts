@@ -108,6 +108,18 @@ describe('question types', () => {
     expect(isWrittenType('INTEGER')).toBe(false);
     expect(['INTEGER', 'MULTIPLE_CHOICE', 'SINGLE_CHOICE', 'SUBJECTIVE', 'TRUE_FALSE'].map(questionTypeLabel)).toEqual(['Numerical value', 'Multiple choice', 'Single correct', 'Written answer', 'True / false']);
   });
+
+  it('answers a case-study sub-part that has options by choosing, and one without options in words', () => {
+    const options = ['$x = 1$', '$x = 2$', '$x = 3$', '$x = 4$'];
+    expect(isWrittenType('CASE_STUDY', options)).toBe(false);
+    expect(isWrittenType('CASE_STUDY', JSON.stringify(options))).toBe(false);
+    expect(questionTypeLabel('CASE_STUDY', options)).toBe('Case study · single correct');
+    expect(isWrittenType('CASE_STUDY', [])).toBe(true);
+    expect(isWrittenType('CASE_STUDY')).toBe(true);
+    expect(questionTypeLabel('CASE_STUDY', [])).toBe('Written answer');
+    // Options never make an ordinary written question a choice one.
+    expect(isWrittenType('LONG_ANSWER', options)).toBe(true);
+  });
 });
 
 describe('stableShuffle', () => {

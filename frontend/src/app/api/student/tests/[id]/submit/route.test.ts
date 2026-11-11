@@ -167,6 +167,14 @@ describe('POST /api/student/tests/[id]/submit -- mock exam scoring', () => {
     expect(attemptTotals()).toMatchObject({ totalScore: 7, totalCorrect: 2, totalIncorrect: 2, totalSkipped: 0 });
   });
 
+  it('scores a case-study sub-part that has options like any choice question', async () => {
+    const caseStudy = (id: string, correctAnswer: string) => ({ question: { id, type: 'CASE_STUDY', options: ['$1$', '$2$', '$3$', '$4$'], correctAnswer, topic: 'Probability', difficulty: 'MEDIUM' } });
+    useSections([{ marksPerQuestion: 1, negativeMarks: 0, attemptLimit: null, questions: [caseStudy('c1', 'C'), caseStudy('c2', 'A')] }]);
+    await submit({ c1: { selectedOption: 'C', status: 'ANSWERED' }, c2: { selectedOption: 'B', status: 'ANSWERED' } })();
+    expect(attemptTotals()).toMatchObject({ totalScore: 1, totalCorrect: 1, totalIncorrect: 1 });
+    expect(records().map((r) => [r.questionId, r.isCorrect, r.selectedOption])).toEqual([['c1', true, 'C'], ['c2', false, 'B']]);
+  });
+
   it('scores only the first N answered questions of a limited section and records the rest as OVER_LIMIT', async () => {
     useSections([{ marksPerQuestion: 4, negativeMarks: 0, attemptLimit: 2, questions: numerical(4) }]);
     await submit({

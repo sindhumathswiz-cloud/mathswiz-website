@@ -8,7 +8,7 @@ import { recordAuditLog, requestAuditContext } from '@/lib/audit-log';
 import { applyMasteryUpdate } from '@/lib/mastery';
 import { withSerializableRetry } from '@/lib/prisma-retry';
 import { recordQuestionReview } from '@/lib/spaced-repetition-review';
-import { AUTO_SCORED_TYPES, answersMatch, countedQuestionIds, hasChoice, isAnswered } from '@/lib/exam-scoring';
+import { answersMatch, countedQuestionIds, hasChoice, isAnswered, isAutoScored } from '@/lib/exam-scoring';
 import { slotKeyOf } from '@/lib/choice-groups';
 import { roundMarks } from '@/lib/exam-patterns';
 import { answersToScore, isPastGrace } from '@/lib/exam-clock';
@@ -131,7 +131,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         let subjectiveImage = null;
         let reviewStatus: 'NOT_REQUIRED' | 'PENDING' = 'NOT_REQUIRED';
 
-        const isSubjective = isWrittenType(q.type);
+        const isSubjective = isWrittenType(q.type, q.options);
 
         if (isSubjective && studentResponse) {
           subjectiveText = typeof studentResponse.subjectiveText === 'string'
@@ -159,7 +159,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             // Answered beyond the section's limit: kept on the record, but it neither
             // scores nor counts as right, wrong or skipped.
             status = 'OVER_LIMIT';
-          } else if (AUTO_SCORED_TYPES.includes(q.type)) {
+          } else if (isAutoScored(q.type, q.options)) {
             if (answersMatch(q.type, q.correctAnswer, selectedOption)) {
               isCorrect = true;
               marksAwarded = section.marksPerQuestion;

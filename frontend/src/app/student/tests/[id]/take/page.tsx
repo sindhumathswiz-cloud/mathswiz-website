@@ -454,7 +454,7 @@ export default function TestTakingUI() {
     const instructionData = useMemo(() => ({
         rows: instructionRows(sections),
         maxMarks: examMaxFromSections(sections),
-        written: allQuestions.filter(q => isWrittenType(q.type)).length,
+        written: allQuestions.filter(q => isWrittenType(q.type, q.options)).length,
     }), [sections, allQuestions]);
 
     if (!testData || allQuestions.length === 0 || !currentQ || !activeSection) {
@@ -471,7 +471,7 @@ export default function TestTakingUI() {
     const attempted = attemptedIn(activeSection, responses);
     const isLastQuestion = currentIndex === allQuestions.length - 1;
     const numerical = isNumericalType(currentQ.type);
-    const written = isWrittenType(currentQ.type);
+    const written = isWrittenType(currentQ.type, currentQ.options);
     const alternatives = alternativePositions(activeSection, currentQ.id);
     const numericValue = String(responses[currentQ.id]?.selectedOption ?? '');
 
@@ -539,7 +539,7 @@ export default function TestTakingUI() {
                 <div className="flex-1 min-w-0 flex flex-col bg-white dark:bg-surface overflow-hidden lg:border-r border-slate-200 dark:border-white/10">
                     <div className="px-4 sm:px-8 py-3 bg-slate-50/60 dark:bg-surface-muted border-b border-slate-100 dark:border-white/10 flex flex-wrap items-center gap-x-3 gap-y-2 shrink-0">
                         <div className="w-8 h-8 rounded-lg bg-indigo-900 text-white flex items-center justify-center font-black text-sm tabular-nums">{positionInSection}</div>
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">{questionTypeLabel(currentQ.type)}</span>
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">{questionTypeLabel(currentQ.type, currentQ.options)}</span>
                         <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">{markingLabel(activeSection)}</span>
                         {alternatives.length > 0 && (
                             <span data-testid="alternative-note" className="rounded-md bg-violet-50 px-2 py-1 text-[11px] font-black text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
