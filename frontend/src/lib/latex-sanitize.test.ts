@@ -87,6 +87,15 @@ Now,$$\begin{aligned} & \sum X P(X)=\frac{263}{15} \end{aligned}$$$`;
     expect(display).toContain('\n+ y');
   });
 
+  it('keeps LaTeX commands that begin with "n", while still turning a stored "\\n" into a line break', () => {
+    const src = String.raw`(c) $( X , X ) \notin R$\n(d) $a \neq b$, $\neg p$, $\nabla f$, $x \ne 0$, $A \ni a$, $\nexists x$\nNext line`;
+    const out = sanitizeLatex(src);
+    for (const cmd of [String.raw`\notin`, String.raw`\neq`, String.raw`\neg`, String.raw`\nabla`, String.raw`\ne 0`, String.raw`\ni a`, String.raw`\nexists`]) expect(out).toContain(cmd);
+    expect(out).toContain('$\n(d)');
+    expect(out).toContain('$\nNext line');
+    expect(renders(out)).toBe(true);
+  });
+
   it('restores backslash commands a broken escape turned into control characters', () => {
     const broken = 'Evaluate $\\cot\\left[\\frac{1}{2}\\sin^{-1}\\left(\\frac{\\sqrt{3}}{2}\right)\\right]$ and $a \times b$, $\frac{1}{2}$, $\beta$, $\vec{a}$.';
     const out = sanitizeLatex(broken);

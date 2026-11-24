@@ -149,8 +149,10 @@ export function sanitizeLatex(text: string): string {
     // Step 6: Remove stray \left. or \right. that KaTeX sometimes chokes on
     result = result.replace(/\\left\./g, '').replace(/\\right\./g, '');
 
-    // Step 6b: Convert literal \n (backslash + n) to actual newlines
-    result = result.replace(/\\n/g, '\n');
+    // Step 6b: Convert literal \n (backslash + n) to actual newlines -- but not where the \n begins a LaTeX command:
+    // \notin, \neq, \ne, \neg, \nabla, \ni, \nexists ... were each read as a line break and the rest of the name
+    // ("otin", "eq") shown as text, so "(X, X) \notin R" displayed as "(X, X)" and "otinR" on the next line.
+    result = result.replace(/\\n(?!(?:otin|eq|e|eg|abla|i|exists|leq|geq|less|gtr|subseteq|supseteq|subset|supset|ot|u|ewline|mid|parallel|rightarrow|leftarrow|Rightarrow|Leftarrow|leftrightarrow|Leftrightarrow|cong|sim|vdash|prec|succ|atural|earrow|warrow)(?![a-zA-Z]))/g, '\n');
 
     // Step 6c: Auto-wrap bare LaTeX commands not already inside $...$ or $$...$$
     const LATEX_CMD = /\\(?:frac|dfrac|tfrac|cfrac|sqrt|int|sum|prod|lim|log|ln|sin|cos|tan|cot|sec|csc|sinh|cosh|tanh|coth|arcsin|arccos|arctan|deg|det|dim|exp|gcd|hom|inf|inj|ker|Pr|sup|liminf|limsup|min|max|arg|bmod|pmod|choose|binom|overset|underset|stackrel|implies|iff|to|mapsto|times|div|pm|mp|cdot|circ|bullet|cap|cup|vee|wedge|oplus|otimes|ominus|oslash|odot|bigcap|bigcup|bigvee|bigwedge|bigoplus|bigotimes|bigodot|leftarrow|rightarrow|Leftarrow|Rightarrow|leftrightarrow|Leftrightarrow|longleftarrow|longrightarrow|Longleftarrow|Longrightarrow|longleftrightarrow|Longleftrightarrow|uparrow|downarrow|Uparrow|Downarrow|updownarrow|Updownarrow|mapsto|longmapsto|hookleftarrow|hookrightarrow|le|ge|neq|approx|sim|cong|equiv|propto|prec|succ|preceq|succeq|subset|supset|subseteq|supseteq|setminus|neg|lnot|land|lor|forall|exists|nexists|top|bot|emptyset|varnothing|aleph|hbar|imath|jmath|ell|wp|Re|Im|partial|nabla|triangle|angle|measuredangle|sphericalangle|surd|prime|backprime|cancel|bcancel|xcancel|sout|vec|hat|bar|dot|ddot|tilde|check|breve|acute|grave|widehat|widetilde|overrightarrow|overleftarrow|overleftrightarrow|underrightarrow|underleftarrow|underleftrightarrow|overline|underline|underbrace|overbrace|boxed|operatorname|text|textbf|textit|mathrm|displaystyle|limits|left|right|begin|end|bigl|bigr|Bigl|Bigr|biggl|biggr|Biggl|Biggr)\b/;
