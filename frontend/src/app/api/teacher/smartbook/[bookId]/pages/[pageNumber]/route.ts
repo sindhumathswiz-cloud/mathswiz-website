@@ -14,7 +14,7 @@ const contentTypeFor = (file: string) => {
   return ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
 };
 
-/** One printed page of a book, for a Premium teacher, and only pages inside its exercises or sections. */
+/** One printed page of any active book, for a Premium teacher. */
 export async function GET(_request: Request, { params }: { params: Promise<{ bookId: string; pageNumber: string }> }) {
   const session = await getServerSession(authOptions);
   const guard = await requirePremiumTeacher(session);

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
@@ -13,7 +13,7 @@ const json = (status: number, body: unknown) => Promise.resolve(new Response(JSO
 
 const renderPlayer = (mode: 'student' | 'teacher', questions = [mcq, proof], extra = {}) => render(
   <SmartbookPlayer mode={mode} backHref="/back" backLabel="Xam Idea" eyebrow="Integrals" title="Multiple choice" pages={[238, 239]}
-    pageImageUrl={(p) => `/img/${p}`} questions={questions} storageKey="test:index" {...extra} />,
+    pageImageUrl={(p) => `/img/${p}`} questions={questions} storageKey="test:index" defaultView="practice" {...extra} />,
 );
 
 describe('SmartbookPlayer (student)', () => {
@@ -75,6 +75,52 @@ describe('SmartbookPlayer (teacher)', () => {
     expect(screen.getByTestId('smartbook-solution-q1')).toHaveTextContent('Four.');
     expect(screen.getByRole('button', { name: 'Bookmark q1' })).toBeInTheDocument();
     expect(screen.queryByTestId('submit-answer')).toBeNull();
+  });
+});
+
+describe('SmartbookPlayer (reader view)', () => {
+  // jsdom has no canvas drawing.
+  beforeEach(() => { window.localStorage.clear(); vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null); });
+  const renderReader = () => render(
+    <SmartbookPlayer mode="student" backHref="/back" backLabel="Xam Idea" eyebrow="Integrals" title="Multiple choice" pages={[238, 239]}
+      readerPages={[236, 237, 238, 239, 240, 241]} pageImageUrl={(p) => `/img/${p}`} questions={[mcq, { ...proof, sourcePageStart: 240 }]} storageKey="test:index" />,
+  );
+
+  it("shows every page of the chapter one below another, at the question's page, with a blank whiteboard beside", () => {
+    renderReader();
+    const pages = screen.getByTestId('reader-pages');
+    expect(within(pages).getAllByRole('img').map((img) => img.getAttribute('src'))).toEqual(['/img/236', '/img/237', '/img/238', '/img/239', '/img/240', '/img/241']);
+    expect(screen.getByTestId('reader-page')).toHaveTextContent('Page 238');
+    expect(screen.getByTestId('reader-page')).toHaveTextContent('pp. 236–241');
+    expect(screen.getByTestId('whiteboard')).toHaveAttribute('data-strokes', '0');
+    expect(screen.getByTestId('tab-board')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it("lists the questions in a tab, and picking one goes to its page", () => {
+    renderReader();
+    fireEvent.click(screen.getByTestId('tab-questions'));
+    expect(screen.queryByTestId('whiteboard')).toBeNull();
+    expect(screen.getByText('What is 2+2?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Question 2' }));
+    expect(screen.getByText('Prove that x = x.')).toBeInTheDocument();
+    expect(screen.getByTestId('reader-page')).toHaveTextContent('Page 240');
+    fireEvent.click(screen.getByTestId('tab-board'));
+    expect(screen.getByTestId('whiteboard')).toBeInTheDocument();
+  });
+
+  it('zooms the pages, and remembers practice view on this device', () => {
+    renderReader();
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(screen.getByText('125%')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('view-practice'));
+    expect(screen.getByTestId('toggle-page')).toBeInTheDocument();
+    expect(window.localStorage.getItem('smartbook:view')).toBe('practice');
+  });
+
+  it("reads the exercise's own pages when no chapter pages are given", () => {
+    render(<SmartbookPlayer mode="student" backHref="/back" backLabel="Xam Idea" eyebrow="Integrals" title="Multiple choice" pages={[238, 239]}
+      pageImageUrl={(p) => `/img/${p}`} questions={[mcq]} storageKey="test:index" />);
+    expect(within(screen.getByTestId('reader-pages')).getAllByRole('img')).toHaveLength(2);
   });
 });
 

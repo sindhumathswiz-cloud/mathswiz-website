@@ -9,6 +9,7 @@ interface ExerciseData {
   chapter: { id: string; name: string; chapterNumber: string | null };
   exercise: { id: string; label: string; startPage: number | null; endPage: number | null };
   pages: number[];
+  chapterPages?: number[];
   questions: PlayerQuestion[];
   previous: { id: string; label: string } | null;
   next: { id: string; label: string } | null;
@@ -26,6 +27,7 @@ export default function TeacherExerciseClient({ data, bookmarked }: { data: Exer
       eyebrow={`${data.book.title} · ${data.chapter.chapterNumber ? `${data.chapter.chapterNumber}. ` : ''}${data.chapter.name}`}
       title={data.exercise.label}
       pages={data.pages}
+      readerPages={data.chapterPages}
       pageImageUrl={(page) => `/api/teacher/smartbook/${data.book.id}/pages/${page}`}
       questions={data.questions}
       storageKey={`teacher-smartbook:${data.exercise.id}:index`}

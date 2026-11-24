@@ -80,6 +80,19 @@ export function exercisePages(exercise: { startPage: number | null; endPage: num
   return pages;
 }
 
+/** A chapter's own pages too many to read in one go are cut here; the reader starts at the exercise anyway. */
+export const MAX_CHAPTER_PAGES = 120;
+
+/**
+ * The pages of a chapter a reader may open, in order: every page inside one of its sections (theory, examples,
+ * exercises) -- the same pages the page-image routes serve -- so the book reads on from the exercise like a PDF.
+ */
+export function chapterPages(sections: Array<{ startPage: number | null; endPage: number | null }>): number[] {
+  const pages = new Set<number>();
+  for (const section of sections) for (const page of exercisePages(section)) pages.add(page);
+  return [...pages].sort((a, b) => a - b).slice(0, MAX_CHAPTER_PAGES);
+}
+
 /** Questions in the order they are printed: by page, then by printed number (2 before 10, 3(a) before 3(b)). */
 export function inPrintedOrder<T extends { sourcePageStart: number | null; printedNumber: string | null; createdAt?: Date | string }>(questions: T[]): T[] {
   return [...questions].sort((a, b) =>

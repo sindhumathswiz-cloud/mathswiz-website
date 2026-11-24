@@ -28,12 +28,12 @@ export default function TeacherSmartbookClient({ books }: { books: SourceBook[] 
 
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 dark:bg-background md:p-10">
+    <main className="min-h-screen bg-slate-50 p-6 dark:bg-background md:px-10 md:pb-10 md:pt-12">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex items-center gap-3">
           <BookOpenText className="h-9 w-9 text-indigo-600 dark:text-brand" />
           <div>
-            <h1 className="font-display text-3xl font-black text-slate-900 dark:text-white">Smartbook</h1>
+            <h2 className="font-display text-2xl font-black text-slate-900 dark:text-white">Exercises as tests</h2>
             <p className="text-slate-600 dark:text-slate-400">Open any exercise of a book to go through its questions with their solutions, bookmark them or add them to a test, or set the whole exercise as a test or homework. Only approved questions are included, in the order the book prints them.</p>
           </div>
           <Link href="/teacher/smartbook/bookmarks" data-testid="my-bookmarks" className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-white/15 dark:bg-surface dark:text-slate-200"><Bookmark className="h-4 w-4" /> My bookmarks</Link>

@@ -32,7 +32,7 @@ describe('GET /api/student/smartbook/[bookId]/pages/[pageNumber]', () => {
     expect(smartbookPageImagePath).toHaveBeenCalledWith('b1', 244, 'Class 12');
   });
 
-  it('refuses a page outside the book\'s exercises, another class\'s book, or an unpublished one', async () => {
+  it('refuses another class\'s book, an unpublished one, or a page the book does not have', async () => {
     smartbookPageImagePath.mockResolvedValue(null);
     expect((await get()).status).toBe(404);
   });

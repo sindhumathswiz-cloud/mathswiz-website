@@ -19,7 +19,7 @@ type CatalogBook = {
   className: string;
   _count: { chapters: number; questions: number; ingestionRuns: number };
   confirmedChapters: number;
-  // When set, students of this class can read the book as a Smartbook (and its pages are never cleaned up).
+  // When set, students of this class can read the book in My Books (and its pages are never cleaned up).
   smartbookPublishedAt: string | null;
   ingestionRuns: Array<{ id: string; status: string; stage: string; progress: number; totalPages: number | null; processedPages: number; extractedQuestions: number; reviewRequired: number; providerConfig: { sourceProfile?: string } | null; errorMessage: string | null }>;
 };
@@ -44,16 +44,16 @@ export default function BookCatalogClient() {
   const [publishingBookId, setPublishingBookId] = useState<string | null>(null);
 
   async function setSmartbook(book: CatalogBook, publish: boolean) {
-    if (publish && !confirm(`Publish "${book.title}" as a Smartbook? Students in ${book.className} will be able to read its pages beside its approved questions, and its pages will no longer be cleaned up after 60 days.`)) return;
+    if (publish && !confirm(`Publish "${book.title}" to students? Students in ${book.className} will be able to read the whole book, page by page, in My Books, and its pages will no longer be cleaned up after 60 days.`)) return;
     setPublishingBookId(book.id);
     try {
       const response = await fetch(`/api/admin/books/${book.id}/smartbook`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish }) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not change the Smartbook setting');
-      setMessage({ kind: 'success', text: publish ? `"${book.title}" is published as a Smartbook for ${book.className}.` : `"${book.title}" is no longer a Smartbook.` });
+      if (!response.ok) throw new Error(data.error || 'Could not change whether the book is published');
+      setMessage({ kind: 'success', text: publish ? `"${book.title}" is published to ${book.className} students.` : `"${book.title}" is no longer published to students.` });
       await loadBooks();
     } catch (error) {
-      setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Could not change the Smartbook setting' });
+      setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Could not change whether the book is published' });
     } finally {
       setPublishingBookId(null);
     }
@@ -533,7 +533,7 @@ export default function BookCatalogClient() {
                       className={`mt-3 ml-0 inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-black disabled:opacity-60 sm:ml-3 ${book.smartbookPublishedAt ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:bg-surface dark:border-white/10 dark:text-slate-300'}`}
                     >
                       {publishingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
-                      {book.smartbookPublishedAt ? 'Smartbook: published (withdraw)' : 'Publish as Smartbook'}
+                      {book.smartbookPublishedAt ? 'Published to students (withdraw)' : 'Publish to students'}
                     </button>
                   )}
                   {book.ingestionRuns[0]?.processedPages > 0 && (

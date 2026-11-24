@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (body.publish) {
     const run = book.ingestionRuns[0];
-    if (!run?.sourceDocumentId) return NextResponse.json({ error: 'Upload and render the book before publishing it as a Smartbook.' }, { status: 409 });
+    if (!run?.sourceDocumentId) return NextResponse.json({ error: 'Upload and render the book before publishing it to students.' }, { status: 409 });
     if (run.draftPurgedAt) return NextResponse.json({ error: 'This book\'s pages were removed by the draft clean-up. Render it again from its PDF, then publish.' }, { status: 409 });
     const withImages = await prisma.documentPage.count({ where: { documentId: run.sourceDocumentId, OR: [{ pageImagePath: { not: null } }, { processedImagePath: { not: null } }] } });
     if (withImages === 0) return NextResponse.json({ error: 'None of this book\'s pages has an image yet. Render the pages, then publish.' }, { status: 409 });

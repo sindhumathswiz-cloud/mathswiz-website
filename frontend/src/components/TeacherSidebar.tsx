@@ -90,7 +90,7 @@ export default function TeacherSidebar() {
         { href: '/teacher/question-bank/browse', icon: <Search size={18} />, label: 'Find Questions', premium: true },
         { href: dashboardHref('Test & Exam Engine'), icon: <ClipboardList size={18} />, label: 'Test & Exams', tab: 'Test & Exam Engine', premium: true },
         { href: '/teacher/homework', icon: <ClipboardCheck size={18} />, label: 'Written Answers', premium: true },
-        { href: '/teacher/smartbook', icon: <BookOpenText size={18} />, label: 'Smartbook', premium: true },
+        { href: '/teacher/smartbook', icon: <BookOpenText size={18} />, label: 'Books', premium: true },
     ];
 
     const insightItems: TeacherNavItem[] = [

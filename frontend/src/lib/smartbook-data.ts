@@ -5,8 +5,9 @@
 import type { Prisma } from '@prisma/client';
 import prisma from './prisma';
 import { isPremiumSubscription } from './subscription';
-import { buildOutline, exercisePages, inPrintedOrder, type SmartbookOutline } from './smartbook';
+import { buildOutline, chapterPages, exercisePages, inPrintedOrder, type SmartbookOutline } from './smartbook';
 import { exerciseLabel, questionInExercise } from './question-source-filter';
+import { readerPageImagePath, studentBooksWhere } from './book-reader';
 
 export async function studentSmartbookAccess(userId: string): Promise<{ premium: boolean; className: string | null }> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { subscription: true, class: true } });
@@ -89,37 +90,27 @@ async function loadExercise(bookId: string, exerciseId: string, bookWhere: Prism
   const outline = await outlineOf(bookId);
   const flat = outline.chapters.flatMap((c) => c.exercises.map((e) => ({ id: e.id, label: `${c.name} · ${e.label}` })));
   const at = flat.findIndex((e) => e.id === exercise.id);
+  const sections = await prisma.bookExercise.findMany({ where: { chapterId: exercise.chapterId }, select: { startPage: true, endPage: true } });
 
   return {
     book,
     chapter: exercise.chapter,
     exercise: { id: exercise.id, label: exerciseLabel(exercise), startPage: exercise.startPage, endPage: exercise.endPage },
     pages: exercisePages(exercise),
+    // The whole chapter, for reading on from the exercise like a PDF.
+    chapterPages: chapterPages(sections),
     questions,
     previous: at > 0 ? flat[at - 1] : null,
     next: at >= 0 && at < flat.length - 1 ? flat[at + 1] : null,
   };
 }
 
-/** The stored image of one page of a published book, if that page is inside one of its exercises or sections. */
+/** The stored image of any page of a book published to this student's class (the book is read whole, like its PDF). */
 export async function smartbookPageImagePath(bookId: string, pageNumber: number, className: string | null): Promise<string | null> {
-  return pageImagePath(bookId, pageNumber, publishedFor(className));
+  return readerPageImagePath(bookId, pageNumber, studentBooksWhere(className));
 }
 
-/** The same for a teacher: any active book, still only pages inside its exercises or sections. */
+/** The same for a teacher: any page of any active book. */
 export async function teacherPageImagePath(bookId: string, pageNumber: number): Promise<string | null> {
-  return pageImagePath(bookId, pageNumber, { isActive: true });
-}
-
-async function pageImagePath(bookId: string, pageNumber: number, bookWhere: Prisma.BookWhereInput): Promise<string | null> {
-  const book = await prisma.book.findFirst({
-    where: { id: bookId, ...bookWhere },
-    select: { ingestionRuns: { orderBy: { createdAt: 'desc' }, take: 1, select: { sourceDocumentId: true } } },
-  });
-  const documentId = book?.ingestionRuns[0]?.sourceDocumentId;
-  if (!documentId) return null;
-  const inside = await prisma.bookExercise.count({ where: { chapter: { bookId }, startPage: { lte: pageNumber }, OR: [{ endPage: { gte: pageNumber } }, { endPage: null, startPage: pageNumber }] } });
-  if (inside === 0) return null;
-  const page = await prisma.documentPage.findFirst({ where: { documentId, pageNumber }, select: { processedImagePath: true, pageImagePath: true } });
-  return page?.processedImagePath || page?.pageImagePath || null;
+  return readerPageImagePath(bookId, pageNumber, { isActive: true });
 }

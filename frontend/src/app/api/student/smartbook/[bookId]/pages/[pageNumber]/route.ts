@@ -13,7 +13,7 @@ const contentTypeFor = (file: string) => {
   return ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
 };
 
-/** One printed page of a Smartbook, for a Premium student of the book's class, and only pages inside its exercises. */
+/** One printed page of a book published to the student's class, for a Premium student: any page, as the book is read whole. */
 export async function GET(_request: Request, { params }: { params: Promise<{ bookId: string; pageNumber: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== 'STUDENT') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
