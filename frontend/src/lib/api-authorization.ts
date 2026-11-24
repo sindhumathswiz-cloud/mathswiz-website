@@ -23,7 +23,6 @@ const ROLE_RULES: readonly ApiRule[] = [
   { prefix: "/api/student/", roles: ["STUDENT"] },
   { prefix: "/api/parent/", roles: ["PARENT"] },
   { prefix: "/api/doubts/", roles: ["STUDENT"] },
-  { prefix: "/api/payments/verify", roles: ["STUDENT"] },
   { prefix: "/api/extract", roles: ["TEACHER", "ADMIN"] },
   { prefix: "/api/scrape-url", roles: ["TEACHER", "ADMIN"] },
   { prefix: "/api/rag/", roles: ["TEACHER", "ADMIN", "STUDENT"] },

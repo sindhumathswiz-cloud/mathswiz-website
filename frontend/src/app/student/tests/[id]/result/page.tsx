@@ -4,9 +4,14 @@ import React from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, XCircle, MinusCircle, TrendingUp, ChevronRight } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 
+// The result reads its figures from the URL, which a statically built page only has in the browser.
 export default function ExamResultPage() {
+  return <Suspense fallback={null}><ExamResult /></Suspense>;
+}
+
+function ExamResult() {
   const searchParams = useSearchParams();
   const attemptId = searchParams.get('attemptId') ?? '';
   const score = parseFloat(searchParams.get('score') ?? '0');

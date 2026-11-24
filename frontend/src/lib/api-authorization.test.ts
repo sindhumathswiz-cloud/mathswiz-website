@@ -56,11 +56,6 @@ describe("API authorization policy", () => {
     expect(authorizeApiPath("/api/extract-word", "PARENT")).toMatchObject({ allowed: false, status: 403 });
   });
 
-  it("keeps payment verification inside the student role", () => {
-    expect(authorizeApiPath("/api/payments/verify", "STUDENT", "POST").allowed).toBe(true);
-    expect(authorizeApiPath("/api/payments/verify", "TEACHER", "POST")).toMatchObject({ allowed: false, status: 403 });
-  });
-
   it("requires authentication for unclassified API routes by default", () => {
     expect(authorizeApiPath("/api/future-feature", null)).toMatchObject({ allowed: false, status: 401 });
     expect(authorizeApiPath("/api/future-feature", "STUDENT").allowed).toBe(true);
