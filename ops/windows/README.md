@@ -16,22 +16,33 @@ testing and the staging site in the main checkout never affect it. Cloudflare Tu
 
 ## What keeps it running
 
-Two Windows scheduled tasks (Task Scheduler → Task Scheduler Library), both run hidden at logon:
+Two Windows scheduled tasks (Task Scheduler → Task Scheduler Library). `register-tasks.ps1` creates them; run it
+again if they are ever deleted or changed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\Mathswiz WebAppln\mathswiz-live\ops\windows\register-tasks.ps1"
+```
+
+Each runs its script through `conhost --headless`, so there is no window to close by mistake: a closed console
+window stops the site.
 
 | Task | Runs | Does |
 |---|---|---|
 | **Mathswiz Live Site** | `ops\windows\start-live.ps1` | Serves the live build on port 3000; restarts it within 5 seconds if it stops |
 | **Mathswiz Tunnel** | `ops\windows\start-tunnel.ps1` | Runs `cloudflared tunnel run mathswiz`; reconnects within 10 seconds if it stops |
 
-Each task also runs again every 5 minutes as a watchdog: while its script is still running the extra run is ignored,
-and if the script itself was stopped, it starts again. To start them now without logging out:
+Each task starts at logon and also every 5 minutes as a watchdog: while its script is still running the extra run
+is ignored, and if the script itself was stopped, it starts again. To start them now without logging out:
 
 ```powershell
 Start-ScheduledTask -TaskName 'Mathswiz Live Site'; Start-ScheduledTask -TaskName 'Mathswiz Tunnel'
 ```
 
-The PC is set never to sleep while plugged in (`powercfg /change standby-timeout-ac 0`; it was 5 minutes). On
-battery it still sleeps after 3 minutes, which takes the site offline, so keep it plugged in and the lid open.
+While plugged in, the PC is set never to sleep (`powercfg /change standby-timeout-ac 0`; it was 5 minutes) and never
+to turn the screen off (`powercfg /change monitor-timeout-ac 0`; it was 5 minutes). Both are needed. This laptop
+uses Modern Standby, so when the screen turns off on its own, the laptop goes into standby and the site goes offline.
+Turning the brightness down is fine. On battery it still sleeps after 3 minutes, so keep it plugged in and the lid
+open; closing the lid or pressing the power button also puts it into standby.
 
 ## Put new code live
 
