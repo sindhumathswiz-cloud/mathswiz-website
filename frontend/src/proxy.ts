@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import { authorizeApiPath } from "@/lib/api-authorization";
 import { checkRateLimit, type RateLimitTier } from "@/lib/rate-limit";
 import { contentRole, IMPORTS_ON_STAGING_MESSAGE, isStagingOnlyWrite } from "@/lib/content-role";
+import { canonicalRedirect, clientIp } from "@/lib/canonical-host";
 
 const AI_PATHS = [
   "/api/doubts/",
@@ -30,6 +31,9 @@ const AUTH_PATHS = [
 
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
+  // The live site answers on one address only: https://www.sindhusmathswizclasses.com (see lib/canonical-host).
+  const canonical = canonicalRedirect(req.nextUrl, req.headers, process.env.CANONICAL_HOST);
+  if (canonical) return NextResponse.redirect(canonical, 308);
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET || process.env.NEXT_AUTH_SECRET });
 
   if (path.startsWith("/api/")) {
@@ -54,8 +58,7 @@ export async function proxy(req: NextRequest) {
     if (AI_PATHS.some((prefix) => path.startsWith(prefix))) rateTier = "ai";
     else if (AUTH_PATHS.some((prefix) => path.startsWith(prefix))) rateTier = "auth";
 
-    const forwardedIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-    const ip = forwardedIp || req.headers.get("x-real-ip") || "unknown";
+    const ip = clientIp(req.headers);
     const identity = token?.id ? `user:${String(token.id)}` : `ip:${ip}`;
     const limit = await checkRateLimit(identity, rateTier);
 
@@ -123,5 +126,7 @@ export const config = {
     "/api/auth/:path*",
     "/api/register",
     "/api/:path*",
+    // Every other page too, for the one-address redirect; not build assets or files in public/.
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|webp|ico|txt|xml)$).*)",
   ],
 };

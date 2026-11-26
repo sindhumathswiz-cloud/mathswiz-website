@@ -14,6 +14,8 @@ Set-Location $frontend
 
 while ($true) {
     $log = Join-Path $logDir ('live-{0:yyyy-MM-dd}.log' -f (Get-Date))
+    # A server left running by an earlier copy of this script still serves the site: leave it, and check again later.
+    if (netstat -ano | Select-String 'LISTENING' | Select-String ":$port\s") { Start-Sleep -Seconds 15; continue }
     $buildFile = Join-Path $frontend '.live-build'
     $build = if (Test-Path $buildFile) { (Get-Content $buildFile -TotalCount 1).Trim() } else { '.next' }
     $env:NEXT_DIST_DIR = $build
