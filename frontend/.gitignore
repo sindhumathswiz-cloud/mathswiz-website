@@ -17,6 +17,10 @@
 /e2e/.auth/
 /.next-e2e/
 /.next-staging/
+# The live copy builds alternately into these and names the one it serves in .live-build (ops/windows).
+/.next-a/
+/.next-b/
+/.live-build
 /logs/
 
 # next.js
