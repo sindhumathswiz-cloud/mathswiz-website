@@ -44,6 +44,30 @@ uses Modern Standby, so when the screen turns off on its own, the laptop goes in
 Turning the brightness down is fine. On battery it still sleeps after 3 minutes, so keep it plugged in and the lid
 open; closing the lid or pressing the power button also puts it into standby.
 
+## Database backups
+
+The free Supabase plan keeps no backups, so this PC does. The **Mathswiz Database Backup** task runs
+`backup-db.ps1` every night at 02:00, or as soon as the PC is back if it was off or asleep then. Each run writes
+`D:\Mathswiz Backups\mathswiz-YYYY-MM-DD_HHmm.dump` and keeps the 14 newest. Results are in
+`D:\Mathswiz Backups\backup.log`; a failed run writes a `FAILED:` line there. The backups hold student names, mobile
+numbers and payment records, so keep that folder private.
+
+- Each backup covers the `public` schema, which holds every table the app uses. Supabase's own `auth` and `storage`
+  schemas are empty here.
+- The PostgreSQL 17 client tools (`pg_dump`, `pg_restore`, `psql`) are in `D:\Mathswiz WebAppln\tools\pgsql\bin`,
+  taken from the official EDB Windows zip.
+- Back up now: `powershell -ExecutionPolicy Bypass -File "D:\Mathswiz WebAppln\mathswiz-live\ops\windows\backup-db.ps1"`
+- Recreate the nightly task: the same command with `-Register`.
+
+Restore into an **empty** Postgres 17 database, for example a new Supabase project or the future VPS, never over
+the live one. The app's tables use the `vector` and `uuid-ossp` extensions, so create those first:
+
+```powershell
+$bin = 'D:\Mathswiz WebAppln\tools\pgsql\bin'
+& "$bin\psql.exe" "<new database URL>" -c 'create extension if not exists vector; create extension if not exists "uuid-ossp";'
+& "$bin\pg_restore.exe" --no-owner --no-privileges --dbname "<new database URL>" "D:\Mathswiz Backups\<backup>.dump"
+```
+
 ## Put new code live
 
 Commit to `main` in the main checkout, then:
