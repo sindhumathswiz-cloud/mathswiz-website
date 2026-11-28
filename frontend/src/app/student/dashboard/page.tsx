@@ -151,7 +151,7 @@ export default async function StudentDashboard() {
             .reduce((sum: number, p: any) => sum + p.amount, 0);
         
         const overdueAmount = payments
-            .filter((p: any) => p.status !== 'PAID' && p.dueDate && new Date(p.dueDate) < new Date())
+            .filter((p: any) => p.status !== 'PAID' && p.status !== 'PENDING_VERIFICATION' && p.dueDate && new Date(p.dueDate) < new Date())
             .reduce((sum: number, p: any) => sum + p.amount, 0);
 
         return (

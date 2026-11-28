@@ -31,6 +31,11 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
     const [filterStatus, setFilterStatus] = useState('ALL');
 
     const handleMarkPaid = async (paymentId: string) => {
+        const payment = payments.find(p => p.id === paymentId);
+        if (payment?.status === 'PENDING_VERIFICATION' && payment.transactionId
+            && !window.confirm(`The student reports paying ₹${Number(payment.amount).toLocaleString('en-IN')} by UPI, reference ${payment.transactionId}. Have you found it in your bank app? Mark it paid?`)) {
+            return;
+        }
         try {
             const res = await fetch(`/api/admin/payments/${paymentId}/mark-paid`, {
                 method: 'PATCH',
@@ -174,7 +179,7 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
                                 Clear
                             </button>
                         )}
-                        {['ALL', 'PAID', 'UPCOMING', 'UNPAID'].map(status => (
+                        {['ALL', 'PENDING_VERIFICATION', 'PAID', 'UPCOMING', 'UNPAID'].map(status => (
                             <button 
                                 key={status}
                                 onClick={() => setFilterStatus(status)}
@@ -184,7 +189,7 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
                                     : 'bg-white dark:bg-surface text-gray-500 dark:text-slate-400 border border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5'
                                 }`}
                             >
-                                {status === 'UNPAID' ? 'Overdue' : status}
+                                {status === 'UNPAID' ? 'Overdue' : status === 'PENDING_VERIFICATION' ? 'To confirm' : status}
                             </button>
                         ))}
                     </div>
@@ -231,8 +236,11 @@ export const FeeManagement = ({ payments: initialPayments }: FeeManagementProps)
                                             p.status === 'UNPAID' ? 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400' :
                                             'bg-amber-50 border-amber-100 text-amber-600 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400'
                                         }`}>
-                                            {p.status}
+                                            {p.status === 'PENDING_VERIFICATION' ? 'To confirm' : p.status}
                                         </span>
+                                        {p.status === 'PENDING_VERIFICATION' && p.transactionId && (
+                                            <p className="mt-1 text-[10px] font-bold text-gray-500 dark:text-slate-400">UPI ref <span className="font-mono">{p.transactionId}</span></p>
+                                        )}
                                     </td>
                                     <td className="px-6 py-5 text-right">
                                         <div className="flex items-center justify-end gap-2">

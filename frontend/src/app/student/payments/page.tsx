@@ -29,7 +29,8 @@ export default async function StudentPaymentsPage() {
         .reduce((sum: number, p: any) => sum + p.amount, 0);
     
     const overdueAmount = payments
-        .filter((p: any) => p.status !== 'PAID' && p.dueDate && new Date(p.dueDate) < new Date())
+        // A fee the student has reported paying is not overdue while a teacher checks it.
+        .filter((p: any) => p.status !== 'PAID' && p.status !== 'PENDING_VERIFICATION' && p.dueDate && new Date(p.dueDate) < new Date())
         .reduce((sum: number, p: any) => sum + p.amount, 0);
 
     return (

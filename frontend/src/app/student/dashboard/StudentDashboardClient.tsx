@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import UpiPayDialog from '@/components/payments/UpiPayDialog';
 import { useSession } from 'next-auth/react';
 import { BookOpen, FileText, CheckCircle, PlayCircle, Lock, Download, Calendar, BarChart3, PlusCircle, Bot, Sparkles, UserCircle, Loader2, XCircle, ClipboardList, Clock, CreditCard, Target, Star, MessageSquare, TrendingUp, Video } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -48,7 +49,9 @@ export default function StudentDashboardClient({
     const { data: session } = useSession();
     type StudentTab = 'batches' | 'tests' | 'materials' | 'performance' | 'profile' | 'payments' | 'achieve' | 'live-classes';
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState<StudentTab>(defaultTab || 'batches');
+    const [payingFee, setPayingFee] = useState<any | null>(null);
 
     // The sidebar drives navigation for the dashboard-hosted sections (My
     // Batches / Live Classes / Profile) via ?tab= -- the routed sections
@@ -689,7 +692,14 @@ export default function StudentDashboardClient({
                                 </div>
                             </div>
 
-                            <div className="border border-gray-200 rounded-2xl overflow-hidden scrollbar-none">
+                            {payingFee && (
+                                <UpiPayDialog
+                                    fee={payingFee}
+                                    onClose={() => setPayingFee(null)}
+                                    onReported={() => { setPayingFee(null); router.refresh(); }}
+                                />
+                            )}
+                            <div className="border border-gray-200 rounded-2xl overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50 uppercase tracking-widest text-[10px] font-black text-gray-400">
                                         <tr>
@@ -720,7 +730,7 @@ export default function StudentDashboardClient({
                                                         {p.status === 'PAID' ? (
                                                             <div>
                                                                 <p className="text-xs font-bold text-emerald-700">Paid on</p>
-                                                                <p className="text-[10px] text-gray-500 font-medium">{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</p>
+                                                                <p className="text-[10px] text-gray-500 font-medium">{p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</p>
                                                             </div>
                                                         ) : (
                                                             <div>
@@ -751,8 +761,18 @@ export default function StudentDashboardClient({
                                                                     Download Receipt
                                                                 </button>
                                                             </div>
+                                                        ) : p.status === 'PENDING_VERIFICATION' ? (
+                                                            <div className="flex flex-col items-end gap-1">
+                                                                <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded-lg border border-amber-300 text-[10px] font-black uppercase flex items-center gap-1">
+                                                                    <Clock className="w-3 h-3" /> Checking payment
+                                                                </span>
+                                                                <span className="text-[10px] text-gray-500 font-mono">UPI ref {p.transactionId}</span>
+                                                                <button onClick={() => setPayingFee(p)} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline underline-offset-2">
+                                                                    Change reference
+                                                                </button>
+                                                            </div>
                                                         ) : (
-                                                            <button className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition shadow-sm shadow-indigo-200">
+                                                            <button onClick={() => setPayingFee(p)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition shadow-sm shadow-indigo-200">
                                                                 Pay Now
                                                             </button>
                                                         )}

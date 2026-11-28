@@ -924,11 +924,20 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                    ) : (
-                                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${row.displayStatus === 'UPCOMING' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                                                            {row.displayStatus}
-                                                        </span>
-                                                    )}
+                                                    ) : row.status === 'PENDING_VERIFICATION' ? (
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 w-max">TO CONFIRM</span>
+                                                            <div className="text-[10px] text-gray-500 font-bold leading-tight">Student paid by UPI · ref <span className="font-mono">{row.transactionId}</span></div>
+                                                        </div>
+                                                    ) : (() => {
+                                                        // Past its due date and still unpaid: show it as overdue (UNPAID), as the totals above do.
+                                                        const shown = row.status === 'UPCOMING' && row.dueDate && new Date(row.dueDate) < now ? 'UNPAID' : row.status;
+                                                        return (
+                                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${shown === 'UPCOMING' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                                                {shown}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                     {row.dueDate ? new Date(row.dueDate).toLocaleDateString('en-IN') : '—'}
@@ -1287,6 +1296,11 @@ export default function ManageBatchClient({ batch, availableTests, initialAttemp
                             <p className="text-xs font-bold text-emerald-600 uppercase mb-1">Payment Detail</p>
                             <p className="text-lg font-black text-emerald-900">₹ {selectedPaymentForMark.amount?.toLocaleString('en-IN')}</p>
                             <p className="text-sm text-emerald-700">{selectedPaymentForMark.description}</p>
+                            {selectedPaymentForMark.status === 'PENDING_VERIFICATION' && selectedPaymentForMark.transactionId && (
+                                <p className="text-sm text-emerald-800 mt-2">
+                                    The student reports paying by UPI, reference <span className="font-mono font-bold">{selectedPaymentForMark.transactionId}</span>. Find it in your bank app before confirming.
+                                </p>
+                            )}
                         </div>
 
                         <form action={async (formData) => {
