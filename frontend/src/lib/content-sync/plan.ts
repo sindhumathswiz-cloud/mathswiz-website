@@ -190,7 +190,17 @@ export function planSync(input: PlanInput): Plan {
       return decide(table.name, id, 'held', 'its question is not approved');
     }
     if (isLive) return decide(table.name, id, 'promote');
+    // A book published to students is read page by page on the live site, so it goes up with its source documents
+    // (whose pages follow them) and its chapter list, whether or not any approved question needs them.
+    const bookId = table.name === 'Book' ? id : table.name === 'SourceDocument' || table.name === 'BookChapter' ? row.bookId : null;
+    if (isPublishedBook(bookId)) return decide(table.name, id, 'promote', 'part of a book published to students');
     pending.set(ledgerKey(table.name, id), table.gate === 'parent' ? 'parent-up' : 'need-up');
+  }
+
+  function isPublishedBook(bookId: string | null | undefined): boolean {
+    const book = bookId == null ? undefined : staging.Book?.get(bookId);
+    // Rows arrive as raw text, so a boolean column reads 't' or 'f'.
+    return book != null && book.smartbookPublishedAt != null && book.isActive !== 'f' && book.isActive !== 'false';
   }
 
   // --- 3. Parents travel with their children; children whose parents cannot are blocked ----------------------

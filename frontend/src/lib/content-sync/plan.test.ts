@@ -120,6 +120,48 @@ describe('planSync: approval and what travels with a question', () => {
     expect(of('DocumentPage', 'p2')?.action).toBe('promote');
   });
 
+  it('sends a book published to students up with its pages and chapters, even with no approved question', () => {
+    const s = {
+      User: [admin],
+      Book: [book('b1', { smartbookPublishedAt: '2026-11-28 10:00:00', isActive: 't' }), book('b2', { isActive: 't' })],
+      BookChapter: [{ id: 'c1', bookId: 'b1', orderIndex: '0' }, { id: 'c2', bookId: 'b2', orderIndex: '0' }],
+      SourceDocument: [{ id: 'd1', ingestedBy: 'u-admin', bookId: 'b1' }, { id: 'd2', ingestedBy: 'u-admin', bookId: 'b2' }],
+      DocumentPage: [{ id: 'p1', documentId: 'd1', pageNumber: '1' }, { id: 'p2', documentId: 'd2', pageNumber: '1' }],
+    };
+    const { of } = run(s, { User: [admin] }, ledgerOf({ User: [admin] }));
+    for (const [table, id] of [['Book', 'b1'], ['BookChapter', 'c1'], ['SourceDocument', 'd1'], ['DocumentPage', 'p1']]) {
+      expect(of(table, id)?.action).toBe('promote');
+    }
+    // An unpublished book still waits until something approved needs it.
+    for (const [table, id] of [['Book', 'b2'], ['BookChapter', 'c2'], ['SourceDocument', 'd2'], ['DocumentPage', 'p2']]) {
+      expect(of(table, id)?.action).toBe('held');
+    }
+  });
+
+  it('publishes the pages of a book already on the live site once it is published', () => {
+    const live = { User: [admin], Book: [book('b1', { isActive: 't' })] };
+    const s = {
+      User: [admin],
+      Book: [book('b1', { smartbookPublishedAt: '2026-11-28 10:00:00', isActive: 't' })],
+      SourceDocument: [{ id: 'd1', ingestedBy: 'u-admin', bookId: 'b1' }],
+      DocumentPage: [{ id: 'p1', documentId: 'd1', pageNumber: '1' }],
+    };
+    const { of } = run(s, live, ledgerOf(live));
+    expect(of('Book', 'b1')?.action).toBe('promote');
+    expect(of('SourceDocument', 'd1')?.action).toBe('promote');
+    expect(of('DocumentPage', 'p1')?.action).toBe('promote');
+  });
+
+  it('does not send up the pages of an archived book, even if it was published', () => {
+    const s = {
+      User: [admin],
+      Book: [book('b1', { smartbookPublishedAt: '2026-11-28 10:00:00', isActive: 'f' })],
+      SourceDocument: [{ id: 'd1', ingestedBy: 'u-admin', bookId: 'b1' }],
+    };
+    const { of } = run(s, { User: [admin] }, ledgerOf({ User: [admin] }));
+    expect(of('SourceDocument', 'd1')?.action).toBe('held');
+  });
+
   it('sends a solution or tag up only with an approved question', () => {
     const s = {
       User: [admin],
